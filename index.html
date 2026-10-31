@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="My Money">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>My Money — Expense Tracker</title>
+<style>
+:root{--bg:#f4f6fa;--panel:#fff;--text:#171b27;--muted:#72798a;--line:#e6e9f0;--accent:#6558e8;--green:#15966a;--red:#dc5362;--soft:#f0efff;--shadow:0 8px 28px #17213a0c}
+[data-theme=dark]{--bg:#10131b;--panel:#191e29;--text:#f2f4fa;--muted:#a0a8b8;--line:#2a3140;--accent:#9a8fff;--green:#50d5a3;--red:#ff7b87;--soft:#292641;--shadow:none}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding-bottom:90px}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(18px);padding:16px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.brand{font-weight:800;font-size:20px;letter-spacing:-.5px}.brand span{color:var(--accent)}.sub{font-size:12px;color:var(--muted);margin-top:3px}
+.iconbtn,.btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;padding:10px 13px;font-weight:650;cursor:pointer}
+main{max-width:760px;margin:auto;padding:18px 16px}.page{display:none}.page.active{display:block}
+h1{font-size:25px;margin:4px 0 5px;letter-spacing:-.7px}h2{font-size:17px;margin:0 0 14px}.muted{color:var(--muted)}.small{font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow);margin-bottom:13px}
+.metric{font-size:24px;font-weight:800;letter-spacing:-.7px;margin-top:8px;overflow-wrap:anywhere}.metric-label{font-size:12px;color:var(--muted)}
+.positive{color:var(--green)}.negative{color:var(--red)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.primary{background:var(--accent);color:white;border:0}.full{width:100%}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:11px;padding:12px;font:inherit;margin-top:6px;min-width:0}
+label{display:block;font-size:12px;color:var(--muted);margin:10px 0 0}textarea{min-height:70px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.formgrid .wide{grid-column:1/-1}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}.item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line);gap:10px}.item:last-child{border:0}
+.pill{font-size:11px;padding:5px 8px;border-radius:20px;background:var(--soft);color:var(--accent);white-space:nowrap}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:8;background:var(--panel);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 3px max(8px,env(safe-area-inset-bottom));overflow-x:auto}
+nav button{border:0;background:none;color:var(--muted);font-size:10px;padding:5px 7px;min-width:55px;cursor:pointer}nav button b{display:block;font-size:19px;margin-bottom:3px;font-weight:500}nav button.active{color:var(--accent);font-weight:800}
+.bar{height:9px;background:var(--line);border-radius:20px;overflow:hidden;margin-top:9px}.bar i{display:block;height:100%;background:var(--accent);border-radius:20px}
+canvas{width:100%;height:190px;display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:600}
+.empty{text-align:center;padding:28px 10px;color:var(--muted)}.danger{color:var(--red)}.hide{display:none!important}
+dialog{border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--text);width:min(94%,520px);max-height:88vh;padding:20px;box-shadow:0 20px 80px #0005}dialog::backdrop{background:#0008}
+@media(min-width:650px){main{padding:26px}.grid.four{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header><div><div class="brand">my<span>money</span></div><div class="sub">Your personal finance space</div></div><button class="iconbtn" id="themeBtn" aria-label="Toggle theme">☼ / ☾</button></header>
+<main>
+<section id="dashboard" class="page active">
+ <div class="row"><div><h1>Overview</h1><div class="muted small" id="todayLabel"></div></div><button class="btn primary" onclick="openTx()">＋ Add</button></div>
+ <div class="grid four" style="margin-top:16px">
+  <div class="card"><div class="metric-label">Income this month</div><div class="metric positive" id="incomeMetric">₹0</div></div>
+  <div class="card"><div class="metric-label">Expenses this month</div><div class="metric negative" id="expenseMetric">₹0</div></div>
+  <div class="card"><div class="metric-label">Net cash flow</div><div class="metric" id="netMetric">₹0</div></div>
+  <div class="card"><div class="metric-label">Monthly budget left</div><div class="metric" id="budgetMetric">—</div></div>
+ </div>
+ <div class="card"><div class="row"><h2>Spending trend</h2><span class="pill">Last 6 months</span></div><canvas id="trendChart" width="650" height="220"></canvas></div>
+ <div class="card"><div class="row"><h2>Top expense categories</h2><span class="small muted">This month</span></div><div id="categoryBreakdown"></div></div>
+ <div class="card"><div class="row"><h2>Recent transactions</h2><button class="btn" onclick="showPage('transactions')">View all</button></div><div id="recentList"></div></div>
+</section>
+
+<section id="transactions" class="page">
+ <div class="row"><div><h1>Transactions</h1><div class="muted small">Income and expenses</div></div><button class="btn primary" onclick="openTx()">＋ Add</button></div>
+ <div class="card" style="margin-top:15px"><div class="formgrid"><div><label>Month</label><input type="month" id="txMonth"></div><div><label>Type</label><select id="txFilter"><option value="all">All transactions</option><option value="expense">Expenses</option><option value="income">Income</option></select></div></div></div>
+ <div class="card"><div id="txList"></div></div>
+</section>
+
+<section id="budget" class="page">
+ <h1>Monthly budget</h1><p class="muted small">Set a total limit and optional category limits.</p>
+ <div class="card"><label>Monthly total budget (₹)</label><input type="number" id="totalBudget" min="0" placeholder="e.g. 30000"><button class="btn primary full" style="margin-top:12px" onclick="saveBudget()">Save total budget</button></div>
+ <div class="card"><h2>Category budgets</h2><div class="formgrid"><div><label>Category</label><select id="budgetCat"></select></div><div><label>Limit (₹)</label><input type="number" id="budgetAmount" min="0" placeholder="5000"></div></div><button class="btn full" style="margin-top:12px" onclick="saveCategoryBudget()">Save category limit</button><div id="budgetList" style="margin-top:12px"></div></div>
+ <div class="card"><h2>This month's usage</h2><div id="budgetUsage"></div></div>
+</section>
+
+<section id="analytics" class="page">
+ <h1>Analytics</h1><p class="muted small">Understand where your money goes.</p>
+ <div class="card"><h2>Monthly income vs expenses</h2><canvas id="analyticsChart" width="650" height="230"></canvas></div>
+ <div class="card"><h2>Category totals</h2><div id="analyticsCategories"></div></div>
+ <div class="card"><h2>Period summary</h2><div id="periodSummary"></div></div>
+</section>
+
+<section id="goals" class="page">
+ <div class="row"><div><h1>Savings goals</h1><div class="muted small">Give your savings a purpose.</div></div><button class="btn primary" onclick="openGoal()">＋ Goal</button></div>
+ <div class="card" style="margin-top:15px" id="goalList"></div>
+</section>
+
+<section id="calendar" class="page">
+ <div class="row"><div><h1>Calendar</h1><div class="muted small">Daily transaction view</div></div><input style="width:auto" type="month" id="calMonth"></div>
+ <div class="card" style="margin-top:15px"><div id="calendarGrid"></div></div><div class="card"><h2 id="selectedDayTitle">Select a date</h2><div id="selectedDayList" class="muted small">Tap a calendar day to view transactions.</div></div>
+</section>
+
+<section id="recurring" class="page">
+ <div class="row"><div><h1>Recurring</h1><div class="muted small">Track regular income and bills.</div></div><button class="btn primary" onclick="openRecurring()">＋ Add</button></div>
+ <div class="card" style="margin-top:15px"><div id="recurringList"></div></div>
+</section>
+
+<section id="debts" class="page">
+ <div class="row"><div><h1>Debt & EMI</h1><div class="muted small">Track outstanding balances and repayments.</div></div><button class="btn primary" onclick="openDebt()">＋ Add</button></div>
+ <div class="card" style="margin-top:15px"><div id="debtSummary"></div></div><div class="card"><div id="debtList"></div></div>
+</section>
+
+<section id="settings" class="page">
+ <h1>Settings & backup</h1><p class="muted small">Your records are stored on this device in this browser.</p>
+ <div class="card"><h2>Currency</h2><select id="currency"><option value="INR">Indian Rupee (₹)</option><option value="USD">US Dollar ($)</option><option value="GBP">British Pound (£)</option><option value="EUR">Euro (€)</option></select><button class="btn primary full" style="margin-top:12px" onclick="saveCurrency()">Save currency</button></div>
+ <div class="card"><h2>Export data</h2><p class="muted small">Download transactions as CSV (opens in Excel) or a full JSON backup.</p><div class="actions"><button class="btn primary" onclick="exportCSV()">Export transactions CSV</button><button class="btn" onclick="exportJSON()">Full backup JSON</button></div></div>
+ <div class="card"><h2>Restore backup</h2><input type="file" id="restoreFile" accept=".json,application/json"><button class="btn full" style="margin-top:10px" onclick="restoreJSON()">Restore from JSON</button></div>
+ <div class="card"><h2>Data management</h2><p class="muted small">Keep a backup before deleting anything. This action permanently clears this app's local records.</p><button class="btn danger full" onclick="clearData()">Delete all app data</button></div>
+ <div class="small muted" style="text-align:center;padding:15px">My Money • Personal use • Offline-first</div>
+</section>
+</main>
+
+<nav>
+<button class="active" data-page="dashboard"><b>⌂</b>Home</button>
+<button data-page="transactions"><b>⇄</b>Activity</button>
+<button data-page="budget"><b>◫</b>Budget</button>
+<button data-page="analytics"><b>▥</b>Insights</button>
+<button data-page="goals"><b>◎</b>Goals</button>
+<button data-page="calendar"><b>▦</b>Calendar</button>
+<button data-page="recurring"><b>↻</b>Recurring</button>
+<button data-page="debts"><b>▤</b>Debt</button>
+<button data-page="settings"><b>⚙</b>More</button>
+</nav>
+
+<dialog id="txDialog"><form method="dialog" id="txForm"><div class="row"><h2 id="txDialogTitle">Add transaction</h2><button class="iconbtn" value="cancel">✕</button></div><input type="hidden" id="txId"><div class="formgrid">
+<div><label>Type</label><select id="txType"><option value="expense">Expense</option><option value="income">Income</option></select></div>
+<div><label>Amount (₹)</label><input type="number" id="txAmount" min="0.01" step="0.01" required></div>
+<div><label>Category</label><select id="txCategory"></select></div><div><label>Date</label><input type="date" id="txDate" required></div>
+<div class="wide"><label>Note / merchant</label><input id="txNote" placeholder="e.g. Grocery shopping"></div>
+</div><div class="actions"><button type="button" class="btn primary full" onclick="saveTx()">Save transaction</button></div></form></dialog>
+
+<dialog id="goalDialog"><form method="dialog"><div class="row"><h2>New savings goal</h2><button class="iconbtn" value="cancel">✕</button></div><label>Goal name</label><input id="goalName" placeholder="Emergency fund" required><div class="formgrid"><div><label>Target amount</label><input type="number" id="goalTarget" min="1"></div><div><label>Already saved</label><input type="number" id="goalSaved" min="0" value="0"></div><div class="wide"><label>Target date (optional)</label><input type="date" id="goalDate"></div></div><button type="button" class="btn primary full" style="margin-top:14px" onclick="saveGoal()">Create goal</button></form></dialog>
+
+<dialog id="recDialog"><form method="dialog"><div class="row"><h2>Recurring transaction</h2><button class="iconbtn" value="cancel">✕</button></div><div class="formgrid"><div><label>Type</label><select id="recType"><option value="expense">Expense</option><option value="income">Income</option></select></div><div><label>Amount</label><input type="number" id="recAmount" min="0.01"></div><div><label>Category</label><select id="recCategory"></select></div><div><label>Frequency</label><select id="recFreq"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="yearly">Yearly</option></select></div><div><label>Start date</label><input type="date" id="recStart"></div><div><label>Note</label><input id="recNote" placeholder="Rent, salary, subscription"></div></div><button type="button" class="btn primary full" style="margin-top:14px" onclick="saveRecurring()">Save recurring item</button></form></dialog>
+
+<dialog id="debtDialog"><form method="dialog"><div class="row"><h2>Add debt / EMI</h2><button class="iconbtn" value="cancel">✕</button></div><label>Loan / debt name</label><input id="debtName" placeholder="Car loan" required><div class="formgrid"><div><label>Original amount</label><input type="number" id="debtOriginal" min="0"></div><div><label>Outstanding balance</label><input type="number" id="debtBalance" min="0"></div><div><label>Monthly EMI</label><input type="number" id="debtEmi" min="0"></div><div><label>Next due date</label><input type="date" id="debtDue"></div></div><button type="button" class="btn primary full" style="margin-top:14px" onclick="saveDebt()">Save debt</button></form></dialog>
+
+<script src="app.js"></script>
+</body></html>
