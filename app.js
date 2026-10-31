@@ -107,6 +107,35 @@ function openTx(t = null) {
   $("txDialog").showModal();
 }
 
+
+function setTxType(type) {
+  $("txType").value = type;
+
+  $("txExpenseBtn").classList.toggle(
+    "primary", type === "expense"
+  );
+
+  $("txIncomeBtn").classList.toggle(
+    "primary", type === "income"
+  );
+}
+
+function openTx(t = null) {
+  $("txForm").reset();
+  $("txId").value = t?.id || "";
+
+  setTxType(t?.type || "expense");
+
+  $("txAmount").value = t?.amount || "";
+  $("txDate").value = t?.date || today();
+  $("txNote").value = t?.note || "";
+
+  $("txDialogTitle").textContent =
+    t ? "Edit transaction" : "Add transaction";
+
+  $("txDialog").showModal();
+}
+
 async function saveTx() {
   let amount = Number($("txAmount").value);
 
@@ -164,52 +193,6 @@ function txHTML(t) {
   </div>`;
 }
 
-async function saveTx() {
-  let amount = Number($("txAmount").value);
-  if (!(amount > 0)) {
-    alert("Enter an amount greater than zero.");
-    return;
-  }
-
-  let id = $("txId").value || crypto.randomUUID();
-  let tx = {
-    id, type: $("txType").value, amount,
-    date: $("txDate").value,
-    category: $("txCategory").value,
-    note: $("txNote").value.trim()
-  };
-
-  if (!tx.date) {
-    alert("Choose a date.");
-    return;
-  }
-
-  let i = state.transactions.findIndex(x => x.id === id);
-  if (i >= 0) state.transactions[i] = tx;
-  else state.transactions.push(tx);
-
-  await persist();
-  $("txDialog").close();
-  render();
-}
-
-function txHTML(t) {
-  return `<div class="item">
-    <div style="min-width:0">
-      <b>${escapeHTML(t.note || t.category)}</b>
-      <div class="small muted">${escapeHTML(t.date)} · ${escapeHTML(t.category)}</div>
-    </div>
-    <div style="text-align:right;white-space:nowrap">
-      <b class="${t.type === "income" ? "positive" : "negative"}">
-        ${t.type === "income" ? "+" : "−"}${money(t.amount)}
-      </b>
-      <div class="small">
-        <button class="btn" onclick="editTx('${t.id}')">Edit</button>
-        <button class="btn danger" onclick="deleteTx('${t.id}')">×</button>
-      </div>
-    </div>
-  </div>`;
-}
 
 function editTx(id) {
   let t = state.transactions.find(x => x.id === id);
