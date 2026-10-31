@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -246,7 +247,6 @@ box-shadow:0 20px 80px #0005
 }
 
 dialog::backdrop {background:#0008}
-
 dialog form {margin:0}
 
 .dialog-actions {
@@ -256,6 +256,18 @@ margin-top:18px
 }
 
 .dialog-actions button {flex:1}
+
+.type-buttons {
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+margin-top:6px
+}
+
+.type-buttons button {
+padding:13px;
+font-size:14px
+}
 
 @media(min-width:650px) {
 main {padding:26px}
@@ -312,7 +324,6 @@ main {padding:26px}
 <canvas id="trendChart" width="650" height="220"></canvas>
 </div>
 
-
 <div class="card">
 <div class="row">
 <h2>Recent transactions</h2>
@@ -332,63 +343,22 @@ main {padding:26px}
 </div>
 
 <div class="card" style="margin-top:15px">
-  <label for="txSearch">Search transactions</label>
-  <input type="search" id="txSearch" placeholder="Merchant, note, category or amount">
+<label for="txSearch">Search transactions</label>
+<input type="search" id="txSearch" placeholder="Search by name, note or amount">
 
-  <div class="formgrid">
-    <div>
-      <label>Date range</label>
-      <select id="txPeriod">
-        <option value="month">This month</option>
-        <option value="today">Today</option>
-        <option value="week">This week</option>
-        <option value="lastmonth">Last month</option>
-        <option value="all">All time</option>
-        <option value="custom">Custom range</option>
-      </select>
-    </div>
-    <div>
-      <label>Type</label>
-      <select id="txFilter">
-        <option value="all">All transactions</option>
-        <option value="expense">Expenses</option>
-        <option value="income">Income</option>
-      </select>
-    </div>
-    <div>
-      <label>Sort by</label>
-      <select id="txSort">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="high">Highest amount</option>
-        <option value="low">Lowest amount</option>
-      </select>
-    </div>
-    <div class="wide" id="txCustomDates" hidden>
-      <div class="formgrid">
-        <div>
-          <label>From date</label>
-          <input type="date" id="txStartDate">
-        </div>
-        <div>
-          <label>To date</label>
-          <input type="date" id="txEndDate">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row" style="margin-top:12px">
-    <span class="small muted" id="txResultCount">Showing transactions</span>
-    <button class="btn" type="button" onclick="clearTxFilters()">Clear filters</button>
-  </div>
+<div class="formgrid">
+<div>
+<label>Date range</label>
+<select id="txPeriod">
+<option value="month">This month</option>
+<option value="today">Today</option>
+<option value="week">This week</option>
+<option value="lastmonth">Last month</option>
+<option value="all">All time</option>
+<option value="custom">Custom range</option>
+</select>
 </div>
 
-<div class="card">
-  <div id="txList"></div>
-</div>
-
-</div>
 <div>
 <label>Type</label>
 <select id="txFilter">
@@ -397,6 +367,34 @@ main {padding:26px}
 <option value="income">Income</option>
 </select>
 </div>
+
+<div>
+<label>Sort by</label>
+<select id="txSort">
+<option value="newest">Newest first</option>
+<option value="oldest">Oldest first</option>
+<option value="high">Highest amount</option>
+<option value="low">Lowest amount</option>
+</select>
+</div>
+
+<div class="wide" id="txCustomDates" hidden>
+<div class="formgrid">
+<div>
+<label>From date</label>
+<input type="date" id="txStartDate">
+</div>
+<div>
+<label>To date</label>
+<input type="date" id="txEndDate">
+</div>
+</div>
+</div>
+</div>
+
+<div class="row" style="margin-top:12px">
+<span class="small muted" id="txResultCount">Showing transactions</span>
+<button class="btn" type="button" onclick="clearTxFilters()">Clear filters</button>
 </div>
 </div>
 
@@ -407,14 +405,13 @@ main {padding:26px}
 
 <section id="budget" class="page">
 <h1>Monthly budget</h1>
-<p class="muted small">Set a total limit and optional category limits.</p>
+<p class="muted small">Set your total monthly spending limit.</p>
 
 <div class="card">
 <label>Monthly total budget (₹)</label>
 <input type="number" id="totalBudget" min="0" placeholder="e.g. 30000">
 <button class="btn primary full" style="margin-top:12px" onclick="saveBudget()">Save total budget</button>
 </div>
-
 
 <div class="card">
 <h2>This month's usage</h2>
@@ -427,45 +424,40 @@ main {padding:26px}
 <p class="muted small">Understand your income, expenses and savings.</p>
 
 <div class="grid four" style="margin-top:16px">
-  <div class="card">
-    <div class="metric-label">Monthly income</div>
-    <div class="metric positive" id="insightIncome">₹0</div>
-  </div>
-  <div class="card">
-    <div class="metric-label">Monthly expenses</div>
-    <div class="metric negative" id="insightExpense">₹0</div>
-  </div>
-  <div class="card">
-    <div class="metric-label">Daily average spending</div>
-    <div class="metric" id="insightDaily">₹0</div>
-  </div>
-  <div class="card">
-    <div class="metric-label">Savings rate</div>
-    <div class="metric" id="insightSavings">0%</div>
-  </div>
+<div class="card">
+<div class="metric-label">Monthly income</div>
+<div class="metric positive" id="insightIncome">₹0</div>
+</div>
+<div class="card">
+<div class="metric-label">Monthly expenses</div>
+<div class="metric negative" id="insightExpense">₹0</div>
+</div>
+<div class="card">
+<div class="metric-label">Daily average spending</div>
+<div class="metric" id="insightDaily">₹0</div>
+</div>
+<div class="card">
+<div class="metric-label">Savings rate</div>
+<div class="metric" id="insightSavings">0%</div>
+</div>
 </div>
 
 <div class="card">
-  <div class="row">
-    <h2>Income vs expenses</h2>
-    <span class="pill">Last 6 months</span>
-  </div>
-  <canvas id="analyticsChart" width="650" height="260"></canvas>
+<div class="row">
+<h2>Income vs expenses</h2>
+<span class="pill">Last 6 months</span>
+</div>
+<canvas id="analyticsChart" width="650" height="260"></canvas>
 </div>
 
 <div class="card">
-  <h2>Month-over-month expenses</h2>
-  <div id="monthComparison"></div>
+<h2>Month-over-month expenses</h2>
+<div id="monthComparison"></div>
 </div>
 
 <div class="card">
-  <h2>Top 5 expense categories</h2>
-  <div id="analyticsCategories"></div>
-</div>
-
-<div class="card">
-  <h2>Period summary</h2>
-  <div id="periodSummary"></div>
+<h2>Period summary</h2>
+<div id="periodSummary"></div>
 </div>
 </section>
 
@@ -583,9 +575,22 @@ My Money • Personal use • Offline-first
 
 <!-- ADD / EDIT TRANSACTION -->
 
+<dialog id="txDialog">
+<form id="txForm" method="dialog">
+
+<div class="row">
+<h2 id="txDialogTitle">Add transaction</h2>
+<button type="button" class="iconbtn"
+onclick="this.closest('dialog').close()">✕</button>
+</div>
+
+<input type="hidden" id="txId">
+
+<div class="formgrid">
+
 <div class="wide">
 <label>Transaction type</label>
-<div class="formgrid">
+<div class="type-buttons">
 <button type="button" class="btn primary"
 id="txExpenseBtn" onclick="setTxType('expense')">
 Expense
@@ -600,6 +605,33 @@ Income
 <option value="income">Income</option>
 </select>
 </div>
+
+<div>
+<label>Amount</label>
+<input type="number" id="txAmount" min="0.01" step="0.01" required>
+</div>
+
+<div>
+<label>Date</label>
+<input type="date" id="txDate" required>
+</div>
+
+<div class="wide">
+<label>Note / Transaction name</label>
+<input id="txNote" placeholder="e.g. Groceries, salary, electricity bill">
+</div>
+
+</div>
+
+<div class="dialog-actions">
+<button type="button" class="btn"
+onclick="this.closest('dialog').close()">Cancel</button>
+<button type="button" class="btn primary"
+onclick="saveTx()">Save transaction</button>
+</div>
+
+</form>
+</dialog>
 
 <!-- SAVINGS GOAL -->
 
@@ -656,9 +688,20 @@ onclick="this.closest('dialog').close()">✕</button>
 <input type="hidden" id="recId">
 
 <div class="formgrid">
-<div>
-<label>Type</label>
-<select id="recType">
+
+<div class="wide">
+<label>Transaction type</label>
+<div class="type-buttons">
+<button type="button" class="btn primary"
+id="recExpenseBtn" onclick="setRecurringType('expense')">
+Expense
+</button>
+<button type="button" class="btn"
+id="recIncomeBtn" onclick="setRecurringType('income')">
+Income
+</button>
+</div>
+<select id="recType" hidden>
 <option value="expense">Expense</option>
 <option value="income">Income</option>
 </select>
@@ -667,11 +710,6 @@ onclick="this.closest('dialog').close()">✕</button>
 <div>
 <label>Amount</label>
 <input type="number" id="recAmount" min="0.01" step="0.01" required>
-</div>
-
-<div>
-<label>Category</label>
-<select id="recCategory"></select>
 </div>
 
 <div>
@@ -690,9 +728,10 @@ onclick="this.closest('dialog').close()">✕</button>
 </div>
 
 <div>
-<label>Note</label>
+<label>Note / Transaction name</label>
 <input id="recNote" placeholder="Rent, salary, subscription">
 </div>
+
 </div>
 
 <div class="dialog-actions">
