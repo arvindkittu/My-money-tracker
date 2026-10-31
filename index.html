@@ -520,8 +520,24 @@ main {padding:26px}
 
 <section id="settings" class="page">
 <h1>Settings & backup</h1>
-<p class="muted small">Your records are stored on this device in this browser.</p>
+<p class="muted small">Your records are stored on this device and can be synchronized to your cloud account.</p>
 
+<div class="card">
+<h2>Cloud account</h2>
+<p class="muted small" id="cloudStatus">Checking cloud connection...</p>
+
+<label>Email address</label>
+<input type="email" id="cloudEmail" placeholder="Enter your email">
+
+<label>Password</label>
+<input type="password" id="cloudPassword" placeholder="Enter your password">
+
+<div class="actions">
+<button class="btn primary" onclick="signInCloud()">Sign in</button>
+<button class="btn" onclick="signUpCloud()">Create account</button>
+<button class="btn danger" onclick="signOutCloud()">Sign out</button>
+</div>
+</div>
 <div class="card">
 <h2>Currency</h2>
 <select id="currency">
