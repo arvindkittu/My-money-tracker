@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 
 const SUPABASE_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
-const SUPABASE_KEY = "sb_publishable_opOShOCyJhaUPAn0wUiVmg_VfJDanMo";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcXd6aGZrdnlrdmRrZHVydGRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDk4MjcsImV4cCI6MjEwOTAyNTgyN30.PHhMIjvOHIAokPdoede5ZVfglaUC0QxOGu6spw_4cXU";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
