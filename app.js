@@ -1,0 +1,714 @@
+const $ = id => document.getElementById(id);
+
+const CATS = {
+  expense: ["Food & Dining","Groceries","Transport","Shopping","Bills & Utilities","Housing","Health","Entertainment","Travel","Education","Personal Care","EMI / Loan","Other"],
+  income: ["Salary","Business","Investment","Gift","Other"]
+};
+
+const DBNAME = "myMoneyDB", STORE = "state";
+let db;
+let state = {
+  transactions: [], budget: 0, categoryBudgets: {},
+  goals: [], recurring: [], debts: [],
+  currency: "INR", theme: "dark", recurringRuns: {}
+};
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    let r = indexedDB.open(DBNAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => { db = r.result; resolve(); };
+    r.onerror = () => reject(r.error);
+  });
+}
+
+function load() {
+  return new Promise(resolve => {
+    let r = db.transaction(STORE).objectStore(STORE).get("app");
+    r.onsuccess = () => {
+      if (r.result) state = { ...state, ...r.result };
+      resolve();
+    };
+    r.onerror = () => resolve();
+  });
+}
+
+function persist() {
+  return new Promise(resolve => {
+    let t = db.transaction(STORE, "readwrite");
+    t.objectStore(STORE).put(state, "app");
+    t.oncomplete = resolve;
+    t.onerror = () => resolve();
+  });
+}
+
+const today = () => new Date().toLocaleDateString("en-CA");
+const month = () => today().slice(0, 7);
+const money = n => new Intl.NumberFormat("en-IN", {
+  style: "currency", currency: state.currency,
+  maximumFractionDigits: 0
+}).format(Number(n) || 0);
+const sum = (a, fn) => a.reduce((s, x) => s + fn(x), 0);
+const monthTx = (m = month()) =>
+  state.transactions.filter(t => t.date.startsWith(m));
+
+function escapeHTML(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;", "<":"&lt;", ">":"&gt;",
+    '"':"&quot;", "'":"&#39;"
+  }[c]));
+}
+
+function cats(sel) {
+  sel.innerHTML = [...CATS.expense, ...CATS.income]
+    .map(c => `<option>${c}</option>`).join("");
+}
+
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(p =>
+    p.classList.toggle("active", p.id === id));
+  document.querySelectorAll("nav button").forEach(b =>
+    b.classList.toggle("active", b.dataset.page === id));
+  render();
+  window.scrollTo(0, 0);
+}
+
+document.querySelectorAll("nav button").forEach(b =>
+  b.onclick = () => showPage(b.dataset.page));
+
+function setTheme() {
+  document.documentElement.dataset.theme = state.theme;
+  $("themeBtn").textContent =
+    state.theme === "dark" ? "☀ Light" : "☾ Dark";
+}
+
+$("themeBtn").onclick = async () => {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  setTheme();
+  await persist();
+  renderCharts();
+};
+
+function openTx(t = null) {
+  $("txForm").reset();
+  $("txId").value = t?.id || "";
+  $("txType").value = t?.type || "expense";
+  $("txAmount").value = t?.amount || "";
+  $("txDate").value = t?.date || today();
+  $("txNote").value = t?.note || "";
+  fillTxCats();
+  $("txCategory").value = t?.category || CATS.expense[0];
+  $("txDialogTitle").textContent =
+    t ? "Edit transaction" : "Add transaction";
+  $("txDialog").showModal();
+}
+
+function fillTxCats() {
+  $("txCategory").innerHTML = CATS[$("txType").value]
+    .map(c => `<option>${c}</option>`).join("");
+}
+
+$("txType").onchange = fillTxCats;
+
+async function saveTx() {
+  let amount = Number($("txAmount").value);
+  if (!(amount > 0)) {
+    alert("Enter an amount greater than zero.");
+    return;
+  }
+
+  let id = $("txId").value || crypto.randomUUID();
+  let tx = {
+    id, type: $("txType").value, amount,
+    date: $("txDate").value,
+    category: $("txCategory").value,
+    note: $("txNote").value.trim()
+  };
+
+  if (!tx.date) {
+    alert("Choose a date.");
+    return;
+  }
+
+  let i = state.transactions.findIndex(x => x.id === id);
+  if (i >= 0) state.transactions[i] = tx;
+  else state.transactions.push(tx);
+
+  await persist();
+  $("txDialog").close();
+  render();
+}
+
+function txHTML(t) {
+  return `<div class="item">
+    <div style="min-width:0">
+      <b>${escapeHTML(t.note || t.category)}</b>
+      <div class="small muted">${escapeHTML(t.date)} · ${escapeHTML(t.category)}</div>
+    </div>
+    <div style="text-align:right;white-space:nowrap">
+      <b class="${t.type === "income" ? "positive" : "negative"}">
+        ${t.type === "income" ? "+" : "−"}${money(t.amount)}
+      </b>
+      <div class="small">
+        <button class="btn" onclick="editTx('${t.id}')">Edit</button>
+        <button class="btn danger" onclick="deleteTx('${t.id}')">×</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function editTx(id) {
+  let t = state.transactions.find(x => x.id === id);
+  if (t) openTx(t);
+}
+
+async function deleteTx(id) {
+  if (confirm("Delete this transaction?")) {
+    state.transactions = state.transactions.filter(t => t.id !== id);
+    await persist();
+    render();
+  }
+}
+
+function renderDashboard() {
+  let a = monthTx();
+  let inc = sum(a.filter(t => t.type === "income"), t => t.amount);
+  let exp = sum(a.filter(t => t.type === "expense"), t => t.amount);
+
+  $("todayLabel").textContent = new Date().toLocaleDateString(
+    undefined, { weekday:"long", day:"numeric", month:"long", year:"numeric" }
+  );
+  $("incomeMetric").textContent = money(inc);
+  $("expenseMetric").textContent = money(exp);
+  $("netMetric").textContent = money(inc - exp);
+  $("budgetMetric").textContent =
+    state.budget ? money(state.budget - exp) : "—";
+  $("budgetMetric").className =
+    "metric " + (state.budget - exp < 0 ? "negative" : "");
+
+  let categories = {};
+  a.filter(t => t.type === "expense").forEach(t =>
+    categories[t.category] = (categories[t.category] || 0) + t.amount
+  );
+
+  let sorted = Object.entries(categories)
+    .sort((x, y) => y[1] - x[1]).slice(0, 5);
+
+  $("categoryBreakdown").innerHTML = sorted.length
+    ? sorted.map(([c, v]) => `
+      <div style="margin:12px 0">
+        <div class="row"><span>${escapeHTML(c)}</span><b>${money(v)}</b></div>
+        <div class="bar"><i style="width:${Math.max(2,
+          v / Math.max(...sorted.map(x => x[1])) * 100)}%"></i></div>
+      </div>`).join("")
+    : '<div class="empty">No expenses this month yet.</div>';
+
+  let recent = [...state.transactions]
+    .sort((x, y) => y.date.localeCompare(x.date)).slice(0, 5);
+
+  $("recentList").innerHTML = recent.length
+    ? recent.map(txHTML).join("")
+    : '<div class="empty">Add your first transaction to get started.</div>';
+
+  drawTrend("trendChart", 6);
+}
+
+function renderTransactions() {
+  let m = $("txMonth").value || month();
+  let f = $("txFilter").value;
+
+  let list = state.transactions.filter(t =>
+    t.date.startsWith(m) && (f === "all" || t.type === f)
+  ).sort((a, b) => b.date.localeCompare(a.date));
+
+  $("txList").innerHTML = list.length
+    ? list.map(txHTML).join("")
+    : '<div class="empty">No matching transactions.</div>';
+}
+
+$("txMonth").value = month();
+$("txMonth").onchange = renderTransactions;
+$("txFilter").onchange = renderTransactions;
+
+function saveBudget() {
+  state.budget = Math.max(0, Number($("totalBudget").value) || 0);
+  persist().then(render);
+}
+
+function saveCategoryBudget() {
+  let c = $("budgetCat").value;
+  let v = Number($("budgetAmount").value);
+  if (!(v > 0)) {
+    alert("Enter a valid limit.");
+    return;
+  }
+  state.categoryBudgets[c] = v;
+  persist().then(render);
+}
+
+function renderBudget() {
+  $("totalBudget").value = state.budget || "";
+  $("budgetCat").innerHTML = CATS.expense
+    .map(c => `<option>${c}</option>`).join("");
+
+  let used = {};
+  monthTx().filter(t => t.type === "expense").forEach(t =>
+    used[t.category] = (used[t.category] || 0) + t.amount
+  );
+
+  $("budgetList").innerHTML =
+    Object.entries(state.categoryBudgets).map(([c, v]) => `
+      <div class="item">
+        <span>${escapeHTML(c)} · ${money(v)}</span>
+        <button class="btn danger" onclick="removeCatBudget('${escapeHTML(c)}')">Remove</button>
+      </div>`).join("") ||
+    '<div class="muted small">No category limits yet.</div>';
+
+  let spent = sum(monthTx().filter(t => t.type === "expense"), t => t.amount);
+
+  $("budgetUsage").innerHTML = state.budget
+    ? `<div class="row"><b>${money(spent)} spent</b><b>${money(state.budget)} budget</b></div>
+       <div class="bar"><i style="width:${Math.min(100, spent / state.budget * 100)}%"></i></div>`
+    : '<div class="muted small">Set a monthly budget to see usage.</div>';
+
+  Object.entries(state.categoryBudgets).forEach(([c, v]) => {
+    $("budgetUsage").innerHTML += `
+      <div style="margin-top:12px">
+        <div class="row"><span>${escapeHTML(c)}</span>
+        <span>${money(used[c] || 0)} / ${money(v)}</span></div>
+        <div class="bar"><i style="width:${Math.min(100,
+          (used[c] || 0) / v * 100)}%"></i></div>
+      </div>`;
+  });
+}
+
+function removeCatBudget(c) {
+  delete state.categoryBudgets[c];
+  persist().then(render);
+}
+
+function drawTrend(id, n) {
+  let cv = $(id), ctx = cv.getContext("2d");
+  let w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  let labels = [], vals = [];
+  for (let i = n - 1; i >= 0; i--) {
+    let d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    let m = d.toLocaleDateString("en-CA").slice(0, 7);
+    labels.push(d.toLocaleDateString(undefined, { month:"short" }));
+    vals.push(sum(monthTx(m).filter(t => t.type === "expense"), t => t.amount));
+  }
+
+  let max = Math.max(1, ...vals), pad = 30;
+  ctx.fillStyle = getComputedStyle(document.body)
+    .getPropertyValue("--muted");
+  ctx.font = "12px sans-serif";
+
+  for (let i = 0; i < n; i++) {
+    let x = pad + i * (w - 2 * pad) / n + 12;
+    let bh = (h - 55) * vals[i] / max;
+    ctx.fillStyle = getComputedStyle(document.body)
+      .getPropertyValue("--accent");
+    ctx.fillRect(x, h - 30 - bh, Math.max(14, (w - 2 * pad) / n - 18), bh);
+    ctx.fillStyle = getComputedStyle(document.body)
+      .getPropertyValue("--muted");
+    ctx.fillText(labels[i], x, h - 10);
+  }
+}
+
+function renderCharts() {
+  drawTrend("trendChart", 6);
+  drawTrend("analyticsChart", 6);
+}
+
+function renderAnalytics() {
+  drawTrend("analyticsChart", 6);
+  let a = monthTx().filter(t => t.type === "expense"), g = {};
+  a.forEach(t => g[t.category] = (g[t.category] || 0) + t.amount);
+
+  let entries = Object.entries(g).sort((x, y) => y[1] - x[1]);
+  $("analyticsCategories").innerHTML = entries.length
+    ? entries.map(([c, v]) => `
+      <div class="item"><span>${escapeHTML(c)}</span><b>${money(v)}</b></div>`
+    ).join("")
+    : '<div class="empty">No data yet.</div>';
+
+  let inc = sum(monthTx().filter(t => t.type === "income"), t => t.amount);
+  let exp = sum(a, t => t.amount);
+
+  $("periodSummary").innerHTML = `
+    <div class="item"><span>Income</span><b class="positive">${money(inc)}</b></div>
+    <div class="item"><span>Expenses</span><b class="negative">${money(exp)}</b></div>
+    <div class="item"><span>Net</span><b>${money(inc - exp)}</b></div>
+    <div class="item"><span>Transactions</span><b>${monthTx().length}</b></div>`;
+}
+
+function openGoal() {
+  $("goalName").value = "";
+  $("goalTarget").value = "";
+  $("goalSaved").value = "0";
+  $("goalDate").value = "";
+  $("goalDialog").showModal();
+}
+
+async function saveGoal() {
+  let name = $("goalName").value.trim();
+  let target = Number($("goalTarget").value);
+  if (!name || !(target > 0)) {
+    alert("Enter a goal name and target amount.");
+    return;
+  }
+  state.goals.push({
+    id: crypto.randomUUID(), name, target,
+    saved: Number($("goalSaved").value) || 0,
+    date: $("goalDate").value
+  });
+  await persist();
+  $("goalDialog").close();
+  render();
+}
+
+function renderGoals() {
+  $("goalList").innerHTML = state.goals.length
+    ? state.goals.map(g => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--line)">
+        <div class="row"><b>${escapeHTML(g.name)}</b>
+          <span class="pill">${Math.min(100, Math.round(g.saved / g.target * 100))}%</span>
+        </div>
+        <div class="row small muted" style="margin-top:8px">
+          <span>${money(g.saved)} saved</span><span>Target ${money(g.target)}</span>
+        </div>
+        <div class="bar"><i style="width:${Math.min(100, g.saved / g.target * 100)}%"></i></div>
+        <div class="actions">
+          <button class="btn" onclick="addGoalMoney('${g.id}')">＋ Add savings</button>
+          <button class="btn danger" onclick="deleteGoal('${g.id}')">Delete</button>
+        </div>
+      </div>`).join("")
+    : '<div class="empty">Create your first savings goal.</div>';
+}
+
+async function addGoalMoney(id) {
+  let g = state.goals.find(x => x.id === id);
+  let v = Number(prompt("How much did you save?", "1000"));
+  if (g && v > 0) {
+    g.saved += v;
+    await persist();
+    render();
+  }
+}
+
+async function deleteGoal(id) {
+  if (confirm("Delete this goal?")) {
+    state.goals = state.goals.filter(g => g.id !== id);
+    await persist();
+    render();
+  }
+}
+
+function renderCalendar() {
+  let m = $("calMonth").value || month();
+  let [y, mo] = m.split("-").map(Number);
+  let first = new Date(y, mo - 1, 1);
+  let days = new Date(y, mo, 0).getDate();
+  let offset = (first.getDay() + 6) % 7;
+
+  let html = "<div style='display:grid;grid-template-columns:repeat(7,1fr);text-align:center;gap:5px'>" +
+    ["M","T","W","T","F","S","S"].map(x =>
+      `<b class="muted small">${x}</b>`).join("");
+
+  for (let i = 0; i < offset; i++) html += "<span></span>";
+
+  for (let d = 1; d <= days; d++) {
+    let date = `${m}-${String(d).padStart(2, "0")}`;
+    let count = state.transactions.filter(t => t.date === date).length;
+    html += `<button class="btn" style="padding:10px 0"
+      onclick="selectDay('${date}')">${d}
+      ${count ? `<span style="display:block;color:var(--accent);font-size:9px">● ${count}</span>` : ""}
+    </button>`;
+  }
+
+  $("calendarGrid").innerHTML = html + "</div>";
+}
+
+function selectDay(date) {
+  $("selectedDayTitle").textContent = date;
+  let list = state.transactions.filter(t => t.date === date);
+  $("selectedDayList").innerHTML = list.length
+    ? list.map(txHTML).join("")
+    : "No transactions on this date.";
+}
+
+$("calMonth").value = month();
+$("calMonth").onchange = renderCalendar;
+
+function openRecurring() {
+  ["recAmount", "recNote"].forEach(id => $(id).value = "");
+  $("recStart").value = today();
+  $("recCategory").innerHTML = [...CATS.expense, ...CATS.income]
+    .map(c => `<option>${c}</option>`).join("");
+  $("recDialog").showModal();
+}
+
+async function saveRecurring() {
+  let amount = Number($("recAmount").value);
+  if (!(amount > 0) || !$("recStart").value) {
+    alert("Enter a valid amount and start date.");
+    return;
+  }
+
+  state.recurring.push({
+    id: crypto.randomUUID(),
+    type: $("recType").value,
+    amount,
+    category: $("recCategory").value,
+    frequency: $("recFreq").value,
+    start: $("recStart").value,
+    note: $("recNote").value,
+    active: true
+  });
+
+  await persist();
+  $("recDialog").close();
+  await processRecurring();
+  render();
+}
+
+async function processRecurring() {
+  let changed = false;
+
+  for (let r of state.recurring) {
+    if (!r.active) continue;
+
+    let last = state.recurringRuns[r.id] || "";
+    let due = new Date(r.start + "T12:00:00");
+    let now = new Date(today() + "T12:00:00");
+    let guard = 0;
+
+    while (due <= now && guard++ < 500) {
+      let ds = due.toLocaleDateString("en-CA");
+      if (ds > last && !state.transactions.some(t =>
+        t.recurringId === r.id && t.date === ds)) {
+        state.transactions.push({
+          id: crypto.randomUUID(), type: r.type,
+          amount: r.amount, category: r.category,
+          note: r.note || "Recurring", date: ds,
+          recurringId: r.id
+        });
+        state.recurringRuns[r.id] = ds;
+        changed = true;
+      }
+
+      if (r.frequency === "weekly") due.setDate(due.getDate() + 7);
+      else if (r.frequency === "yearly") due.setFullYear(due.getFullYear() + 1);
+      else due.setMonth(due.getMonth() + 1);
+    }
+  }
+
+  if (changed) await persist();
+}
+
+function renderRecurring() {
+  $("recurringList").innerHTML = state.recurring.length
+    ? state.recurring.map(r => `
+      <div class="item">
+        <div><b>${escapeHTML(r.note || r.category)}</b>
+          <div class="small muted">${r.frequency} · ${r.type} · ${money(r.amount)}</div>
+        </div>
+        <div>
+          <button class="btn" onclick="toggleRecurring('${r.id}')">${r.active ? "Pause" : "Resume"}</button>
+          <button class="btn danger" onclick="removeRecurring('${r.id}')">×</button>
+        </div>
+      </div>`).join("")
+    : '<div class="empty">No recurring items yet.</div>';
+}
+
+async function toggleRecurring(id) {
+  let r = state.recurring.find(x => x.id === id);
+  r.active = !r.active;
+  await persist();
+  render();
+}
+
+async function removeRecurring(id) {
+  if (confirm("Remove this recurring item?")) {
+    state.recurring = state.recurring.filter(x => x.id !== id);
+    await persist();
+    render();
+  }
+}
+
+function openDebt() {
+  $("debtName").value = "";
+  ["debtOriginal", "debtBalance", "debtEmi"].forEach(id => $(id).value = "");
+  $("debtDue").value = "";
+  $("debtDialog").showModal();
+}
+
+async function saveDebt() {
+  let name = $("debtName").value.trim();
+  let original = Number($("debtOriginal").value);
+  let balance = Number($("debtBalance").value);
+
+  if (!name || !(original > 0) || balance < 0) {
+    alert("Enter a name, original amount and valid balance.");
+    return;
+  }
+
+  state.debts.push({
+    id: crypto.randomUUID(), name, original, balance,
+    emi: Number($("debtEmi").value) || 0,
+    due: $("debtDue").value
+  });
+
+  await persist();
+  $("debtDialog").close();
+  render();
+}
+
+function renderDebts() {
+  let total = sum(state.debts, d => d.balance);
+  $("debtSummary").innerHTML = `
+    <div class="metric">${money(total)}</div>
+    <div class="muted small">Total outstanding balance · ${state.debts.length} account(s)</div>`;
+
+  $("debtList").innerHTML = state.debts.length
+    ? state.debts.map(d => `
+      <div class="item">
+        <div><b>${escapeHTML(d.name)}</b>
+          <div class="small muted">Outstanding ${money(d.balance)} · EMI ${money(d.emi)}
+          ${d.due ? " · Due " + d.due : ""}</div>
+        </div>
+        <div>
+          <button class="btn" onclick="payDebt('${d.id}')">Record payment</button>
+          <button class="btn danger" onclick="removeDebt('${d.id}')">×</button>
+        </div>
+      </div>`).join("")
+    : '<div class="empty">No debts or EMIs added.</div>';
+}
+
+async function payDebt(id) {
+  let d = state.debts.find(x => x.id === id);
+  let v = Number(prompt("Payment amount", String(d.emi || 0)));
+
+  if (d && v > 0) {
+    d.balance = Math.max(0, d.balance - v);
+    state.transactions.push({
+      id: crypto.randomUUID(), type: "expense",
+      amount: v, date: today(), category: "EMI / Loan",
+      note: "Debt payment: " + d.name
+    });
+    await persist();
+    render();
+  }
+}
+
+async function removeDebt(id) {
+  if (confirm("Remove this debt record?")) {
+    state.debts = state.debts.filter(d => d.id !== id);
+    await persist();
+    render();
+  }
+}
+
+function saveCurrency() {
+  state.currency = $("currency").value;
+  persist().then(render);
+}
+
+function download(name, content, type) {
+  let a = document.createElement("a");
+  let url = URL.createObjectURL(new Blob([content], { type }));
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportCSV() {
+  let rows = [
+    ["Date","Type","Amount","Currency","Category","Note"],
+    ...state.transactions.map(t => [
+      t.date, t.type, t.amount, state.currency, t.category, t.note || ""
+    ])
+  ];
+
+  let csv = rows.map(r =>
+    r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(",")
+  ).join("\r\n");
+
+  download("my-money-transactions.csv", "\uFEFF" + csv, "text/csv;charset=utf-8");
+}
+
+function exportJSON() {
+  download("my-money-backup-" + today() + ".json",
+    JSON.stringify({ ...state, backupCreated: new Date().toISOString() }, null, 2),
+    "application/json");
+}
+
+async function restoreJSON() {
+  let f = $("restoreFile").files[0];
+  if (!f) {
+    alert("Choose a JSON backup file.");
+    return;
+  }
+
+  try {
+    let data = JSON.parse(await f.text());
+    if (!Array.isArray(data.transactions)) throw Error();
+
+    if (!confirm("Restore will replace the current app data. Continue?")) return;
+
+    state = { ...state, ...data };
+    delete state.backupCreated;
+    await persist();
+    setTheme();
+    render();
+    alert("Backup restored.");
+  } catch (e) {
+    alert("This file does not look like a valid My Money backup.");
+  }
+}
+
+async function clearData() {
+  if (confirm("Permanently delete all app records? Export a backup first.")) {
+    state = {
+      transactions: [], budget: 0, categoryBudgets: {},
+      goals: [], recurring: [], debts: [],
+      currency: "INR", theme: state.theme, recurringRuns: {}
+    };
+    await persist();
+    render();
+  }
+}
+
+function render() {
+  renderDashboard();
+  renderTransactions();
+  renderBudget();
+  renderAnalytics();
+  renderGoals();
+  renderCalendar();
+  renderRecurring();
+  renderDebts();
+  $("currency").value = state.currency;
+}
+
+async function init() {
+  await openDB();
+  await load();
+  cats($("txCategory"));
+  setTheme();
+  $("currency").value = state.currency;
+  await processRecurring();
+  render();
+
+  if ("serviceWorker" in navigator &&
+      location.protocol.startsWith("http")) {
+    navigator.serviceWorker.register("./sw.js").catch(console.error);
+  }
+}
+
+init();
