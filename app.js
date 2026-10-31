@@ -1,5 +1,15 @@
 const $ = id => document.getElementById(id);
 
+const SUPABASE_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Kl9qvEjDh5QxlD7X_N2M_A_CjBD9D5I";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+let cloudUser = null;
+
 const DBNAME = "myMoneyDB", STORE = "state";
 let db;
 let state = {
@@ -1104,13 +1114,104 @@ function render() {
   $("currency").value = state.currency;
 }
 
+async function updateCloudStatus(message) {
+  $("cloudStatus").textContent = message;
+}
+
+async function initCloudAuth() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    updateCloudStatus("Unable to check cloud account: " + error.message);
+    return;
+  }
+
+  cloudUser = data.session?.user || null;
+
+  updateCloudStatus(
+    cloudUser
+      ? "Signed in as " + cloudUser.email
+      : "Not signed in. Sign in or create an account."
+  );
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    cloudUser = session?.user || null;
+
+    updateCloudStatus(
+      cloudUser
+        ? "Signed in as " + cloudUser.email
+        : "Not signed in. Sign in or create an account."
+    );
+  });
+}
+
+async function signUpCloud() {
+  const email = $("cloudEmail").value.trim();
+  const password = $("cloudPassword").value;
+
+  if (!email || password.length < 6) {
+    alert("Enter a valid email and a password with at least 6 characters.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signUp({
+    email,
+    password
+  });
+
+  if (error) {
+    alert("Account creation failed: " + error.message);
+    return;
+  }
+
+  if (data.session) {
+    alert("Account created and signed in successfully.");
+  } else {
+    alert("Account created. Please check your email for the confirmation link.");
+  }
+}
+
+async function signInCloud() {
+  const email = $("cloudEmail").value.trim();
+  const password = $("cloudPassword").value;
+
+  if (!email || !password) {
+    alert("Enter your email and password.");
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    alert("Sign-in failed: " + error.message);
+    return;
+  }
+
+  alert("Signed in successfully.");
+}
+
+async function signOutCloud() {
+  const { error } = await supabaseClient.auth.signOut();
+
+  if (error) {
+    alert("Sign-out failed: " + error.message);
+    return;
+  }
+
+  alert("Signed out successfully.");
+}
+
 async function init() {
   await openDB();
   await load();
   setTheme();
   $("currency").value = state.currency;
-  await processRecurring();
+    await processRecurring();
   render();
+  await initCloudAuth();
 
   if ("serviceWorker" in navigator &&
       location.protocol.startsWith("http")) {
