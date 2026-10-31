@@ -312,13 +312,6 @@ main {padding:26px}
 <canvas id="trendChart" width="650" height="220"></canvas>
 </div>
 
-<div class="card">
-<div class="row">
-<h2>Top expense categories</h2>
-<span class="small muted">This month</span>
-</div>
-<div id="categoryBreakdown"></div>
-</div>
 
 <div class="card">
 <div class="row">
@@ -360,12 +353,6 @@ main {padding:26px}
         <option value="all">All transactions</option>
         <option value="expense">Expenses</option>
         <option value="income">Income</option>
-      </select>
-    </div>
-    <div>
-      <label>Category</label>
-      <select id="txCategoryFilter">
-        <option value="all">All categories</option>
       </select>
     </div>
     <div>
@@ -428,21 +415,6 @@ main {padding:26px}
 <button class="btn primary full" style="margin-top:12px" onclick="saveBudget()">Save total budget</button>
 </div>
 
-<div class="card">
-<h2>Category budgets</h2>
-<div class="formgrid">
-<div>
-<label>Category</label>
-<select id="budgetCat"></select>
-</div>
-<div>
-<label>Limit (₹)</label>
-<input type="number" id="budgetAmount" min="0" placeholder="5000">
-</div>
-</div>
-<button class="btn full" style="margin-top:12px" onclick="saveCategoryBudget()">Save category limit</button>
-<div id="budgetList" style="margin-top:12px"></div>
-</div>
 
 <div class="card">
 <h2>This month's usage</h2>
@@ -611,57 +583,23 @@ My Money • Personal use • Offline-first
 
 <!-- ADD / EDIT TRANSACTION -->
 
-<dialog id="txDialog">
-<form method="dialog" id="txForm">
-
-<div class="row">
-<h2 id="txDialogTitle">Add transaction</h2>
-<button type="button" class="iconbtn"
-onclick="document.getElementById('txDialog').close()">✕</button>
-</div>
-
-<input type="hidden" id="txId">
-
+<div class="wide">
+<label>Transaction type</label>
 <div class="formgrid">
-<div>
-<label>Type</label>
-<select id="txType">
+<button type="button" class="btn primary"
+id="txExpenseBtn" onclick="setTxType('expense')">
+Expense
+</button>
+<button type="button" class="btn"
+id="txIncomeBtn" onclick="setTxType('income')">
+Income
+</button>
+</div>
+<select id="txType" hidden>
 <option value="expense">Expense</option>
 <option value="income">Income</option>
 </select>
 </div>
-
-<div>
-<label>Amount (₹)</label>
-<input type="number" id="txAmount" min="0.01" step="0.01" required>
-</div>
-
-<div>
-<label>Category</label>
-<select id="txCategory"></select>
-</div>
-
-<div>
-<label>Date</label>
-<input type="date" id="txDate" required>
-</div>
-
-<div class="wide">
-<label>Note / merchant</label>
-<input id="txNote" placeholder="e.g. Grocery shopping">
-</div>
-</div>
-
-<div class="dialog-actions">
-<button type="button" class="btn"
-onclick="document.getElementById('txDialog').close()">Cancel</button>
-
-<button type="button" class="btn primary"
-onclick="saveTx()">Save transaction</button>
-</div>
-
-</form>
-</dialog>
 
 <!-- SAVINGS GOAL -->
 
