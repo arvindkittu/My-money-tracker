@@ -771,66 +771,158 @@ function selectDay(date) {
 $("calMonth").value = month();
 $("calMonth").onchange = renderCalendar;
 
-function openRecurring() {
-  ["recAmount", "recNote"].forEach(id => $(id).value = "");
-  $("recStart").value = today();
-  $("recCategory").innerHTML = [...CATS.expense, ...CATS.income]
+function openRecurring(r = null) {
+  $("recId").value = r?.id || "";
+  $("recType").value = r?.type || "expense";
+  $("recAmount").value = r?.amount || "";
+  $("recStart").value = r?.start || today();
+  $("recNote").value = r?.note || "";
+  $("recFreq").value = r?.frequency || "monthly";
+
+  $("recCategory").innerHTML = CATS[$("recType").value]
     .map(c => `<option>${c}</option>`).join("");
+
+  $("recCategory").value = r?.category || CATS[$("recType").value][0];
+
+  $("recDialogTitle").textContent =
+    r ? "Edit recurring transaction" : "Recurring transaction";
+
+  $("recSaveBtn").textContent =
+    r ? "Update recurring item" : "Save recurring item";
+
   $("recDialog").showModal();
 }
 
+$("recType").onchange = () => {
+  const current = $("recCategory").value;
+  const categories = CATS[$("recType").value];
+
+  $("recCategory").innerHTML = categories
+    .map(c => `<option>${c}</option>`).join("");
+
+  if (categories.includes(current)) {
+    $("recCategory").value = current;
+  }
+};
+
 async function saveRecurring() {
-  let amount = Number($("recAmount").value);
-  if (!(amount > 0) || !$("recStart").value) {
+  const amount = Number($("recAmount").value);
+  const start = $("recStart").value;
+  const id = $("recId").value;
+
+  if (!(amount > 0) || !start) {
     alert("Enter a valid amount and start date.");
     return;
   }
 
-  state.recurring.push({
-    id: crypto.randomUUID(),
+  const existing = state.recurring.find(r => r.id === id);
+
+  const item = {
+    id: id || crypto.randomUUID(),
     type: $("recType").value,
     amount,
     category: $("recCategory").value,
     frequency: $("recFreq").value,
-    start: $("recStart").value,
-    note: $("recNote").value,
-    active: true
-  });
+    start,
+    note: $("recNote").value.trim(),
+    active: existing ? existing.active : true
+  };
+
+  if (existing) {
+    Object.assign(existing, item);
+  } else {
+    state.recurring.push(item);
+  }
 
   await persist();
   $("recDialog").close();
+
   await processRecurring();
   render();
+}
+
+function advanceRecurringDate(date, frequency) {
+  const next = new Date(date);
+  const originalDay = next.getDate();
+
+  if (frequency === "weekly") {
+    next.setDate(next.getDate() + 7);
+  } else {
+    const months = frequency === "quarterly" ? 3 :
+      frequency === "yearly" ? 12 : 1;
+
+    next.setDate(1);
+    next.setMonth(next.getMonth() + months);
+
+    const lastDay = new Date(
+      next.getFullYear(),
+      next.getMonth() + 1,
+      0
+    ).getDate();
+
+    next.setDate(Math.min(originalDay, lastDay));
+  }
+
+  return next;
+}
+
+function formatLocalDate(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("-");
+}
+
+function getNextRecurringDate(r) {
+  if (!r.start) return "—";
+
+  let due = new Date(r.start + "T12:00:00");
+  const now = new Date(today() + "T12:00:00");
+  let guard = 0;
+
+  while (due <= now && guard++ < 500) {
+    due = advanceRecurringDate(due, r.frequency);
+  }
+
+  return formatLocalDate(due);
 }
 
 async function processRecurring() {
   let changed = false;
 
-  for (let r of state.recurring) {
-    if (!r.active) continue;
+  for (const r of state.recurring) {
+    if (!r.active || !r.start) continue;
 
-    let last = state.recurringRuns[r.id] || "";
+    const last = state.recurringRuns[r.id] || "";
     let due = new Date(r.start + "T12:00:00");
-    let now = new Date(today() + "T12:00:00");
+    const now = new Date(today() + "T12:00:00");
     let guard = 0;
 
     while (due <= now && guard++ < 500) {
-      let ds = due.toLocaleDateString("en-CA");
-      if (ds > last && !state.transactions.some(t =>
-        t.recurringId === r.id && t.date === ds)) {
+      const ds = formatLocalDate(due);
+
+      if (
+        ds > last &&
+        !state.transactions.some(t =>
+          t.recurringId === r.id && t.date === ds
+        )
+      ) {
         state.transactions.push({
-          id: crypto.randomUUID(), type: r.type,
-          amount: r.amount, category: r.category,
-          note: r.note || "Recurring", date: ds,
+          id: crypto.randomUUID(),
+          type: r.type,
+          amount: r.amount,
+          category: r.category,
+          note: r.note || "Recurring",
+          date: ds,
           recurringId: r.id
         });
+
         state.recurringRuns[r.id] = ds;
         changed = true;
       }
 
-      if (r.frequency === "weekly") due.setDate(due.getDate() + 7);
-      else if (r.frequency === "yearly") due.setFullYear(due.getFullYear() + 1);
-      else due.setMonth(due.getMonth() + 1);
+      due = advanceRecurringDate(due, r.frequency);
     }
   }
 
