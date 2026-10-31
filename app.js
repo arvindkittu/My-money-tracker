@@ -933,14 +933,44 @@ function renderRecurring() {
   $("recurringList").innerHTML = state.recurring.length
     ? state.recurring.map(r => `
       <div class="item">
-        <div><b>${escapeHTML(r.note || r.category)}</b>
-          <div class="small muted">${r.frequency} · ${r.type} · ${money(r.amount)}</div>
+        <div style="min-width:0">
+          <b>${escapeHTML(r.note || r.category)}</b>
+
+          <div class="small muted">
+            ${escapeHTML(r.frequency)} ·
+            ${escapeHTML(r.type)} ·
+            ${money(r.amount)}
+          </div>
+
+          <div class="small muted">
+            Next due: ${getNextRecurringDate(r)}
+          </div>
+
+          <div class="small">
+            <span class="pill">
+              ${r.active ? "Active" : "Paused"}
+            </span>
+          </div>
         </div>
-        <div>
-          <button class="btn" onclick="toggleRecurring('${r.id}')">${r.active ? "Pause" : "Resume"}</button>
-          <button class="btn danger" onclick="removeRecurring('${r.id}')">×</button>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn"
+            onclick="openRecurring(state.recurring.find(x => x.id === '${r.id}'))">
+            Edit
+          </button>
+
+          <button class="btn"
+            onclick="toggleRecurring('${r.id}')">
+            ${r.active ? "Pause" : "Resume"}
+          </button>
+
+          <button class="btn danger"
+            onclick="removeRecurring('${r.id}')">
+            ×
+          </button>
         </div>
-      </div>`).join("")
+      </div>
+    `).join("")
     : '<div class="empty">No recurring items yet.</div>';
 }
 
