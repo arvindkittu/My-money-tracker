@@ -1164,9 +1164,12 @@ async function signUpCloud() {
   }
 
   const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
+  email,
+  password,
+  options: {
+    emailRedirectTo: "https://arvindkittu.github.io/My-money-tracker/"
+  }
+});
 
   if (error) {
     alert("Account creation failed: " + error.message);
