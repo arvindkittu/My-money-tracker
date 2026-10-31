@@ -451,22 +451,49 @@ main {padding:26px}
 </section>
 
 <section id="analytics" class="page">
-<h1>Analytics</h1>
-<p class="muted small">Understand where your money goes.</p>
+<h1>Financial Insights</h1>
+<p class="muted small">Understand your income, expenses and savings.</p>
 
-<div class="card">
-<h2>Monthly income vs expenses</h2>
-<canvas id="analyticsChart" width="650" height="230"></canvas>
+<div class="grid four" style="margin-top:16px">
+  <div class="card">
+    <div class="metric-label">Monthly income</div>
+    <div class="metric positive" id="insightIncome">₹0</div>
+  </div>
+  <div class="card">
+    <div class="metric-label">Monthly expenses</div>
+    <div class="metric negative" id="insightExpense">₹0</div>
+  </div>
+  <div class="card">
+    <div class="metric-label">Daily average spending</div>
+    <div class="metric" id="insightDaily">₹0</div>
+  </div>
+  <div class="card">
+    <div class="metric-label">Savings rate</div>
+    <div class="metric" id="insightSavings">0%</div>
+  </div>
 </div>
 
 <div class="card">
-<h2>Category totals</h2>
-<div id="analyticsCategories"></div>
+  <div class="row">
+    <h2>Income vs expenses</h2>
+    <span class="pill">Last 6 months</span>
+  </div>
+  <canvas id="analyticsChart" width="650" height="260"></canvas>
 </div>
 
 <div class="card">
-<h2>Period summary</h2>
-<div id="periodSummary"></div>
+  <h2>Month-over-month expenses</h2>
+  <div id="monthComparison"></div>
+</div>
+
+<div class="card">
+  <h2>Top 5 expense categories</h2>
+  <div id="analyticsCategories"></div>
+</div>
+
+<div class="card">
+  <h2>Period summary</h2>
+  <div id="periodSummary"></div>
 </div>
 </section>
 
