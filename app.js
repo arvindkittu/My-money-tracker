@@ -9,6 +9,15 @@ const supabaseClient = window.supabase.createClient(
 );
 
 let cloudUser = null;
+async function testSupabaseConnection() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    alert("Supabase test failed: " + error.message);
+  } else {
+    alert("Supabase API connection successful.");
+  }
+}
 
 const DBNAME = "myMoneyDB", STORE = "state";
 let db;
