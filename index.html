@@ -339,10 +339,68 @@ main {padding:26px}
 </div>
 
 <div class="card" style="margin-top:15px">
-<div class="formgrid">
-<div>
-<label>Month</label>
-<input type="month" id="txMonth">
+  <label for="txSearch">Search transactions</label>
+  <input type="search" id="txSearch" placeholder="Merchant, note, category or amount">
+
+  <div class="formgrid">
+    <div>
+      <label>Date range</label>
+      <select id="txPeriod">
+        <option value="month">This month</option>
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="lastmonth">Last month</option>
+        <option value="all">All time</option>
+        <option value="custom">Custom range</option>
+      </select>
+    </div>
+    <div>
+      <label>Type</label>
+      <select id="txFilter">
+        <option value="all">All transactions</option>
+        <option value="expense">Expenses</option>
+        <option value="income">Income</option>
+      </select>
+    </div>
+    <div>
+      <label>Category</label>
+      <select id="txCategoryFilter">
+        <option value="all">All categories</option>
+      </select>
+    </div>
+    <div>
+      <label>Sort by</label>
+      <select id="txSort">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="high">Highest amount</option>
+        <option value="low">Lowest amount</option>
+      </select>
+    </div>
+    <div class="wide" id="txCustomDates" hidden>
+      <div class="formgrid">
+        <div>
+          <label>From date</label>
+          <input type="date" id="txStartDate">
+        </div>
+        <div>
+          <label>To date</label>
+          <input type="date" id="txEndDate">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <span class="small muted" id="txResultCount">Showing transactions</span>
+    <button class="btn" type="button" onclick="clearTxFilters()">Clear filters</button>
+  </div>
+</div>
+
+<div class="card">
+  <div id="txList"></div>
+</div>
+
 </div>
 <div>
 <label>Type</label>
