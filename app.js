@@ -213,22 +213,177 @@ function renderDashboard() {
   drawTrend("trendChart", 6);
 }
 
-function renderTransactions() {
-  let m = $("txMonth").value || month();
-  let f = $("txFilter").value;
+function getTxDateRange() {
+  const period = $("txPeriod").value;
+  const now = new Date();
+  const todayDate = today();
 
-  let list = state.transactions.filter(t =>
-    t.date.startsWith(m) && (f === "all" || t.type === f)
-  ).sort((a, b) => b.date.localeCompare(a.date));
+  if (period === "today") {
+    return { start: todayDate, end: todayDate };
+  }
+
+  if (period === "month") {
+    const m = month();
+    return { start: m + "-01", end: m + "-31" };
+  }
+
+  if (period === "lastmonth") {
+    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const last = new Date(y, d.getMonth() + 1, 0).getDate();
+
+    return {
+      start: y + "-" + m + "-01",
+      end: y + "-" + m + "-" + String(last).padStart(2, "0")
+    };
+  }
+
+  if (period === "week") {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+
+    const start = d.toLocaleDateString("en-CA");
+    const endDate = new Date(d);
+    endDate.setDate(endDate.getDate() + 6);
+
+    return {
+      start,
+      end: endDate.toLocaleDateString("en-CA")
+    };
+  }
+
+  if (period === "custom") {
+    return {
+      start: $("txStartDate").value,
+      end: $("txEndDate").value
+    };
+  }
+
+  return { start: "", end: "" };
+}
+
+function populateTxCategoryFilter() {
+  const select = $("txCategoryFilter");
+  const current = select.value || "all";
+
+  const categories = [...new Set([
+    ...CATS.expense,
+    ...CATS.income,
+    ...state.transactions.map(t => t.category).filter(Boolean)
+  ])].sort();
+
+  select.innerHTML =
+    '<option value="all">All categories</option>' +
+    categories.map(c =>
+      '<option value="' + escapeHTML(c) + '">' +
+      escapeHTML(c) + '</option>'
+    ).join("");
+
+  select.value = categories.includes(current) ? current : "all";
+}
+
+function renderTransactions() {
+  const query = $("txSearch").value.trim().toLowerCase();
+  const type = $("txFilter").value;
+  const category = $("txCategoryFilter").value;
+  const sort = $("txSort").value;
+  const range = getTxDateRange();
+
+  $("txCustomDates").hidden =
+    $("txPeriod").value !== "custom";
+
+  let list = state.transactions.filter(t => {
+    if (type !== "all" && t.type !== type) return false;
+
+    if (category !== "all" && t.category !== category) {
+      return false;
+    }
+
+    if (range.start && t.date < range.start) return false;
+    if (range.end && t.date > range.end) return false;
+
+    if (
+      $("txPeriod").value === "custom" &&
+      !range.start && !range.end
+    ) return false;
+
+    if (
+      $("txPeriod").value === "custom" &&
+      range.start && range.end &&
+      range.start > range.end
+    ) return false;
+
+    if (query) {
+      const searchable = [
+        t.note,
+        t.category,
+        t.type,
+        t.date,
+        String(t.amount)
+      ].join(" ").toLowerCase();
+
+      if (!searchable.includes(query)) return false;
+    }
+
+    return true;
+  });
+
+  list.sort((a, b) => {
+    if (sort === "oldest") {
+      return a.date.localeCompare(b.date);
+    }
+
+    if (sort === "high") {
+      return Number(b.amount) - Number(a.amount) ||
+        b.date.localeCompare(a.date);
+    }
+
+    if (sort === "low") {
+      return Number(a.amount) - Number(b.amount) ||
+        b.date.localeCompare(a.date);
+    }
+
+    return b.date.localeCompare(a.date);
+  });
+
+  $("txResultCount").textContent =
+    list.length + (list.length === 1
+      ? " transaction"
+      : " transactions");
 
   $("txList").innerHTML = list.length
     ? list.map(txHTML).join("")
-    : '<div class="empty">No matching transactions.</div>';
+    : '<div class="empty">No matching transactions. Try changing or clearing your filters.</div>';
 }
 
-$("txMonth").value = month();
-$("txMonth").onchange = renderTransactions;
-$("txFilter").onchange = renderTransactions;
+function clearTxFilters() {
+  $("txSearch").value = "";
+  $("txPeriod").value = "month";
+  $("txFilter").value = "all";
+  $("txCategoryFilter").value = "all";
+  $("txSort").value = "newest";
+  $("txStartDate").value = "";
+  $("txEndDate").value = "";
+
+  renderTransactions();
+}
+
+$("txSearch").addEventListener("input", renderTransactions);
+
+[
+  "txPeriod",
+  "txFilter",
+  "txCategoryFilter",
+  "txSort",
+  "txStartDate",
+  "txEndDate"
+].forEach(id =>
+  $(id).addEventListener("change", renderTransactions)
+);
+
+populateTxCategoryFilter();
 
 function saveBudget() {
   state.budget = Math.max(0, Number($("totalBudget").value) || 0);
