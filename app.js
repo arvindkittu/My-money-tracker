@@ -1213,6 +1213,35 @@ async function signOutCloud() {
   alert("Signed out successfully.");
 }
 
+async function testSupabaseConnection() {
+  try {
+    const response = await fetch(
+      SUPABASE_URL + "/auth/v1/settings",
+      {
+        method: "GET",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + SUPABASE_KEY
+        }
+      }
+    );
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert("Supabase connection successful! API key is valid.");
+    } else {
+      alert(
+        "Supabase connection failed. HTTP " +
+        response.status + ": " +
+        (result.message || result.msg || JSON.stringify(result))
+      );
+    }
+  } catch (error) {
+    alert("Connection error: " + error.message);
+  }
+}
+
 async function init() {
   await openDB();
   await load();
