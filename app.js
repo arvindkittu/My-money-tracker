@@ -1,10 +1,5 @@
 const $ = id => document.getElementById(id);
 
-const CATS = {
-  expense: ["Food & Dining","Groceries","Transport","Shopping","Bills & Utilities","Housing","Health","Entertainment","Travel","Education","Personal Care","EMI / Loan","Other"],
-  income: ["Salary","Business","Investment","Gift","Other"]
-};
-
 const DBNAME = "myMoneyDB", STORE = "state";
 let db;
 let state = {
@@ -59,11 +54,6 @@ function escapeHTML(s) {
   }[c]));
 }
 
-function cats(sel) {
-  sel.innerHTML = [...CATS.expense, ...CATS.income]
-    .map(c => `<option>${c}</option>`).join("");
-}
-
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p =>
     p.classList.toggle("active", p.id === id));
@@ -89,26 +79,90 @@ $("themeBtn").onclick = async () => {
   renderCharts();
 };
 
+function setTxType(type) {
+  $("txType").value = type;
+
+  $("txExpenseBtn").classList.toggle(
+    "primary", type === "expense"
+  );
+
+  $("txIncomeBtn").classList.toggle(
+    "primary", type === "income"
+  );
+}
+
 function openTx(t = null) {
   $("txForm").reset();
   $("txId").value = t?.id || "";
-  $("txType").value = t?.type || "expense";
+
+  setTxType(t?.type || "expense");
+
   $("txAmount").value = t?.amount || "";
   $("txDate").value = t?.date || today();
   $("txNote").value = t?.note || "";
-  fillTxCats();
-  $("txCategory").value = t?.category || CATS.expense[0];
+
   $("txDialogTitle").textContent =
     t ? "Edit transaction" : "Add transaction";
+
   $("txDialog").showModal();
 }
 
-function fillTxCats() {
-  $("txCategory").innerHTML = CATS[$("txType").value]
-    .map(c => `<option>${c}</option>`).join("");
+async function saveTx() {
+  let amount = Number($("txAmount").value);
+
+  if (!(amount > 0)) {
+    alert("Enter an amount greater than zero.");
+    return;
+  }
+
+  let id = $("txId").value || crypto.randomUUID();
+
+  let tx = {
+    id,
+    type: $("txType").value,
+    amount,
+    date: $("txDate").value,
+    note: $("txNote").value.trim()
+  };
+
+  if (!tx.date) {
+    alert("Choose a date.");
+    return;
+  }
+
+  let i = state.transactions.findIndex(x => x.id === id);
+
+  if (i >= 0) {
+    state.transactions[i] = {
+      ...state.transactions[i],
+      ...tx
+    };
+  } else {
+    state.transactions.push(tx);
+  }
+
+  await persist();
+  $("txDialog").close();
+  render();
 }
 
-$("txType").onchange = fillTxCats;
+function txHTML(t) {
+  return `<div class="item">
+    <div style="min-width:0">
+      <b>${escapeHTML(t.note || "Unnamed transaction")}</b>
+      <div class="small muted">${escapeHTML(t.date)}</div>
+    </div>
+    <div style="text-align:right;white-space:nowrap">
+      <b class="${t.type === "income" ? "positive" : "negative"}">
+        ${t.type === "income" ? "+" : "−"}${money(t.amount)}
+      </b>
+      <div class="small">
+        <button class="btn" onclick="editTx('${t.id}')">Edit</button>
+        <button class="btn danger" onclick="deleteTx('${t.id}')">×</button>
+      </div>
+    </div>
+  </div>`;
+}
 
 async function saveTx() {
   let amount = Number($("txAmount").value);
@@ -172,39 +226,40 @@ async function deleteTx(id) {
 
 function renderDashboard() {
   let a = monthTx();
-  let inc = sum(a.filter(t => t.type === "income"), t => t.amount);
-  let exp = sum(a.filter(t => t.type === "expense"), t => t.amount);
+
+  let inc = sum(
+    a.filter(t => t.type === "income"),
+    t => t.amount
+  );
+
+  let exp = sum(
+    a.filter(t => t.type === "expense"),
+    t => t.amount
+  );
 
   $("todayLabel").textContent = new Date().toLocaleDateString(
-    undefined, { weekday:"long", day:"numeric", month:"long", year:"numeric" }
+    undefined,
+    {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }
   );
+
   $("incomeMetric").textContent = money(inc);
   $("expenseMetric").textContent = money(exp);
   $("netMetric").textContent = money(inc - exp);
+
   $("budgetMetric").textContent =
     state.budget ? money(state.budget - exp) : "—";
+
   $("budgetMetric").className =
     "metric " + (state.budget - exp < 0 ? "negative" : "");
 
-  let categories = {};
-  a.filter(t => t.type === "expense").forEach(t =>
-    categories[t.category] = (categories[t.category] || 0) + t.amount
-  );
-
-  let sorted = Object.entries(categories)
-    .sort((x, y) => y[1] - x[1]).slice(0, 5);
-
-  $("categoryBreakdown").innerHTML = sorted.length
-    ? sorted.map(([c, v]) => `
-      <div style="margin:12px 0">
-        <div class="row"><span>${escapeHTML(c)}</span><b>${money(v)}</b></div>
-        <div class="bar"><i style="width:${Math.max(2,
-          v / Math.max(...sorted.map(x => x[1])) * 100)}%"></i></div>
-      </div>`).join("")
-    : '<div class="empty">No expenses this month yet.</div>';
-
   let recent = [...state.transactions]
-    .sort((x, y) => y.date.localeCompare(x.date)).slice(0, 5);
+    .sort((x, y) => y.date.localeCompare(x.date))
+    .slice(0, 5);
 
   $("recentList").innerHTML = recent.length
     ? recent.map(txHTML).join("")
@@ -264,30 +319,10 @@ function getTxDateRange() {
   return { start: "", end: "" };
 }
 
-function populateTxCategoryFilter() {
-  const select = $("txCategoryFilter");
-  const current = select.value || "all";
-
-  const categories = [...new Set([
-    ...CATS.expense,
-    ...CATS.income,
-    ...state.transactions.map(t => t.category).filter(Boolean)
-  ])].sort();
-
-  select.innerHTML =
-    '<option value="all">All categories</option>' +
-    categories.map(c =>
-      '<option value="' + escapeHTML(c) + '">' +
-      escapeHTML(c) + '</option>'
-    ).join("");
-
-  select.value = categories.includes(current) ? current : "all";
-}
 
 function renderTransactions() {
   const query = $("txSearch").value.trim().toLowerCase();
   const type = $("txFilter").value;
-  const category = $("txCategoryFilter").value;
   const sort = $("txSort").value;
   const range = getTxDateRange();
 
@@ -296,10 +331,6 @@ function renderTransactions() {
 
   let list = state.transactions.filter(t => {
     if (type !== "all" && t.type !== type) return false;
-
-    if (category !== "all" && t.category !== category) {
-      return false;
-    }
 
     if (range.start && t.date < range.start) return false;
     if (range.end && t.date > range.end) return false;
@@ -318,7 +349,6 @@ function renderTransactions() {
     if (query) {
       const searchable = [
         t.note,
-        t.category,
         t.type,
         t.date,
         String(t.amount)
@@ -362,7 +392,6 @@ function clearTxFilters() {
   $("txSearch").value = "";
   $("txPeriod").value = "month";
   $("txFilter").value = "all";
-  $("txCategoryFilter").value = "all";
   $("txSort").value = "newest";
   $("txStartDate").value = "";
   $("txEndDate").value = "";
@@ -375,7 +404,6 @@ $("txSearch").addEventListener("input", renderTransactions);
 [
   "txPeriod",
   "txFilter",
-  "txCategoryFilter",
   "txSort",
   "txStartDate",
   "txEndDate"
@@ -383,63 +411,33 @@ $("txSearch").addEventListener("input", renderTransactions);
   $(id).addEventListener("change", renderTransactions)
 );
 
-populateTxCategoryFilter();
 
 function saveBudget() {
   state.budget = Math.max(0, Number($("totalBudget").value) || 0);
   persist().then(render);
 }
 
-function saveCategoryBudget() {
-  let c = $("budgetCat").value;
-  let v = Number($("budgetAmount").value);
-  if (!(v > 0)) {
-    alert("Enter a valid limit.");
-    return;
-  }
-  state.categoryBudgets[c] = v;
-  persist().then(render);
-}
 
 function renderBudget() {
   $("totalBudget").value = state.budget || "";
-  $("budgetCat").innerHTML = CATS.expense
-    .map(c => `<option>${c}</option>`).join("");
 
-  let used = {};
-  monthTx().filter(t => t.type === "expense").forEach(t =>
-    used[t.category] = (used[t.category] || 0) + t.amount
+  let spent = sum(
+    monthTx().filter(t => t.type === "expense"),
+    t => t.amount
   );
 
-  $("budgetList").innerHTML =
-    Object.entries(state.categoryBudgets).map(([c, v]) => `
-      <div class="item">
-        <span>${escapeHTML(c)} · ${money(v)}</span>
-        <button class="btn danger" onclick="removeCatBudget('${escapeHTML(c)}')">Remove</button>
-      </div>`).join("") ||
-    '<div class="muted small">No category limits yet.</div>';
-
-  let spent = sum(monthTx().filter(t => t.type === "expense"), t => t.amount);
-
   $("budgetUsage").innerHTML = state.budget
-    ? `<div class="row"><b>${money(spent)} spent</b><b>${money(state.budget)} budget</b></div>
-       <div class="bar"><i style="width:${Math.min(100, spent / state.budget * 100)}%"></i></div>`
+    ? `<div class="row">
+         <b>${money(spent)} spent</b>
+         <b>${money(state.budget)} budget</b>
+       </div>
+       <div class="bar">
+         <i style="width:${Math.min(100, spent / state.budget * 100)}%"></i>
+       </div>
+       <div class="small muted" style="margin-top:8px">
+         ${money(Math.max(0, state.budget - spent))} remaining
+       </div>`
     : '<div class="muted small">Set a monthly budget to see usage.</div>';
-
-  Object.entries(state.categoryBudgets).forEach(([c, v]) => {
-    $("budgetUsage").innerHTML += `
-      <div style="margin-top:12px">
-        <div class="row"><span>${escapeHTML(c)}</span>
-        <span>${money(used[c] || 0)} / ${money(v)}</span></div>
-        <div class="bar"><i style="width:${Math.min(100,
-          (used[c] || 0) / v * 100)}%"></i></div>
-      </div>`;
-  });
-}
-
-function removeCatBudget(c) {
-  delete state.categoryBudgets[c];
-  persist().then(render);
 }
 
 function drawTrend(id, n) {
@@ -549,15 +547,18 @@ function drawIncomeExpenseChart() {
   ctx.fillText("Expenses", left + 103, 16);
 }
 
+
 function renderAnalytics() {
   const current = monthTx();
 
   const income = sum(
-    current.filter(t => t.type === "income"), t => t.amount
+    current.filter(t => t.type === "income"),
+    t => t.amount
   );
 
   const expenses = sum(
-    current.filter(t => t.type === "expense"), t => t.amount
+    current.filter(t => t.type === "expense"),
+    t => t.amount
   );
 
   const net = income - expenses;
@@ -574,36 +575,6 @@ function renderAnalytics() {
     "metric " + (savingsRate < 0 ? "negative" : "positive");
 
   drawIncomeExpenseChart();
-
-  const categoryTotals = {};
-
-  current.filter(t => t.type === "expense").forEach(t => {
-    categoryTotals[t.category] =
-      (categoryTotals[t.category] || 0) + Number(t.amount || 0);
-  });
-
-  const entries = Object.entries(categoryTotals)
-    .sort((a, b) => b[1] - a[1]);
-
-  const topFive = entries.slice(0, 5);
-
-  $("analyticsCategories").innerHTML = topFive.length
-    ? topFive.map(([category, amount]) => {
-        const percent = expenses > 0
-          ? amount / expenses * 100 : 0;
-
-        return `
-          <div style="margin:12px 0">
-            <div class="row">
-              <span>${escapeHTML(category)}</span>
-              <b>${money(amount)} · ${percent.toFixed(1)}%</b>
-            </div>
-            <div class="bar">
-              <i style="width:${Math.min(100, percent)}%"></i>
-            </div>
-          </div>`;
-      }).join("")
-    : '<div class="empty">No expenses recorded this month.</div>';
 
   const previousDate = new Date();
   previousDate.setDate(1);
@@ -667,11 +638,9 @@ function renderAnalytics() {
     </div>
     <div class="item">
       <span>Transactions</span><b>${current.length}</b>
-    </div>
-    <div class="item">
-      <span>Categories with spending</span><b>${entries.length}</b>
     </div>`;
 }
+
 
 function openGoal() {
   $("goalName").value = "";
@@ -771,18 +740,28 @@ function selectDay(date) {
 $("calMonth").value = month();
 $("calMonth").onchange = renderCalendar;
 
+
+function setRecurringType(type) {
+  $("recType").value = type;
+
+  $("recExpenseBtn").classList.toggle(
+    "primary", type === "expense"
+  );
+
+  $("recIncomeBtn").classList.toggle(
+    "primary", type === "income"
+  );
+}
+
 function openRecurring(r = null) {
   $("recId").value = r?.id || "";
-  $("recType").value = r?.type || "expense";
+
+  setRecurringType(r?.type || "expense");
+
   $("recAmount").value = r?.amount || "";
   $("recStart").value = r?.start || today();
   $("recNote").value = r?.note || "";
   $("recFreq").value = r?.frequency || "monthly";
-
-  $("recCategory").innerHTML = CATS[$("recType").value]
-    .map(c => `<option>${c}</option>`).join("");
-
-  $("recCategory").value = r?.category || CATS[$("recType").value][0];
 
   $("recDialogTitle").textContent =
     r ? "Edit recurring transaction" : "Recurring transaction";
@@ -792,18 +771,6 @@ function openRecurring(r = null) {
 
   $("recDialog").showModal();
 }
-
-$("recType").onchange = () => {
-  const current = $("recCategory").value;
-  const categories = CATS[$("recType").value];
-
-  $("recCategory").innerHTML = categories
-    .map(c => `<option>${c}</option>`).join("");
-
-  if (categories.includes(current)) {
-    $("recCategory").value = current;
-  }
-};
 
 async function saveRecurring() {
   const amount = Number($("recAmount").value);
@@ -821,7 +788,6 @@ async function saveRecurring() {
     id: id || crypto.randomUUID(),
     type: $("recType").value,
     amount,
-    category: $("recCategory").value,
     frequency: $("recFreq").value,
     start,
     note: $("recNote").value.trim(),
@@ -909,14 +875,13 @@ async function processRecurring() {
         )
       ) {
         state.transactions.push({
-          id: crypto.randomUUID(),
-          type: r.type,
-          amount: r.amount,
-          category: r.category,
-          note: r.note || "Recurring",
-          date: ds,
-          recurringId: r.id
-        });
+  id: crypto.randomUUID(),
+  type: r.type,
+  amount: r.amount,
+  note: r.note || "Recurring",
+  date: ds,
+  recurringId: r.id
+});
 
         state.recurringRuns[r.id] = ds;
         changed = true;
@@ -934,7 +899,7 @@ function renderRecurring() {
     ? state.recurring.map(r => `
       <div class="item">
         <div style="min-width:0">
-          <b>${escapeHTML(r.note || r.category)}</b>
+          <b>${escapeHTML(r.note || (r.type === "income" ? "Recurring income" : "Recurring expense"))}</b>
 
           <div class="small muted">
             ${escapeHTML(r.frequency)} ·
@@ -1045,10 +1010,12 @@ async function payDebt(id) {
   if (d && v > 0) {
     d.balance = Math.max(0, d.balance - v);
     state.transactions.push({
-      id: crypto.randomUUID(), type: "expense",
-      amount: v, date: today(), category: "EMI / Loan",
-      note: "Debt payment: " + d.name
-    });
+  id: crypto.randomUUID(),
+  type: "expense",
+  amount: v,
+  date: today(),
+  note: "Debt payment: " + d.name
+});
     await persist();
     render();
   }
@@ -1076,11 +1043,16 @@ function download(name, content, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+
 function exportCSV() {
   let rows = [
-    ["Date","Type","Amount","Currency","Category","Note"],
+    ["Date", "Type", "Amount", "Currency", "Note"],
     ...state.transactions.map(t => [
-      t.date, t.type, t.amount, state.currency, t.category, t.note || ""
+      t.date,
+      t.type,
+      t.amount,
+      state.currency,
+      t.note || ""
     ])
   ];
 
@@ -1088,7 +1060,11 @@ function exportCSV() {
     r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(",")
   ).join("\r\n");
 
-  download("my-money-transactions.csv", "\uFEFF" + csv, "text/csv;charset=utf-8");
+  download(
+    "my-money-transactions.csv",
+    "\uFEFF" + csv,
+    "text/csv;charset=utf-8"
+  );
 }
 
 function exportJSON() {
@@ -1148,7 +1124,6 @@ function render() {
 async function init() {
   await openDB();
   await load();
-  cats($("txCategory"));
   setTheme();
   $("currency").value = state.currency;
   await processRecurring();
