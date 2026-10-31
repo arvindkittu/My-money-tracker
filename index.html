@@ -710,10 +710,12 @@ onclick="saveGoal()">Create goal</button>
 <form method="dialog">
 
 <div class="row">
-<h2>Recurring transaction</h2>
+<h2 id="recDialogTitle">Recurring transaction</h2>
 <button type="button" class="iconbtn"
 onclick="this.closest('dialog').close()">✕</button>
 </div>
+
+<input type="hidden" id="recId">
 
 <div class="formgrid">
 <div>
@@ -726,7 +728,7 @@ onclick="this.closest('dialog').close()">✕</button>
 
 <div>
 <label>Amount</label>
-<input type="number" id="recAmount" min="0.01">
+<input type="number" id="recAmount" min="0.01" step="0.01" required>
 </div>
 
 <div>
@@ -737,15 +739,16 @@ onclick="this.closest('dialog').close()">✕</button>
 <div>
 <label>Frequency</label>
 <select id="recFreq">
-<option value="monthly">Monthly</option>
 <option value="weekly">Weekly</option>
+<option value="monthly">Monthly</option>
+<option value="quarterly">Quarterly (every 3 months)</option>
 <option value="yearly">Yearly</option>
 </select>
 </div>
 
 <div>
 <label>Start date</label>
-<input type="date" id="recStart">
+<input type="date" id="recStart" required>
 </div>
 
 <div>
@@ -758,7 +761,7 @@ onclick="this.closest('dialog').close()">✕</button>
 <button type="button" class="btn"
 onclick="this.closest('dialog').close()">Cancel</button>
 <button type="button" class="btn primary"
-onclick="saveRecurring()">Save recurring item</button>
+id="recSaveBtn" onclick="saveRecurring()">Save recurring item</button>
 </div>
 
 </form>
