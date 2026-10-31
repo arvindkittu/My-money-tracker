@@ -479,26 +479,198 @@ function renderCharts() {
   drawTrend("analyticsChart", 6);
 }
 
+function drawIncomeExpenseChart() {
+  const cv = $("analyticsChart");
+  const ctx = cv.getContext("2d");
+  const w = cv.width, h = cv.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const months = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+
+    const key = d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0");
+
+    const items = monthTx(key);
+
+    months.push({
+      label: d.toLocaleDateString(undefined, { month: "short" }),
+      income: sum(items.filter(t => t.type === "income"), t => t.amount),
+      expense: sum(items.filter(t => t.type === "expense"), t => t.amount)
+    });
+  }
+
+  const max = Math.max(1, ...months.flatMap(m => [m.income, m.expense]));
+  const top = 28, bottom = 38, left = 24;
+  const chartH = h - top - bottom;
+  const groupW = (w - left * 2) / months.length;
+  const barW = Math.min(24, groupW * 0.27);
+
+  const green = getComputedStyle(document.body)
+    .getPropertyValue("--green").trim();
+  const red = getComputedStyle(document.body)
+    .getPropertyValue("--red").trim();
+  const muted = getComputedStyle(document.body)
+    .getPropertyValue("--muted").trim();
+
+  months.forEach((m, i) => {
+    const center = left + groupW * i + groupW / 2;
+    const incomeH = chartH * m.income / max;
+    const expenseH = chartH * m.expense / max;
+
+    ctx.fillStyle = green;
+    ctx.fillRect(center - barW - 2,
+      top + chartH - incomeH, barW, incomeH);
+
+    ctx.fillStyle = red;
+    ctx.fillRect(center + 2,
+      top + chartH - expenseH, barW, expenseH);
+
+    ctx.fillStyle = muted;
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(m.label, center, h - 12);
+  });
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = green;
+  ctx.fillRect(left, 7, 10, 10);
+  ctx.fillStyle = muted;
+  ctx.font = "11px sans-serif";
+  ctx.fillText("Income", left + 15, 16);
+
+  ctx.fillStyle = red;
+  ctx.fillRect(left + 88, 7, 10, 10);
+  ctx.fillStyle = muted;
+  ctx.fillText("Expenses", left + 103, 16);
+}
+
 function renderAnalytics() {
-  drawTrend("analyticsChart", 6);
-  let a = monthTx().filter(t => t.type === "expense"), g = {};
-  a.forEach(t => g[t.category] = (g[t.category] || 0) + t.amount);
+  const current = monthTx();
 
-  let entries = Object.entries(g).sort((x, y) => y[1] - x[1]);
-  $("analyticsCategories").innerHTML = entries.length
-    ? entries.map(([c, v]) => `
-      <div class="item"><span>${escapeHTML(c)}</span><b>${money(v)}</b></div>`
-    ).join("")
-    : '<div class="empty">No data yet.</div>';
+  const income = sum(
+    current.filter(t => t.type === "income"), t => t.amount
+  );
 
-  let inc = sum(monthTx().filter(t => t.type === "income"), t => t.amount);
-  let exp = sum(a, t => t.amount);
+  const expenses = sum(
+    current.filter(t => t.type === "expense"), t => t.amount
+  );
+
+  const net = income - expenses;
+  const dayOfMonth = new Date().getDate();
+  const dailyAverage = expenses / Math.max(1, dayOfMonth);
+  const savingsRate = income > 0 ? net / income * 100 : 0;
+
+  $("insightIncome").textContent = money(income);
+  $("insightExpense").textContent = money(expenses);
+  $("insightDaily").textContent = money(dailyAverage);
+  $("insightSavings").textContent = savingsRate.toFixed(1) + "%";
+
+  $("insightSavings").className =
+    "metric " + (savingsRate < 0 ? "negative" : "positive");
+
+  drawIncomeExpenseChart();
+
+  const categoryTotals = {};
+
+  current.filter(t => t.type === "expense").forEach(t => {
+    categoryTotals[t.category] =
+      (categoryTotals[t.category] || 0) + Number(t.amount || 0);
+  });
+
+  const entries = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1]);
+
+  const topFive = entries.slice(0, 5);
+
+  $("analyticsCategories").innerHTML = topFive.length
+    ? topFive.map(([category, amount]) => {
+        const percent = expenses > 0
+          ? amount / expenses * 100 : 0;
+
+        return `
+          <div style="margin:12px 0">
+            <div class="row">
+              <span>${escapeHTML(category)}</span>
+              <b>${money(amount)} · ${percent.toFixed(1)}%</b>
+            </div>
+            <div class="bar">
+              <i style="width:${Math.min(100, percent)}%"></i>
+            </div>
+          </div>`;
+      }).join("")
+    : '<div class="empty">No expenses recorded this month.</div>';
+
+  const previousDate = new Date();
+  previousDate.setDate(1);
+  previousDate.setMonth(previousDate.getMonth() - 1);
+
+  const previousMonth = previousDate.getFullYear() + "-" +
+    String(previousDate.getMonth() + 1).padStart(2, "0");
+
+  const previousItems = monthTx(previousMonth);
+
+  const previousExpenses = sum(
+    previousItems.filter(t => t.type === "expense"),
+    t => t.amount
+  );
+
+  const difference = expenses - previousExpenses;
+
+  let comparisonText;
+
+  if (previousExpenses === 0 && expenses > 0) {
+    comparisonText = "No expenses in the previous month";
+  } else if (previousExpenses === 0) {
+    comparisonText = "No expenses in either month";
+  } else {
+    const change = difference / previousExpenses * 100;
+
+    comparisonText =
+      (difference > 0 ? "Up " : difference < 0 ? "Down " : "No change ") +
+      Math.abs(change).toFixed(1) + "% compared with last month";
+  }
+
+  $("monthComparison").innerHTML = `
+    <div class="item">
+      <span>This month</span><b>${money(expenses)}</b>
+    </div>
+    <div class="item">
+      <span>Last month</span><b>${money(previousExpenses)}</b>
+    </div>
+    <div class="item">
+      <span>Difference</span>
+      <b class="${difference > 0 ? "negative" : difference < 0 ? "positive" : ""}">
+        ${difference > 0 ? "+" : difference < 0 ? "−" : ""}${money(Math.abs(difference))}
+      </b>
+    </div>
+    <div class="small muted" style="margin-top:8px">
+      ${comparisonText}
+    </div>`;
 
   $("periodSummary").innerHTML = `
-    <div class="item"><span>Income</span><b class="positive">${money(inc)}</b></div>
-    <div class="item"><span>Expenses</span><b class="negative">${money(exp)}</b></div>
-    <div class="item"><span>Net</span><b>${money(inc - exp)}</b></div>
-    <div class="item"><span>Transactions</span><b>${monthTx().length}</b></div>`;
+    <div class="item">
+      <span>Income</span>
+      <b class="positive">${money(income)}</b>
+    </div>
+    <div class="item">
+      <span>Expenses</span>
+      <b class="negative">${money(expenses)}</b>
+    </div>
+    <div class="item">
+      <span>Net savings</span>
+      <b class="${net < 0 ? "negative" : "positive"}">${money(net)}</b>
+    </div>
+    <div class="item">
+      <span>Transactions</span><b>${current.length}</b>
+    </div>
+    <div class="item">
+      <span>Categories with spending</span><b>${entries.length}</b>
+    </div>`;
 }
 
 function openGoal() {
