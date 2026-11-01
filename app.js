@@ -22,12 +22,26 @@ async function testSupabaseConnection() {
 }
 
 const DBNAME = "myMoneyDB", STORE = "state";
+
 let db;
-let state = {
-  transactions: [], budget: 0, categoryBudgets: {},
-  goals: [], recurring: [], debts: [],
-  currency: "INR", theme: "dark", recurringRuns: {}
-};
+let activeStateKey = null;
+let activeStateUserId = null;
+
+function createEmptyState() {
+  return {
+    transactions: [],
+    budget: 0,
+    categoryBudgets: {},
+    goals: [],
+    recurring: [],
+    debts: [],
+    currency: "INR",
+    theme: "dark",
+    recurringRuns: {}
+  };
+}
+
+let state = createEmptyState();
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -53,7 +67,102 @@ function openDB() {
     r.onerror = () => reject(r.error);
   });
 }
+function getAccountStateKey(userId) {
+  return "account:" + userId;
+}
 
+function readLocalState(key) {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE)
+      .objectStore(STORE).get(key);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function writeLocalState(key, data) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readwrite");
+
+    transaction.objectStore(STORE).put(data, key);
+
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+function readLegacyOwner() {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("syncQueue")
+      .objectStore("syncQueue").get("__legacy_owner__");
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function saveLegacyOwner(userId) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction("syncQueue", "readwrite");
+
+    transaction.objectStore("syncQueue").put(
+      userId,
+      "__legacy_owner__"
+    );
+
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+async function loadAccountState(userId) {
+  if (!userId) {
+    throw new Error("A signed-in user is required.");
+  }
+
+  const accountKey = getAccountStateKey(userId);
+
+  let accountData = await readLocalState(accountKey);
+
+  if (!accountData) {
+    const legacyData = await readLocalState("app");
+    const legacyOwner = await readLegacyOwner();
+
+    if (
+      legacyData &&
+      (!legacyOwner || legacyOwner === userId)
+    ) {
+      accountData = legacyData;
+
+      await writeLocalState(accountKey, accountData);
+
+      if (!legacyOwner) {
+        await saveLegacyOwner(userId);
+      }
+    } else {
+      accountData = createEmptyState();
+
+      await writeLocalState(accountKey, accountData);
+
+      if (!legacyOwner) {
+        await saveLegacyOwner(userId);
+      }
+    }
+  }
+
+  state = {
+    ...createEmptyState(),
+    ...accountData
+  };
+
+  activeStateKey = accountKey;
+  activeStateUserId = userId;
+
+  return state;
+}
 function load() {
   return new Promise(resolve => {
     let r = db.transaction(STORE).objectStore(STORE).get("app");
