@@ -1536,6 +1536,44 @@ async function saveCloudProfileName() {
 
   alert("Your profile name has been updated successfully.");
 }
+async function changeCloudPassword() {
+  if (!cloudUser) {
+    alert("Please sign in before changing your password.");
+    return;
+  }
+
+  const newPassword = $("newCloudPassword").value;
+  const confirmPassword = $("confirmCloudPassword").value;
+
+  if (newPassword.length < 6) {
+    alert("Your new password must contain at least 6 characters.");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    alert("The new passwords do not match.");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      alert("Password update failed: " + error.message);
+      return;
+    }
+
+    $("newCloudPassword").value = "";
+    $("confirmCloudPassword").value = "";
+
+    alert("Your password has been updated successfully.");
+
+  } catch (error) {
+    alert("Password update failed: " + error.message);
+  }
+}
 async function signInCloud() {
   const email = $("cloudEmail").value.trim();
   const password = $("cloudPassword").value;
