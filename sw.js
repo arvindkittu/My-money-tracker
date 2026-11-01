@@ -1,4 +1,4 @@
-const CACHE_NAME = "my-money-v19";
+const CACHE_NAME = "my-money-v20";
 
 const FILES_TO_CACHE = [
   "./",
@@ -47,6 +47,24 @@ self.addEventListener("fetch", event => {
         return response;
       }).catch(() => caches.match(event.request)
         .then(cached => cached || caches.match("./index.html")))
+    );
+    return;
+  }
+
+  if (url.origin === self.location.origin &&
+      url.pathname.endsWith("/app.js")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then(response => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache =>
+              cache.put(event.request, copy)
+            );
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
