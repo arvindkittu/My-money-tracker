@@ -1241,6 +1241,7 @@ async function updateCloudStatus(message) {
 }
 
 
+
 async function loadCloudData() {
   if (!cloudUser) {
     cloudReady = false;
@@ -1250,33 +1251,74 @@ async function loadCloudData() {
   cloudReady = false;
 
   try {
+    updateCloudStatus("Downloading cloud data...");
+
     const { data, error } = await supabaseClient
       .from("user_app_state")
       .select("data, updated_at")
       .eq("user_id", cloudUser.id)
       .maybeSingle();
 
-    if (error) {
-      updateCloudStatus("Cloud download failed: " + error.message);
+    if (error) throw error;
+
+    if (!data || !data.data) {
+      cloudReady = true;
+      updateCloudStatus("No cloud backup found.");
       return;
     }
 
-    if (data && data.data) {
-      state = { ...state, ...data.data };
+    const cloudData = data.data;
 
-      await persist();
-      setTheme();
-      render();
-
-      cloudReady = true;
-
-      updateCloudStatus(
-        "Signed in as " + cloudUser.email + " · Cloud data loaded"
-      );
-    } else {
-      cloudReady = true;
-      updateCloudStatus("No cloud backup found.");
+    if (!Array.isArray(cloudData.transactions)) {
+      throw new Error("Cloud transaction data is invalid.");
     }
+
+    // Use the cloud transaction list as the source of truth.
+    state = {
+      ...state,
+      ...cloudData,
+      transactions: cloudData.transactions
+    };
+
+    // Save locally without triggering another cloud upload.
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE, "readwrite");
+
+      transaction.objectStore(STORE).put(state, "app");
+
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+
+    // Verify that all downloaded transactions were saved locally.
+    const localData = await new Promise((resolve, reject) => {
+      const request = db.transaction(STORE)
+        .objectStore(STORE).get("app");
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const localCount = localData?.transactions?.length ?? 0;
+    const cloudCount = cloudData.transactions.length;
+
+    if (localCount !== cloudCount) {
+      throw new Error(
+        "Local verification failed. Cloud: " +
+        cloudCount + ", Local: " + localCount
+      );
+    }
+
+    setTheme();
+    render();
+
+    cloudReady = true;
+
+    updateCloudStatus(
+      "Signed in as " + cloudUser.email +
+      " · Cloud data loaded · " + cloudCount + " transactions"
+    );
 
   } catch (error) {
     cloudReady = false;
