@@ -1447,7 +1447,9 @@ async function updateCloudStatus(message) {
 }
 
 async function loadCloudData() {
-  if (!cloudUser) {
+  const userId = cloudUser?.id;
+
+  if (!userId) {
     cloudReady = false;
     return;
   }
@@ -1455,38 +1457,62 @@ async function loadCloudData() {
   cloudReady = false;
 
   try {
-    await loadAccountState(cloudUser.id);
-if (pending) {
-  cloudReady = true;
+    // Load this account's local data first.
+    await loadAccountState(userId);
 
-  const synced = await processPendingSync();
+    if (cloudUser?.id !== userId) return;
 
-  if (!synced) {
-    cloudReady = false;
-    updateCloudStatus(
-      "Pending local changes could not be uploaded. Local data is preserved."
-    );
-    return;
-  }
-}
+    // Upload pending offline changes before downloading cloud data.
+    const pending = await getPendingSync(userId);
+
+    if (pending) {
+      cloudReady = true;
+
+      const synced = await processPendingSync();
+
+      if (!synced) {
+        cloudReady = false;
+
+        updateCloudStatus(
+          "Pending local changes could not be uploaded. Local data is preserved."
+        );
+
+        setTheme();
+        render();
+        return;
+      }
+
+      cloudReady = false;
+    }
+
     updateCloudStatus("Downloading cloud data...");
 
     const { data, error } = await supabaseClient
-  .from("user_app_state", {
-    fetch: (input, init) =>
-      fetch(input, { ...init, cache: "no-store" })
-  })
-  .select("data, updated_at")
-  .eq("user_id", cloudUser.id)
-  .maybeSingle();
+      .from("user_app_state", {
+        fetch: (input, init) =>
+          fetch(input, { ...init, cache: "no-store" })
+      })
+      .select("data, updated_at")
+      .eq("user_id", userId)
+      .maybeSingle();
 
     if (error) throw error;
 
     if (!data || !data.data) {
       cloudReady = true;
-      updateCloudStatus("No cloud backup found.");
+
+      setTheme();
+      render();
+
+      updateCloudStatus(
+        "Logged in as " + getCloudDisplayName() +
+        " · Local data loaded · No cloud backup yet"
+      );
+
       return;
     }
+
+    if (cloudUser?.id !== userId) return;
 
     const cloudData = data.data;
 
@@ -1494,35 +1520,20 @@ if (pending) {
       throw new Error("Cloud transaction data is invalid.");
     }
 
-    // Use the cloud transaction list as the source of truth.
+    // Replace the active account's state with its cloud data.
     state = {
-      ...state,
+      ...createEmptyState(),
       ...cloudData,
       transactions: cloudData.transactions
     };
 
-    // Save locally without triggering another cloud upload.
-    await new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE, "readwrite");
+    // Save only under this account's local storage key.
+    const accountKey = getAccountStateKey(userId);
 
-      transaction.objectStore(STORE).put(state, "app");transaction.objectStore(STORE).put(
-  state,
-  activeStateKey
-);
+    await writeLocalState(accountKey, state);
 
-      transaction.oncomplete = resolve;
-      transaction.onerror = () => reject(transaction.error);
-      transaction.onabort = () => reject(transaction.error);
-    });
-
-    // Verify that all downloaded transactions were saved locally.
-    const localData = await new Promise((resolve, reject) => {
-      const request = db.transaction(STORE)
-        .objectStore(STORE).get("app");
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    // Verify the account-specific local save.
+    const localData = await readLocalState(accountKey);
 
     const localCount = localData?.transactions?.length ?? 0;
     const cloudCount = cloudData.transactions.length;
@@ -1534,6 +1545,8 @@ if (pending) {
       );
     }
 
+    if (cloudUser?.id !== userId) return;
+
     setTheme();
     render();
 
@@ -1541,12 +1554,16 @@ if (pending) {
 
     updateCloudStatus(
       "Logged in as " + getCloudDisplayName() +
-" · Cloud data loaded · " + cloudCount + " transactions"
+      " · Cloud data loaded · " + cloudCount +
+      " transactions"
     );
 
   } catch (error) {
     cloudReady = false;
-    updateCloudStatus("Cloud download failed: " + error.message);
+
+    updateCloudStatus(
+      "Cloud download failed: " + error.message
+    );
   }
 }
 
