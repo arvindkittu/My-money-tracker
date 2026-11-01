@@ -163,15 +163,8 @@ async function loadAccountState(userId) {
 
   return state;
 }
-function load() {
-  return new Promise(resolve => {
-    let r = db.transaction(STORE).objectStore(STORE).get("app");
-    r.onsuccess = () => {
-      if (r.result) state = { ...state, ...r.result };
-      resolve();
-    };
-    r.onerror = () => resolve();
-  });
+async function load() {
+  state = createEmptyState();
 }
 
 function savePendingSync(snapshot, userId = cloudUser?.id) {
@@ -281,24 +274,20 @@ async function processPendingSync() {
 
 function persist() {
   const snapshot = JSON.parse(JSON.stringify(state));
-  const userId = cloudUser?.id || null;
+  const userId = cloudUser?.id;
 
-  const localSave = new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE, "readwrite");
+  if (!userId || activeStateUserId !== userId) {
+    return Promise.reject(
+      new Error("Account storage is not initialized.")
+    );
+  }
 
-    transaction.objectStore(STORE).put(snapshot, "app");
-
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
+  const localSave = writeLocalState(
+    getAccountStateKey(userId),
+    snapshot
+  );
 
   return localSave.then(async () => {
-    if (!userId) {
-      updateCloudStatus("Saved locally · Sign in to sync");
-      return;
-    }
-
     await savePendingSync(snapshot, userId);
 
     if (!cloudUser || cloudUser.id !== userId) {
@@ -1354,13 +1343,7 @@ async function diagnoseTransactions() {
     const cloudCount = Array.isArray(cloudTransactions)
       ? cloudTransactions.length : 0;
 
-    const localRecord = await new Promise((resolve, reject) => {
-      const request = db.transaction(STORE)
-        .objectStore(STORE).get("app");
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    const localRecord = await readLocalState(activeStateKey);
 
     const localCount = Array.isArray(localRecord?.transactions)
       ? localRecord.transactions.length : 0;
@@ -1472,8 +1455,7 @@ async function loadCloudData() {
   cloudReady = false;
 
   try {
-    const pending = await getPendingSync(cloudUser.id);
-
+    await loadAccountState(cloudUser.id);
 if (pending) {
   cloudReady = true;
 
@@ -1523,7 +1505,10 @@ if (pending) {
     await new Promise((resolve, reject) => {
       const transaction = db.transaction(STORE, "readwrite");
 
-      transaction.objectStore(STORE).put(state, "app");
+      transaction.objectStore(STORE).put(state, "app");transaction.objectStore(STORE).put(
+  state,
+  activeStateKey
+);
 
       transaction.oncomplete = resolve;
       transaction.onerror = () => reject(transaction.error);
