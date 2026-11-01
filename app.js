@@ -1233,10 +1233,13 @@ async function loadCloudData() {
     updateCloudStatus("Downloading cloud data...");
 
     const { data, error } = await supabaseClient
-      .from("user_app_state")
-      .select("data, updated_at")
-      .eq("user_id", cloudUser.id)
-      .maybeSingle();
+  .from("user_app_state", {
+    fetch: (input, init) =>
+      fetch(input, { ...init, cache: "no-store" })
+  })
+  .select("data, updated_at")
+  .eq("user_id", cloudUser.id)
+  .maybeSingle();
 
     if (error) throw error;
 
