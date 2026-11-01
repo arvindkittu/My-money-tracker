@@ -111,45 +111,84 @@ function clearPendingSync() {
   });
 }
 
+function clearPendingSyncIfCurrent(createdAt) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "syncQueue",
+      "readwrite"
+    );
+
+    const store = transaction.objectStore("syncQueue");
+    const request = store.get("latest");
+
+    request.onsuccess = () => {
+      if (request.result?.createdAt === createdAt) {
+        store.delete("latest");
+      }
+    };
+
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
 function persist() {
-  const localSave = new Promise(resolve => {
-    let t = db.transaction(STORE, "readwrite");
-    t.objectStore(STORE).put(state, "app");
-    t.oncomplete = resolve;
-    t.onerror = resolve;
+  const snapshot = JSON.parse(JSON.stringify(state));
+
+  const localSave = new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readwrite");
+
+    transaction.objectStore(STORE).put(snapshot, "app");
+
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
   });
 
-  if (cloudReady && cloudUser) {
-    const snapshot = JSON.parse(JSON.stringify(state));
-    const userId = cloudUser.id;
+  return localSave.then(async () => {
+    await savePendingSync(snapshot);
 
-    cloudSyncQueue = cloudSyncQueue
-      .then(async () => {
-        const { error } = await supabaseClient
-          .from("user_app_state", {
-  fetch: (input, init) =>
-    fetch(input, { ...init, cache: "no-store" })
-})
-          .upsert({
-            user_id: userId,
-            data: snapshot,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: "user_id"
-          });
+    if (!cloudUser || !cloudReady || !navigator.onLine) {
+      updateCloudStatus("Saved locally · Pending cloud sync");
+      return;
+    }
 
-        if (error) {
-          updateCloudStatus("Cloud sync failed: " + error.message);
-        } else if (cloudUser && cloudUser.id === userId) {
-          updateCloudStatus(
-            "Signed in as " + cloudUser.email + " · Synced"
-          );
-        }
-      })
-      .catch(error => {
-        updateCloudStatus("Cloud sync failed: " + error.message);
-      });
-  }
+    cloudSyncQueue = cloudSyncQueue.then(async () => {
+      if (!cloudUser || !cloudReady || !navigator.onLine) return;
+
+      const pending = await getPendingSync();
+      if (!pending) return;
+
+      const userId = cloudUser.id;
+
+      const { error } = await supabaseClient
+        .from("user_app_state", {
+          fetch: (input, init) =>
+            fetch(input, { ...init, cache: "no-store" })
+        })
+        .upsert({
+          user_id: userId,
+          data: pending.data,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: "user_id"
+        });
+
+      if (error) throw error;
+
+      await clearPendingSyncIfCurrent(pending.createdAt);
+
+      if (cloudUser && cloudUser.id === userId) {
+        updateCloudStatus(
+          "Signed in as " + cloudUser.email + " · Synced"
+        );
+      }
+    }).catch(error => {
+      updateCloudStatus("Cloud sync pending: " + error.message);
+    });
+  });
+}
 
   return localSave;
 }
