@@ -554,6 +554,33 @@ main {padding:26px}
   <button class="btn full" onclick="checkCloudData()">Check cloud database</button>
 <button class="btn primary full" onclick="window.uploadLocalDataToCloud()">Upload local data to cloud</button>
 </div>
+  <div class="card">
+  <h2>Change password</h2>
+
+  <label>New password</label>
+  <input
+    type="password"
+    id="newCloudPassword"
+    placeholder="Enter new password"
+    autocomplete="new-password"
+  >
+
+  <label>Confirm new password</label>
+  <input
+    type="password"
+    id="confirmCloudPassword"
+    placeholder="Confirm new password"
+    autocomplete="new-password"
+  >
+
+  <button
+    class="btn primary full"
+    style="margin-top:12px"
+    onclick="changeCloudPassword()"
+  >
+    Update password
+  </button>
+</div>
 <div class="card">
 <h2>Currency</h2>
 <select id="currency">
