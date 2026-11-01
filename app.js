@@ -1502,7 +1502,36 @@ async function signUpCloud() {
     alert("Account created. Please check your email for the confirmation link.");
   }
 }
+async function saveCloudProfileName() {
+  if (!cloudUser) {
+    alert("Please sign in first.");
+    return;
+  }
 
+  const fullName = $("cloudFullName").value.trim();
+
+  if (!fullName) {
+    alert("Please enter your full name.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.updateUser({
+    data: {
+      full_name: fullName
+    }
+  });
+
+  if (error) {
+    alert("Profile update failed: " + error.message);
+    return;
+  }
+
+  cloudUser = data.user || cloudUser;
+
+  updateCloudStatus("Profile updated: " + fullName);
+
+  alert("Your profile name has been updated successfully.");
+}
 async function signInCloud() {
   const email = $("cloudEmail").value.trim();
   const password = $("cloudPassword").value;
