@@ -157,7 +157,7 @@ async function processPendingSync() {
 
     if (cloudUser?.id === userId) {
       updateCloudStatus(
-        "Signed in as " + cloudUser.email + " · Synced"
+        "Logged in as " + getCloudDisplayName() + " · Synced"
       );
     }
   }).catch(error => {
@@ -1327,7 +1327,11 @@ function render() {
   renderDebts();
   $("currency").value = state.currency;
 }
-
+function getCloudDisplayName() {
+  return cloudUser?.user_metadata?.full_name ||
+         cloudUser?.email ||
+         "Account";
+}
 async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
 }
@@ -1424,8 +1428,8 @@ if (pending) {
     cloudReady = true;
 
     updateCloudStatus(
-      "Signed in as " + cloudUser.email +
-      " · Cloud data loaded · " + cloudCount + " transactions"
+      "Logged in as " + getCloudDisplayName() +
+" · Cloud data loaded · " + cloudCount + " transactions"
     );
 
   } catch (error) {
