@@ -37,7 +37,7 @@ self.addEventListener("fetch", event => {
       (url.pathname.endsWith("/") ||
        url.pathname.endsWith("/index.html"))) {
     event.respondWith(
-      fetch(event.request).then(response => {
+      fetch(event.request, { cache: "no-store" }).then(response => {
         if (response.ok) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then(cache =>
