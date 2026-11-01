@@ -65,65 +65,47 @@ function load() {
   });
 }
 
-function savePendingSync(snapshot) {
+function savePendingSync(snapshot, userId = cloudUser?.id) {
+  if (!userId) return Promise.resolve(false);
+
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(
-      "syncQueue",
-      "readwrite"
-    );
+    const transaction = db.transaction("syncQueue", "readwrite");
 
-    transaction.objectStore("syncQueue").put(
-      {
-        data: snapshot,
-        createdAt: new Date().toISOString()
-      },
-      "latest"
-    );
+    transaction.objectStore("syncQueue").put({
+      userId,
+      data: snapshot,
+      createdAt: Date.now() + "-" + crypto.randomUUID()
+    }, userId);
 
-    transaction.oncomplete = resolve;
+    transaction.oncomplete = () => resolve(true);
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
 }
 
-function getPendingSync() {
+function getPendingSync(userId = cloudUser?.id) {
+  if (!userId) return Promise.resolve(null);
+
   return new Promise((resolve, reject) => {
     const request = db.transaction("syncQueue")
-      .objectStore("syncQueue").get("latest");
+      .objectStore("syncQueue").get(userId);
 
     request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
 }
 
-function clearPendingSync() {
+function clearPendingSyncIfCurrent(createdAt, userId = cloudUser?.id) {
+  if (!userId) return Promise.resolve();
+
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction(
-      "syncQueue",
-      "readwrite"
-    );
-
-    transaction.objectStore("syncQueue").delete("latest");
-
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-}
-
-function clearPendingSyncIfCurrent(createdAt) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(
-      "syncQueue",
-      "readwrite"
-    );
-
+    const transaction = db.transaction("syncQueue", "readwrite");
     const store = transaction.objectStore("syncQueue");
-    const request = store.get("latest");
+    const request = store.get(userId);
 
     request.onsuccess = () => {
       if (request.result?.createdAt === createdAt) {
-        store.delete("latest");
+        store.delete(userId);
       }
     };
 
@@ -132,23 +114,18 @@ function clearPendingSyncIfCurrent(createdAt) {
     transaction.onabort = () => reject(transaction.error);
   });
 }
+
 async function processPendingSync() {
-  if (!cloudUser || !cloudReady || !navigator.onLine) {
-    return;
-  }
+  const userId = cloudUser?.id;
+
+  if (!userId || !cloudReady || !navigator.onLine) return;
 
   cloudSyncQueue = cloudSyncQueue.then(async () => {
-    if (!cloudUser || !cloudReady || !navigator.onLine) {
-      return;
-    }
+    if (!cloudUser || cloudUser.id !== userId ||
+        !cloudReady || !navigator.onLine) return;
 
-    const pending = await getPendingSync();
-
-    if (!pending) {
-      return;
-    }
-
-    const userId = cloudUser.id;
+    const pending = await getPendingSync(userId);
+    if (!pending) return;
 
     const { error } = await supabaseClient
       .from("user_app_state", {
@@ -165,9 +142,9 @@ async function processPendingSync() {
 
     if (error) throw error;
 
-    await clearPendingSyncIfCurrent(pending.createdAt);
+    await clearPendingSyncIfCurrent(pending.createdAt, userId);
 
-    if (cloudUser && cloudUser.id === userId) {
+    if (cloudUser?.id === userId) {
       updateCloudStatus(
         "Signed in as " + cloudUser.email + " · Synced"
       );
@@ -194,10 +171,15 @@ function persist() {
   return localSave.then(async () => {
     await savePendingSync(snapshot);
 
-    if (!cloudUser || !cloudReady || !navigator.onLine) {
-      updateCloudStatus("Saved locally · Pending cloud sync");
-      return;
-    }
+    if (!cloudUser) {
+  updateCloudStatus("Saved locally · Sign in to sync");
+  return;
+}
+
+if (!cloudReady || !navigator.onLine) {
+  updateCloudStatus("Saved locally · Pending cloud sync");
+  return;
+}
 
     cloudSyncQueue = cloudSyncQueue.then(async () => {
       if (!cloudUser || !cloudReady || !navigator.onLine) return;
