@@ -1197,13 +1197,37 @@ async function loadCloudData() {
   }
 }
 
+
 async function initCloudAuth() {
   const { data, error } = await supabaseClient.auth.getSession();
 
   if (error) {
+    cloudReady = false;
     updateCloudStatus("Unable to check cloud account: " + error.message);
     return;
   }
+
+  cloudUser = data.session?.user || null;
+
+  if (cloudUser) {
+    updateCloudStatus("Signed in as " + cloudUser.email);
+    await loadCloudData();
+  } else {
+    cloudReady = false;
+    updateCloudStatus("Not signed in. Sign in or create an account.");
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    cloudUser = session?.user || null;
+
+    if (!cloudUser) {
+      cloudReady = false;
+      updateCloudStatus("Not signed in. Sign in or create an account.");
+    } else {
+      updateCloudStatus("Signed in as " + cloudUser.email);
+    }
+  });
+}
 
   cloudUser = data.session?.user || null;
 
@@ -1272,7 +1296,8 @@ async function signInCloud() {
     return;
   }
 
-  alert("Signed in successfully.");
+    await loadCloudData();
+  alert("Signed in successfully. Cloud data loaded.");
 }
 
 async function signOutCloud() {
@@ -1425,14 +1450,17 @@ window.uploadLocalDataToCloud = async function() {
   }
 };
 
+
 async function init() {
   await openDB();
   await load();
   setTheme();
   $("currency").value = state.currency;
-    await processRecurring();
-  render();
+
   await initCloudAuth();
+  await processRecurring();
+
+  render();
 
   if ("serviceWorker" in navigator &&
       location.protocol.startsWith("http")) {
@@ -1441,3 +1469,4 @@ async function init() {
 }
 
 init();
+
