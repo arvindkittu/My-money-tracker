@@ -1327,6 +1327,24 @@ function render() {
   renderDebts();
   $("currency").value = state.currency;
 }
+function showAuthenticatedApp() {
+  document.body.classList.remove("auth-locked");
+}
+
+function showLoginGate(message) {
+  document.body.classList.add("auth-locked");
+
+  $("loginGateStatus").textContent = message;
+
+  [
+    "gateEmail",
+    "gatePassword",
+    "cloudEmail",
+    "cloudPassword"
+  ].forEach(id => {
+    if ($(id)) $(id).value = "";
+  });
+}
 function getCloudDisplayName() {
   return cloudUser?.user_metadata?.full_name ||
          cloudUser?.email ||
@@ -1439,40 +1457,72 @@ if (pending) {
 }
 
 async function initCloudAuth() {
-  const { data, error } = await supabaseClient.auth.getSession();
+  const { data, error } =
+    await supabaseClient.auth.getSession();
 
   if (error) {
     cloudReady = false;
-    updateCloudStatus("Unable to check cloud account: " + error.message);
+
+    showLoginGate(
+      "Unable to check your account: " + error.message
+    );
+
     return;
   }
 
   cloudUser = data.session?.user || null;
 
   if (cloudUser) {
+    showAuthenticatedApp();
+
+    $("cloudEmail").value = cloudUser.email || "";
+    $("cloudFullName").value =
+      cloudUser.user_metadata?.full_name || "";
+
     updateCloudStatus("Loading cloud data...");
+
     await loadCloudData();
   } else {
     cloudReady = false;
-    updateCloudStatus("Not signed in. Sign in or create an account.");
+
+    showLoginGate(
+      "Sign in to access your personal finance dashboard."
+    );
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     cloudUser = session?.user || null;
 
-    if (!cloudUser) {
+    if (event === "SIGNED_OUT" || !cloudUser) {
       cloudReady = false;
-      updateCloudStatus("Not signed in. Sign in or create an account.");
-    } else if (event === "SIGNED_IN") {
-      loadCloudData();
+
+      showLoginGate(
+        "You have signed out. Sign in to continue."
+      );
+    }
+
+    if (event === "USER_UPDATED" && cloudUser) {
+      $("cloudFullName").value =
+        cloudUser.user_metadata?.full_name || "";
     }
   });
 }
 
 async function signUpCloud() {
-  const fullName = $("cloudFullName").value.trim();
-  const email = $("cloudEmail").value.trim();
-  const password = $("cloudPassword").value;
+  const fromGate =
+    document.body.classList.contains("auth-locked");
+
+  const fullName = $(
+    fromGate ? "gateFullName" : "cloudFullName"
+  ).value.trim();
+
+  const email = $(
+    fromGate ? "gateEmail" : "cloudEmail"
+  ).value.trim();
+
+  const password = $(
+    fromGate ? "gatePassword" : "cloudPassword"
+  ).value;
 
   if (!fullName) {
     alert("Please enter your full name.");
@@ -1488,7 +1538,8 @@ async function signUpCloud() {
     email,
     password,
     options: {
-      emailRedirectTo: "https://arvindkittu.github.io/My-money-tracker/",
+      emailRedirectTo:
+        "https://arvindkittu.github.io/My-money-tracker/",
       data: {
         full_name: fullName
       }
@@ -1500,10 +1551,30 @@ async function signUpCloud() {
     return;
   }
 
-  if (data.session) {
-    alert("Account created and signed in successfully.");
+  if (data.session && data.user) {
+    cloudUser = data.user;
+
+    showAuthenticatedApp();
+
+    $("cloudEmail").value = email;
+    $("cloudFullName").value = fullName;
+
+    await loadCloudData();
+    await processRecurring();
+    render();
+
+    alert("Account created successfully.");
   } else {
-    alert("Account created. Please check your email for the confirmation link.");
+    if (fromGate) {
+      $("gateEmail").value = email;
+      $("gatePassword").value = "";
+      $("loginGateStatus").textContent =
+        "Account created. Please verify your email, then sign in.";
+    } else {
+      alert(
+        "Account created. Please check your email for confirmation."
+      );
+    }
   }
 }
 async function saveCloudProfileName() {
@@ -1575,29 +1646,77 @@ async function changeCloudPassword() {
   }
 }
 async function signInCloud() {
-  const email = $("cloudEmail").value.trim();
-  const password = $("cloudPassword").value;
+  const fromGate =
+    document.body.classList.contains("auth-locked");
+
+  const email = $(fromGate ? "gateEmail" : "cloudEmail")
+    .value.trim();
+
+  const password = $(fromGate ? "gatePassword" : "cloudPassword")
+    .value;
 
   if (!email || !password) {
     alert("Enter your email and password.");
     return;
   }
 
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+  const { data, error } =
+    await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
 
   if (error) {
-    alert("Sign-in failed: " + error.message);
+    if (fromGate) {
+      $("loginGateStatus").textContent =
+        "Sign-in failed: " + error.message;
+    } else {
+      alert("Sign-in failed: " + error.message);
+    }
     return;
   }
 
-    await loadCloudData();
-  alert("Signed in successfully. Cloud data loaded.");
-}
+  cloudUser = data.user || data.session?.user;
 
+  showAuthenticatedApp();
+
+  $("cloudEmail").value = email;
+  $("cloudFullName").value =
+    cloudUser?.user_metadata?.full_name || "";
+
+  $("gatePassword").value = "";
+
+  await loadCloudData();
+
+  if (cloudUser) {
+    await processRecurring();
+  }
+
+  render();
+
+  alert("Signed in successfully.");
+}
 async function signOutCloud() {
+  if (cloudUser) {
+    const pending = await getPendingSync(cloudUser.id);
+
+    if (pending) {
+      if (navigator.onLine && cloudReady) {
+        await processPendingSync();
+      }
+
+      const remaining = await getPendingSync(cloudUser.id);
+
+      if (remaining && !confirm(
+        "Some changes are still waiting to sync.\n\n" +
+        "They will remain saved locally for this account.\n\n" +
+        "Do you still want to sign out?"
+      )) {
+        return;
+      }
+    }
+  }
+
   const { error } = await supabaseClient.auth.signOut();
 
   if (error) {
@@ -1605,7 +1724,12 @@ async function signOutCloud() {
     return;
   }
 
-  alert("Signed out successfully.");
+  cloudUser = null;
+  cloudReady = false;
+
+  showLoginGate(
+    "You have signed out successfully. Sign in to continue."
+  );
 }
 
 async function testSupabaseConnection() {
@@ -1794,7 +1918,9 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-await processRecurring();
+if (cloudUser) {
+  await processRecurring();
+}
 
   render();
 
