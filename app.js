@@ -1245,30 +1245,61 @@ async function testSupabaseConnection() {
   }
 }
 
-
 async function checkCloudData() {
-  if (!cloudUser) {
-    alert("You are not signed in. Please sign in first.");
-    return;
+  try {
+    alert("Checking Supabase database...");
+
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    if (sessionError) {
+      alert("Session error: " + sessionError.message);
+      return;
+    }
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      cloudUser = null;
+      updateCloudStatus("Not signed in.");
+      alert("No active login session. Please sign in again.");
+      return;
+    }
+
+    cloudUser = user;
+
+    const { data, error } = await supabaseClient
+      .from("user_app_state")
+      .select("user_id, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      alert(
+        "Database error: " +
+        error.message +
+        "\nCode: " + (error.code || "Not available")
+      );
+      return;
+    }
+
+    if (!data) {
+      alert(
+        "SUCCESS: Supabase database is accessible.\n\n" +
+        "No cloud backup exists yet.\n" +
+        "Your existing records remain safely on this device."
+      );
+      return;
+    }
+
+    alert(
+      "SUCCESS: Cloud backup found.\n\n" +
+      "Last updated: " + data.updated_at
+    );
+
+  } catch (error) {
+    alert("Unexpected error: " + error.message);
   }
-
-  const { data, error } = await supabaseClient
-    .from("user_app_state")
-    .select("user_id, updated_at")
-    .eq("user_id", cloudUser.id)
-    .maybeSingle();
-
-  if (error) {
-    alert("Database check failed: " + error.message);
-    return;
-  }
-
-  if (!data) {
-    alert("Cloud database is connected. No backup exists yet. Your existing records are still on this device.");
-    return;
-  }
-
-  alert("Cloud backup found. Last updated: " + data.updated_at);
 }
 async function init() {
   await openDB();
