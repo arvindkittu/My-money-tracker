@@ -1081,61 +1081,32 @@ function download(name, content, type) {
 async function downloadCloudCSV() {
   try {
     if (!cloudUser) {
-      alert("Please sign in to your cloud account first.");
+      alert("Please sign in first.");
       return;
     }
 
     const { data, error } = await supabaseClient
       .from("user_app_state")
-      .select("data")
+      .select("user_id, data, updated_at")
       .eq("user_id", cloudUser.id)
       .single();
 
     if (error) throw error;
 
-    const cloudData = data.data || {};
-    const transactions = Array.isArray(cloudData.transactions)
-      ? cloudData.transactions
+    const transactions = Array.isArray(data.data?.transactions)
+      ? data.data.transactions
       : [];
 
-    const currency = cloudData.currency || "INR";
-
-    const rows = [
-      ["Date", "Type", "Amount", "Currency", "Note"],
-      ...transactions.map(t => [
-        t.date || "",
-        t.type || "",
-        t.amount ?? "",
-        currency,
-        t.note || ""
-      ])
-    ];
-
-    const csv = rows.map(row =>
-      row.map(value => {
-        let text = String(value);
-
-        if (/^[=+\-@]/.test(text)) {
-          text = "'" + text;
-        }
-
-        return '"' + text.replace(/"/g, '""') + '"';
-      }).join(",")
-    ).join("\r\n");
-
-    download(
-      "my-money-cloud-report-" + today() + ".csv",
-      "\uFEFF" + csv,
-      "text/csv;charset=utf-8"
-    );
-
     alert(
-      "Cloud CSV downloaded successfully!\n\n" +
-      "Transactions: " + transactions.length
+      "CLOUD DIAGNOSTICS\n\n" +
+      "Logged-in user ID:\n" + cloudUser.id +
+      "\n\nDatabase record user ID:\n" + data.user_id +
+      "\n\nTransactions returned: " + transactions.length +
+      "\n\nLast updated:\n" + data.updated_at
     );
 
   } catch (error) {
-    alert("Cloud CSV download failed: " + error.message);
+    alert("Cloud diagnostic failed: " + error.message);
   }
 }
 
