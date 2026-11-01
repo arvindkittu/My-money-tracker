@@ -1666,7 +1666,29 @@ window.uploadLocalDataToCloud = async function() {
     alert("Unexpected error: " + error.message);
   }
 };
+let cloudRetryInProgress = false;
 
+async function retryPendingSync() {
+  if (
+    cloudRetryInProgress ||
+    !cloudUser ||
+    !navigator.onLine
+  ) {
+    return;
+  }
+
+  cloudRetryInProgress = true;
+
+  try {
+    if (!cloudReady) {
+      await loadCloudData();
+    } else {
+      await processPendingSync();
+    }
+  } finally {
+    cloudRetryInProgress = false;
+  }
+}
 
 async function init() {
   await openDB();
@@ -1674,8 +1696,25 @@ async function init() {
   setTheme();
   $("currency").value = state.currency;
 
-  await initCloudAuth();
-  await processRecurring();
+ await initCloudAuth();
+
+window.addEventListener("online", retryPendingSync);
+
+window.addEventListener("offline", () => {
+  if (cloudUser) {
+    updateCloudStatus(
+      "Offline · Changes will sync when connection returns"
+    );
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    retryPendingSync();
+  }
+});
+
+await processRecurring();
 
   render();
 
