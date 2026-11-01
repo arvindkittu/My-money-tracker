@@ -126,31 +126,25 @@ async function loadAccountState(userId) {
   const accountKey = getAccountStateKey(userId);
 
   let accountData = await readLocalState(accountKey);
+  let legacyOwner = await readLegacyOwner();
 
-  if (!accountData) {
+  // Claim legacy data for the first account that initializes storage.
+  if (!legacyOwner) {
     const legacyData = await readLocalState("app");
-    const legacyOwner = await readLegacyOwner();
 
-    if (
-      legacyData &&
-      (!legacyOwner || legacyOwner === userId)
-    ) {
+    if (legacyData && !accountData) {
       accountData = legacyData;
-
       await writeLocalState(accountKey, accountData);
-
-      if (!legacyOwner) {
-        await saveLegacyOwner(userId);
-      }
-    } else {
-      accountData = createEmptyState();
-
-      await writeLocalState(accountKey, accountData);
-
-      if (!legacyOwner) {
-        await saveLegacyOwner(userId);
-      }
     }
+
+    await saveLegacyOwner(userId);
+    legacyOwner = userId;
+  }
+
+  // Never copy legacy data when another account already owns it.
+  if (!accountData) {
+    accountData = createEmptyState();
+    await writeLocalState(accountKey, accountData);
   }
 
   state = {
@@ -1426,6 +1420,12 @@ function showAuthenticatedApp() {
 function showLoginGate(message) {
   document.body.classList.add("auth-locked");
 
+  // Clear the previous account from application memory.
+  state = createEmptyState();
+  activeStateKey = null;
+  activeStateUserId = null;
+  cloudReady = false;
+
   $("loginGateStatus").textContent = message;
 
   [
@@ -1584,7 +1584,10 @@ async function initCloudAuth() {
   cloudUser = data.session?.user || null;
 
   if (cloudUser) {
-    showAuthenticatedApp();
+    const userId = cloudUser.id;
+
+    // Keep the dashboard locked until this account's data is loaded.
+    showLoginGate("Loading your account data...");
 
     $("cloudEmail").value = cloudUser.email || "";
     $("cloudFullName").value =
@@ -1593,6 +1596,18 @@ async function initCloudAuth() {
     updateCloudStatus("Loading cloud data...");
 
     await loadCloudData();
+
+    if (
+      cloudUser?.id === userId &&
+      activeStateUserId === userId
+    ) {
+      showAuthenticatedApp();
+      render();
+    } else {
+      showLoginGate(
+        "Unable to load your account's local data. Please refresh and sign in again."
+      );
+    }
   } else {
     cloudReady = false;
 
@@ -1787,26 +1802,40 @@ async function signInCloud() {
     return;
   }
 
-  cloudUser = data.user || data.session?.user;
+  // Lock and clear the previous account before loading the new one.
+  showLoginGate("Loading your account data...");
 
-  showAuthenticatedApp();
+  cloudUser = data.user || data.session?.user;
+  const userId = cloudUser?.id;
+
+  if (!userId) {
+    showLoginGate("Unable to identify the signed-in account.");
+    return;
+  }
 
   $("cloudEmail").value = email;
   $("cloudFullName").value =
-    cloudUser?.user_metadata?.full_name || "";
-
-  $("gatePassword").value = "";
+    cloudUser.user_metadata?.full_name || "";
 
   await loadCloudData();
 
-  if (cloudUser) {
-    await processRecurring();
+  if (
+    cloudUser?.id !== userId ||
+    activeStateUserId !== userId
+  ) {
+    $("loginGateStatus").textContent =
+      "Your account's local data could not be loaded. Please refresh and try again.";
+    return;
   }
 
+  showAuthenticatedApp();
+
+  await processRecurring();
   render();
 
   alert("Signed in successfully.");
 }
+
 async function signOutCloud() {
   if (cloudUser) {
     const pending = await getPendingSync(cloudUser.id);
@@ -2029,7 +2058,7 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-if (cloudUser) {
+if (cloudUser && activeStateUserId === cloudUser.id) {
   await processRecurring();
 }
 
