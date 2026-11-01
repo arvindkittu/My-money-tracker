@@ -64,7 +64,10 @@ function persist() {
     cloudSyncQueue = cloudSyncQueue
       .then(async () => {
         const { error } = await supabaseClient
-          .from("user_app_state")
+          .from("user_app_state", {
+  fetch: (input, init) =>
+    fetch(input, { ...init, cache: "no-store" })
+})
           .upsert({
             user_id: userId,
             data: snapshot,
