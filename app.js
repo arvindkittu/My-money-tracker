@@ -65,6 +65,52 @@ function load() {
   });
 }
 
+function savePendingSync(snapshot) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "syncQueue",
+      "readwrite"
+    );
+
+    transaction.objectStore("syncQueue").put(
+      {
+        data: snapshot,
+        createdAt: new Date().toISOString()
+      },
+      "latest"
+    );
+
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+function getPendingSync() {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("syncQueue")
+      .objectStore("syncQueue").get("latest");
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function clearPendingSync() {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      "syncQueue",
+      "readwrite"
+    );
+
+    transaction.objectStore("syncQueue").delete("latest");
+
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
 function persist() {
   const localSave = new Promise(resolve => {
     let t = db.transaction(STORE, "readwrite");
