@@ -1139,6 +1139,49 @@ async function downloadCloudCSV() {
   }
 }
 
+async function diagnoseTransactions() {
+  try {
+    const { data, error } = await supabaseClient
+      .from("user_app_state")
+      .select("data")
+      .eq("user_id", cloudUser.id)
+      .single();
+
+    if (error) throw error;
+
+    const cloudCount = Array.isArray(data.data.transactions)
+      ? data.data.transactions.length : 0;
+
+    const localRecord = await new Promise((resolve, reject) => {
+      const request = db.transaction(STORE)
+        .objectStore(STORE).get("app");
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    const localCount = Array.isArray(localRecord?.transactions)
+      ? localRecord.transactions.length : 0;
+
+    const appCount = Array.isArray(state.transactions)
+      ? state.transactions.length : 0;
+
+    const visibleCount =
+      $("txList").querySelectorAll(".item").length;
+
+    alert(
+      "TRANSACTION DIAGNOSTICS\n\n" +
+      "Supabase: " + cloudCount + "\n" +
+      "IndexedDB: " + localCount + "\n" +
+      "App memory: " + appCount + "\n" +
+      "Displayed: " + visibleCount
+    );
+
+  } catch (error) {
+    alert("Diagnostic failed: " + error.message);
+  }
+}
+
 function exportJSON() {
   download("my-money-backup-" + today() + ".json",
     JSON.stringify({ ...state, backupCreated: new Date().toISOString() }, null, 2),
