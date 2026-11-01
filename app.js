@@ -1466,8 +1466,14 @@ async function initCloudAuth() {
 }
 
 async function signUpCloud() {
+  const fullName = $("cloudFullName").value.trim();
   const email = $("cloudEmail").value.trim();
   const password = $("cloudPassword").value;
+
+  if (!fullName) {
+    alert("Please enter your full name.");
+    return;
+  }
 
   if (!email || password.length < 6) {
     alert("Enter a valid email and a password with at least 6 characters.");
@@ -1475,12 +1481,15 @@ async function signUpCloud() {
   }
 
   const { data, error } = await supabaseClient.auth.signUp({
-  email,
-  password,
-  options: {
-    emailRedirectTo: "https://arvindkittu.github.io/My-money-tracker/"
-  }
-});
+    email,
+    password,
+    options: {
+      emailRedirectTo: "https://arvindkittu.github.io/My-money-tracker/",
+      data: {
+        full_name: fullName
+      }
+    }
+  });
 
   if (error) {
     alert("Account creation failed: " + error.message);
