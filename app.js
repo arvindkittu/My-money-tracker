@@ -1245,6 +1245,31 @@ async function testSupabaseConnection() {
   }
 }
 
+
+async function checkCloudData() {
+  if (!cloudUser) {
+    alert("You are not signed in. Please sign in first.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("user_app_state")
+    .select("user_id, updated_at")
+    .eq("user_id", cloudUser.id)
+    .maybeSingle();
+
+  if (error) {
+    alert("Database check failed: " + error.message);
+    return;
+  }
+
+  if (!data) {
+    alert("Cloud database is connected. No backup exists yet. Your existing records are still on this device.");
+    return;
+  }
+
+  alert("Cloud backup found. Last updated: " + data.updated_at);
+}
 async function init() {
   await openDB();
   await load();
