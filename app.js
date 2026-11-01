@@ -1182,26 +1182,6 @@ async function loadCloudData() {
     }
 
     if (data && data.data) {
-      const localMatches = state.transactions.filter(
-        t => Number(t.amount) === 1
-      );
-
-      const cloudTransactions = Array.isArray(data.data.transactions)
-        ? data.data.transactions
-        : [];
-
-      const cloudMatches = cloudTransactions.filter(
-        t => Number(t.amount) === 1
-      );
-
-      const localInfo = localMatches.map(t =>
-        "ID " + String(t.id).slice(-8) + ": " + t.note
-      ).join(" | ") || "None";
-
-      const cloudInfo = cloudMatches.map(t =>
-        "ID " + String(t.id).slice(-8) + ": " + t.note
-      ).join(" | ") || "None";
-
       state = { ...state, ...data.data };
 
       await persist();
@@ -1211,8 +1191,7 @@ async function loadCloudData() {
       cloudReady = true;
 
       updateCloudStatus(
-        "Local: " + localInfo +
-        " · Cloud: " + cloudInfo
+        "Signed in as " + cloudUser.email + " · Cloud data loaded"
       );
     } else {
       cloudReady = true;
