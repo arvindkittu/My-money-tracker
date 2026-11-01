@@ -157,6 +157,7 @@ async function processPendingSync() {
 }
 function persist() {
   const snapshot = JSON.parse(JSON.stringify(state));
+  const userId = cloudUser?.id || null;
 
   const localSave = new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE, "readwrite");
@@ -169,54 +170,26 @@ function persist() {
   });
 
   return localSave.then(async () => {
-    await savePendingSync(snapshot);
+    if (!userId) {
+      updateCloudStatus("Saved locally · Sign in to sync");
+      return;
+    }
 
-    if (!cloudUser) {
-  updateCloudStatus("Saved locally · Sign in to sync");
-  return;
-}
+    await savePendingSync(snapshot, userId);
 
-if (!cloudReady || !navigator.onLine) {
-  updateCloudStatus("Saved locally · Pending cloud sync");
-  return;
-}
+    if (!cloudUser || cloudUser.id !== userId) {
+      updateCloudStatus("Saved locally · Pending account sync");
+      return;
+    }
 
-    cloudSyncQueue = cloudSyncQueue.then(async () => {
-      if (!cloudUser || !cloudReady || !navigator.onLine) return;
+    if (!cloudReady || !navigator.onLine) {
+      updateCloudStatus("Saved locally · Pending cloud sync");
+      return;
+    }
 
-      const pending = await getPendingSync();
-      if (!pending) return;
-
-      const userId = cloudUser.id;
-
-      const { error } = await supabaseClient
-        .from("user_app_state", {
-          fetch: (input, init) =>
-            fetch(input, { ...init, cache: "no-store" })
-        })
-        .upsert({
-          user_id: userId,
-          data: pending.data,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: "user_id"
-        });
-
-      if (error) throw error;
-
-      await clearPendingSyncIfCurrent(pending.createdAt);
-
-      if (cloudUser && cloudUser.id === userId) {
-        updateCloudStatus(
-          "Signed in as " + cloudUser.email + " · Synced"
-        );
-      }
-    }).catch(error => {
-      updateCloudStatus("Cloud sync pending: " + error.message);
-    });
+    await processPendingSync();
   });
 }
-
 const today = () => new Date().toLocaleDateString("en-CA");
 const month = () => today().slice(0, 7);
 const money = n => new Intl.NumberFormat("en-IN", {
