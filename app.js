@@ -1160,6 +1160,7 @@ async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
 }
 
+
 async function loadCloudData() {
   if (!cloudUser) {
     cloudReady = false;
@@ -1180,31 +1181,46 @@ async function loadCloudData() {
       return;
     }
 
-    
-if (data && data.data) {
-  const cloudCount = Array.isArray(data.data.transactions)
-    ? data.data.transactions.length
-    : 0;
+    if (data && data.data) {
+      const localMatches = state.transactions.filter(
+        t => Number(t.amount) === 1
+      );
 
-  state = { ...state, ...data.data };
+      const cloudTransactions = Array.isArray(data.data.transactions)
+        ? data.data.transactions
+        : [];
 
-  await persist();
-  setTheme();
-  render();
+      const cloudMatches = cloudTransactions.filter(
+        t => Number(t.amount) === 1
+      );
 
-  const appCount = state.transactions.length;
-  const displayedCount = $("txResultCount").textContent;
+      const localInfo = localMatches.map(t =>
+        "ID " + String(t.id).slice(-8) + ": " + t.note
+      ).join(" | ") || "None";
 
-  updateCloudStatus(
-    "Cloud diagnostic · Downloaded: " + cloudCount +
-    " · App: " + appCount +
-    " · Display: " + displayedCount
-  );
-}
+      const cloudInfo = cloudMatches.map(t =>
+        "ID " + String(t.id).slice(-8) + ": " + t.note
+      ).join(" | ") || "None";
 
-    cloudReady = true;
+      state = { ...state, ...data.data };
+
+      await persist();
+      setTheme();
+      render();
+
+      cloudReady = true;
+
+      updateCloudStatus(
+        "Local: " + localInfo +
+        " · Cloud: " + cloudInfo
+      );
+    } else {
+      cloudReady = true;
+      updateCloudStatus("No cloud backup found.");
+    }
 
   } catch (error) {
+    cloudReady = false;
     updateCloudStatus("Cloud download failed: " + error.message);
   }
 }
