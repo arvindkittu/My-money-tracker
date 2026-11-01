@@ -273,10 +273,72 @@ font-size:14px
 main {padding:26px}
 .grid.four {grid-template-columns:repeat(4,1fr)}
 }
+  .login-gate {
+  display: none;
+  max-width: 460px;
+  margin: 7vh auto;
+  padding: 16px;
+}
+
+body.auth-locked > header,
+body.auth-locked > main,
+body.auth-locked > nav {
+  display: none !important;
+}
+
+body.auth-locked .login-gate {
+  display: block;
+}
 </style>
 </head>
 
 <body>
+  <section id="loginGate" class="login-gate">
+  <div class="card">
+    <div class="brand">my<span>money</span></div>
+    <h1 style="margin-top:20px">Welcome back</h1>
+
+    <p class="muted small" id="loginGateStatus">
+      Sign in to access your personal finance dashboard.
+    </p>
+
+    <label>Full name (for new accounts)</label>
+    <input
+      type="text"
+      id="gateFullName"
+      placeholder="Enter your full name"
+      autocomplete="name"
+    >
+
+    <label>Email address</label>
+    <input
+      type="email"
+      id="gateEmail"
+      placeholder="Enter your email"
+      autocomplete="username"
+    >
+
+    <label>Password</label>
+    <input
+      type="password"
+      id="gatePassword"
+      placeholder="Enter your password"
+      autocomplete="current-password"
+    >
+
+    <div class="actions">
+      <button class="btn primary full"
+        onclick="signInCloud()">
+        Sign in
+      </button>
+
+      <button class="btn full"
+        onclick="signUpCloud()">
+        Create account
+      </button>
+    </div>
+  </div>
+</section>
 
 <header>
 <div>
