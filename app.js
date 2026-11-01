@@ -1180,15 +1180,27 @@ async function loadCloudData() {
       return;
     }
 
-    if (data && data.data) {
-      state = { ...state, ...data.data };
-      await persist();
-      setTheme();
-      render();
-      updateCloudStatus(
-        "Signed in as " + cloudUser.email + " · Cloud data loaded"
-      );
-    }
+    
+if (data && data.data) {
+  const cloudCount = Array.isArray(data.data.transactions)
+    ? data.data.transactions.length
+    : 0;
+
+  state = { ...state, ...data.data };
+
+  await persist();
+  setTheme();
+  render();
+
+  const appCount = state.transactions.length;
+  const displayedCount = $("txResultCount").textContent;
+
+  updateCloudStatus(
+    "Cloud diagnostic · Downloaded: " + cloudCount +
+    " · App: " + appCount +
+    " · Display: " + displayedCount
+  );
+}
 
     cloudReady = true;
 
