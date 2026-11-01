@@ -1197,7 +1197,6 @@ async function loadCloudData() {
   }
 }
 
-
 async function initCloudAuth() {
   const { data, error } = await supabaseClient.auth.getSession();
 
@@ -1209,20 +1208,23 @@ async function initCloudAuth() {
 
   cloudUser = data.session?.user || null;
 
-  updateCloudStatus(
-    cloudUser
-      ? "Signed in as " + cloudUser.email
-      : "Not signed in. Sign in or create an account."
-  );
+  if (cloudUser) {
+    updateCloudStatus("Loading cloud data...");
+    await loadCloudData();
+  } else {
+    cloudReady = false;
+    updateCloudStatus("Not signed in. Sign in or create an account.");
+  }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     cloudUser = session?.user || null;
 
-    updateCloudStatus(
-      cloudUser
-        ? "Signed in as " + cloudUser.email
-        : "Not signed in. Sign in or create an account."
-    );
+    if (!cloudUser) {
+      cloudReady = false;
+      updateCloudStatus("Not signed in. Sign in or create an account.");
+    } else if (event === "SIGNED_IN") {
+      loadCloudData();
+    }
   });
 }
 
