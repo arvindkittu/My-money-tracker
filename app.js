@@ -31,9 +31,25 @@ let state = {
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    let r = indexedDB.open(DBNAME, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-    r.onsuccess = () => { db = r.result; resolve(); };
+    let r = indexedDB.open(DBNAME, 2);
+
+    r.onupgradeneeded = () => {
+      const database = r.result;
+
+      if (!database.objectStoreNames.contains(STORE)) {
+        database.createObjectStore(STORE);
+      }
+
+      if (!database.objectStoreNames.contains("syncQueue")) {
+        database.createObjectStore("syncQueue");
+      }
+    };
+
+    r.onsuccess = () => {
+      db = r.result;
+      resolve();
+    };
+
     r.onerror = () => reject(r.error);
   });
 }
