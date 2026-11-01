@@ -1209,28 +1209,6 @@ async function initCloudAuth() {
 
   cloudUser = data.session?.user || null;
 
-  if (cloudUser) {
-    updateCloudStatus("Signed in as " + cloudUser.email);
-    await loadCloudData();
-  } else {
-    cloudReady = false;
-    updateCloudStatus("Not signed in. Sign in or create an account.");
-  }
-
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    cloudUser = session?.user || null;
-
-    if (!cloudUser) {
-      cloudReady = false;
-      updateCloudStatus("Not signed in. Sign in or create an account.");
-    } else {
-      updateCloudStatus("Signed in as " + cloudUser.email);
-    }
-  });
-}
-
-  cloudUser = data.session?.user || null;
-
   updateCloudStatus(
     cloudUser
       ? "Signed in as " + cloudUser.email
