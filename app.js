@@ -1302,10 +1302,9 @@ async function checkCloudData() {
   }
 }
 
+
 window.uploadLocalDataToCloud = async function() {
   try {
-    alert("Upload function started.");
-
     const { data: sessionData, error: sessionError } =
       await supabaseClient.auth.getSession();
 
@@ -1321,49 +1320,34 @@ window.uploadLocalDataToCloud = async function() {
       return;
     }
 
-    const { data: existing, error: checkError } =
-      await supabaseClient
-        .from("user_app_state")
-        .select("user_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-    if (checkError) {
-      alert("Cloud check failed: " + checkError.message);
-      return;
-    }
-
-    if (existing) {
-      alert("A cloud backup already exists. No data was uploaded.");
-      return;
-    }
-
     const transactionCount = state.transactions.length;
 
     if (!confirm(
-      "Upload your local financial data to Supabase?\n\n" +
+      "Update your cloud backup with the latest local data?\n\n" +
       "Transactions: " + transactionCount +
-      "\nYour local records will remain unchanged."
+      "\nYour existing cloud backup will be updated."
     )) return;
 
     const cloudData = JSON.parse(JSON.stringify(state));
 
     const { error: uploadError } = await supabaseClient
       .from("user_app_state")
-      .insert({
+      .upsert({
         user_id: user.id,
         data: cloudData,
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: "user_id"
       });
 
     if (uploadError) {
-      alert("Upload failed: " + uploadError.message);
+      alert("Cloud update failed: " + uploadError.message);
       return;
     }
 
     alert(
-      "SUCCESS! Your data has been uploaded.\nTransactions: " +
-      transactionCount
+      "SUCCESS! Your cloud backup has been updated.\n" +
+      "Transactions: " + transactionCount
     );
 
   } catch (error) {
