@@ -50,12 +50,43 @@ function load() {
 }
 
 function persist() {
-  return new Promise(resolve => {
+  const localSave = new Promise(resolve => {
     let t = db.transaction(STORE, "readwrite");
     t.objectStore(STORE).put(state, "app");
     t.oncomplete = resolve;
-    t.onerror = () => resolve();
+    t.onerror = resolve;
   });
+
+  if (cloudReady && cloudUser) {
+    const snapshot = JSON.parse(JSON.stringify(state));
+    const userId = cloudUser.id;
+
+    cloudSyncQueue = cloudSyncQueue
+      .then(async () => {
+        const { error } = await supabaseClient
+          .from("user_app_state")
+          .upsert({
+            user_id: userId,
+            data: snapshot,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: "user_id"
+          });
+
+        if (error) {
+          updateCloudStatus("Cloud sync failed: " + error.message);
+        } else if (cloudUser && cloudUser.id === userId) {
+          updateCloudStatus(
+            "Signed in as " + cloudUser.email + " · Synced"
+          );
+        }
+      })
+      .catch(error => {
+        updateCloudStatus("Cloud sync failed: " + error.message);
+      });
+  }
+
+  return localSave;
 }
 
 const today = () => new Date().toLocaleDateString("en-CA");
