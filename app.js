@@ -190,9 +190,6 @@ function persist() {
   });
 }
 
-  return localSave;
-}
-
 const today = () => new Date().toLocaleDateString("en-CA");
 const month = () => today().slice(0, 7);
 const money = n => new Intl.NumberFormat("en-IN", {
