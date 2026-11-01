@@ -118,13 +118,21 @@ function clearPendingSyncIfCurrent(createdAt, userId = cloudUser?.id) {
 async function processPendingSync() {
   const userId = cloudUser?.id;
 
-  if (!userId || !cloudReady || !navigator.onLine) return;
+  if (!userId || !cloudReady || !navigator.onLine) {
+    return false;
+  }
+
+  let syncSucceeded = true;
 
   cloudSyncQueue = cloudSyncQueue.then(async () => {
     if (!cloudUser || cloudUser.id !== userId ||
-        !cloudReady || !navigator.onLine) return;
+        !cloudReady || !navigator.onLine) {
+      syncSucceeded = false;
+      return;
+    }
 
     const pending = await getPendingSync(userId);
+
     if (!pending) return;
 
     const { error } = await supabaseClient
@@ -142,7 +150,10 @@ async function processPendingSync() {
 
     if (error) throw error;
 
-    await clearPendingSyncIfCurrent(pending.createdAt, userId);
+    await clearPendingSyncIfCurrent(
+      pending.createdAt,
+      userId
+    );
 
     if (cloudUser?.id === userId) {
       updateCloudStatus(
@@ -150,11 +161,15 @@ async function processPendingSync() {
       );
     }
   }).catch(error => {
+    syncSucceeded = false;
     updateCloudStatus("Cloud sync pending: " + error.message);
   });
 
   await cloudSyncQueue;
+
+  return syncSucceeded;
 }
+
 function persist() {
   const snapshot = JSON.parse(JSON.stringify(state));
   const userId = cloudUser?.id || null;
@@ -1317,8 +1332,6 @@ async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
 }
 
-
-
 async function loadCloudData() {
   if (!cloudUser) {
     cloudReady = false;
@@ -1328,6 +1341,21 @@ async function loadCloudData() {
   cloudReady = false;
 
   try {
+    const pending = await getPendingSync(cloudUser.id);
+
+if (pending) {
+  cloudReady = true;
+
+  const synced = await processPendingSync();
+
+  if (!synced) {
+    cloudReady = false;
+    updateCloudStatus(
+      "Pending local changes could not be uploaded. Local data is preserved."
+    );
+    return;
+  }
+}
     updateCloudStatus("Downloading cloud data...");
 
     const { data, error } = await supabaseClient
