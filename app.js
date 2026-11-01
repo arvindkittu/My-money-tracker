@@ -1112,16 +1112,22 @@ async function downloadCloudCSV() {
 
 async function diagnoseTransactions() {
   try {
+    if (!cloudUser) {
+      alert("Please sign in before checking transaction counts.");
+      return;
+    }
+
     const { data, error } = await supabaseClient
       .from("user_app_state")
-      .select("data")
+      .select("user_id, data, updated_at")
       .eq("user_id", cloudUser.id)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
 
-    const cloudCount = Array.isArray(data.data.transactions)
-      ? data.data.transactions.length : 0;
+    const cloudTransactions = data?.data?.transactions;
+    const cloudCount = Array.isArray(cloudTransactions)
+      ? cloudTransactions.length : 0;
 
     const localRecord = await new Promise((resolve, reject) => {
       const request = db.transaction(STORE)
@@ -1137,15 +1143,14 @@ async function diagnoseTransactions() {
     const appCount = Array.isArray(state.transactions)
       ? state.transactions.length : 0;
 
-    const visibleCount =
-      $("txList").querySelectorAll(".item").length;
-
     alert(
       "TRANSACTION DIAGNOSTICS\n\n" +
+      "Signed-in user: " + cloudUser.id + "\n" +
+      "Cloud record user: " + (data?.user_id || "No record") + "\n" +
       "Supabase: " + cloudCount + "\n" +
       "IndexedDB: " + localCount + "\n" +
       "App memory: " + appCount + "\n" +
-      "Displayed: " + visibleCount
+      "Last cloud update: " + (data?.updated_at || "No record")
     );
 
   } catch (error) {
