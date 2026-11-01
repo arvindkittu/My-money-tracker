@@ -1302,8 +1302,10 @@ async function checkCloudData() {
   }
 }
 
-async function uploadLocalDataToCloud() {
+window.uploadLocalDataToCloud = async function() {
   try {
+    alert("Upload function started.");
+
     const { data: sessionData, error: sessionError } =
       await supabaseClient.auth.getSession();
 
@@ -1315,11 +1317,9 @@ async function uploadLocalDataToCloud() {
     const user = sessionData.session?.user;
 
     if (!user) {
-      alert("Please sign in before uploading.");
+      alert("Please sign in first.");
       return;
     }
-
-    cloudUser = user;
 
     const { data: existing, error: checkError } =
       await supabaseClient
@@ -1334,21 +1334,17 @@ async function uploadLocalDataToCloud() {
     }
 
     if (existing) {
-      alert(
-        "A cloud backup already exists. Upload stopped to protect your data."
-      );
+      alert("A cloud backup already exists. No data was uploaded.");
       return;
     }
 
     const transactionCount = state.transactions.length;
 
     if (!confirm(
-      "Upload your current local financial data to Supabase?\n\n" +
-      "Transactions: " + transactionCount + "\n" +
-      "Your local records will remain unchanged."
-    )) {
-      return;
-    }
+      "Upload your local financial data to Supabase?\n\n" +
+      "Transactions: " + transactionCount +
+      "\nYour local records will remain unchanged."
+    )) return;
 
     const cloudData = JSON.parse(JSON.stringify(state));
 
@@ -1366,14 +1362,14 @@ async function uploadLocalDataToCloud() {
     }
 
     alert(
-      "SUCCESS! Your local data has been uploaded to Supabase.\n\n" +
-      "Transactions uploaded: " + transactionCount
+      "SUCCESS! Your data has been uploaded.\nTransactions: " +
+      transactionCount
     );
 
   } catch (error) {
-    alert("Unexpected upload error: " + error.message);
+    alert("Unexpected error: " + error.message);
   }
-}
+};
 
 async function init() {
   await openDB();
