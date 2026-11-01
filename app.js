@@ -132,7 +132,52 @@ function clearPendingSyncIfCurrent(createdAt) {
     transaction.onabort = () => reject(transaction.error);
   });
 }
+async function processPendingSync() {
+  if (!cloudUser || !cloudReady || !navigator.onLine) {
+    return;
+  }
 
+  cloudSyncQueue = cloudSyncQueue.then(async () => {
+    if (!cloudUser || !cloudReady || !navigator.onLine) {
+      return;
+    }
+
+    const pending = await getPendingSync();
+
+    if (!pending) {
+      return;
+    }
+
+    const userId = cloudUser.id;
+
+    const { error } = await supabaseClient
+      .from("user_app_state", {
+        fetch: (input, init) =>
+          fetch(input, { ...init, cache: "no-store" })
+      })
+      .upsert({
+        user_id: userId,
+        data: pending.data,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: "user_id"
+      });
+
+    if (error) throw error;
+
+    await clearPendingSyncIfCurrent(pending.createdAt);
+
+    if (cloudUser && cloudUser.id === userId) {
+      updateCloudStatus(
+        "Signed in as " + cloudUser.email + " · Synced"
+      );
+    }
+  }).catch(error => {
+    updateCloudStatus("Cloud sync pending: " + error.message);
+  });
+
+  await cloudSyncQueue;
+}
 function persist() {
   const snapshot = JSON.parse(JSON.stringify(state));
 
