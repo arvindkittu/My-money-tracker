@@ -9,6 +9,8 @@ const supabaseClient = window.supabase.createClient(
 );
 
 let cloudUser = null;
+let cloudReady = false;
+let cloudSyncQueue = Promise.resolve();
 async function testSupabaseConnection() {
   const { data, error } = await supabaseClient.auth.getSession();
 
@@ -1125,6 +1127,43 @@ function render() {
 
 async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
+}
+
+async function loadCloudData() {
+  if (!cloudUser) {
+    cloudReady = false;
+    return;
+  }
+
+  cloudReady = false;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("user_app_state")
+      .select("data, updated_at")
+      .eq("user_id", cloudUser.id)
+      .maybeSingle();
+
+    if (error) {
+      updateCloudStatus("Cloud download failed: " + error.message);
+      return;
+    }
+
+    if (data && data.data) {
+      state = { ...state, ...data.data };
+      await persist();
+      setTheme();
+      render();
+      updateCloudStatus(
+        "Signed in as " + cloudUser.email + " · Cloud data loaded"
+      );
+    }
+
+    cloudReady = true;
+
+  } catch (error) {
+    updateCloudStatus("Cloud download failed: " + error.message);
+  }
 }
 
 async function initCloudAuth() {
