@@ -1078,28 +1078,65 @@ function download(name, content, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+async function downloadCloudCSV() {
+  try {
+    if (!cloudUser) {
+      alert("Please sign in to your cloud account first.");
+      return;
+    }
 
-function exportCSV() {
-  let rows = [
-    ["Date", "Type", "Amount", "Currency", "Note"],
-    ...state.transactions.map(t => [
-      t.date,
-      t.type,
-      t.amount,
-      state.currency,
-      t.note || ""
-    ])
-  ];
+    const { data, error } = await supabaseClient
+      .from("user_app_state")
+      .select("data")
+      .eq("user_id", cloudUser.id)
+      .single();
 
-  let csv = rows.map(r =>
-    r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(",")
-  ).join("\r\n");
+    if (error) throw error;
 
-  download(
-    "my-money-transactions.csv",
-    "\uFEFF" + csv,
-    "text/csv;charset=utf-8"
-  );
+    const cloudData = data.data || {};
+    const transactions = Array.isArray(cloudData.transactions)
+      ? cloudData.transactions
+      : [];
+
+    const currency = cloudData.currency || "INR";
+
+    const rows = [
+      ["Date", "Type", "Amount", "Currency", "Note"],
+      ...transactions.map(t => [
+        t.date || "",
+        t.type || "",
+        t.amount ?? "",
+        currency,
+        t.note || ""
+      ])
+    ];
+
+    const csv = rows.map(row =>
+      row.map(value => {
+        let text = String(value);
+
+        if (/^[=+\-@]/.test(text)) {
+          text = "'" + text;
+        }
+
+        return '"' + text.replace(/"/g, '""') + '"';
+      }).join(",")
+    ).join("\r\n");
+
+    download(
+      "my-money-cloud-report-" + today() + ".csv",
+      "\uFEFF" + csv,
+      "text/csv;charset=utf-8"
+    );
+
+    alert(
+      "Cloud CSV downloaded successfully!\n\n" +
+      "Transactions: " + transactions.length
+    );
+
+  } catch (error) {
+    alert("Cloud CSV download failed: " + error.message);
+  }
 }
 
 function exportJSON() {
