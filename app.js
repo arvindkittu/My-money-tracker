@@ -1414,41 +1414,97 @@ async function diagnoseTransactions() {
       return;
     }
 
-    const { data, error } = await supabaseClient
-      .from("user_app_state")
+    const userId = cloudUser.id;
+
+    // Verify the locally stored Supabase session.
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    // Verify the signed-in user against Supabase Auth.
+    const { data: verifiedData, error: verifiedError } =
+      await supabaseClient.auth.getUser();
+
+    // Read this account's IndexedDB record.
+    const localRecord = await readLocalState(
+      getAccountStateKey(userId)
+    );
+
+    // Inspect pending offline changes without modifying them.
+    const pending = await getPendingSync(userId);
+
+    // Read the cloud record.
+    const {
+      data: cloudRecord,
+      error: cloudError,
+      status: cloudStatusCode
+    } = await supabaseClient
+      .from("user_app_state", {
+        fetch: (input, init) =>
+          fetch(input, { ...init, cache: "no-store" })
+      })
       .select("user_id, data, updated_at")
-      .eq("user_id", cloudUser.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
-    if (error) throw error;
+    if (cloudError) throw cloudError;
 
-    const cloudTransactions = data?.data?.transactions;
-    const cloudCount = Array.isArray(cloudTransactions)
-      ? cloudTransactions.length : 0;
+    const sessionUserId =
+      sessionData?.session?.user?.id || "No session";
 
-    const localRecord = await readLocalState(activeStateKey);
+    const verifiedUserId =
+      verifiedData?.user?.id || "Not verified";
 
-    const localCount = Array.isArray(localRecord?.transactions)
-      ? localRecord.transactions.length : 0;
+    const localCount =
+      localRecord?.transactions?.length ?? 0;
 
-    const appCount = Array.isArray(state.transactions)
-      ? state.transactions.length : 0;
+    const appCount =
+      state.transactions?.length ?? 0;
 
-    alert(
-      "TRANSACTION DIAGNOSTICS\n\n" +
-      "Signed-in user: " + cloudUser.id + "\n" +
-      "Cloud record user: " + (data?.user_id || "No record") + "\n" +
-      "Supabase: " + cloudCount + "\n" +
-      "IndexedDB: " + localCount + "\n" +
-      "App memory: " + appCount + "\n" +
-      "Last cloud update: " + (data?.updated_at || "No record")
-    );
+    const cloudCount =
+      cloudRecord?.data?.transactions?.length ?? 0;
+
+    const pendingCount =
+      pending?.data?.transactions?.length ?? 0;
+
+    const message =
+      "SYNC DIAGNOSTICS\n\n" +
+
+      "Signed-in ID: " + userId + "\n" +
+      "Session ID: " + sessionUserId + "\n" +
+      "Verified Auth ID: " + verifiedUserId + "\n" +
+      "Active local user: " +
+        (activeStateUserId || "None") + "\n\n" +
+
+      "Project: " + new URL(SUPABASE_URL).host + "\n" +
+      "Online: " + navigator.onLine + "\n" +
+      "Cloud ready: " + cloudReady + "\n\n" +
+
+      "Cloud row: " +
+        (cloudRecord ? "Found" : "Not found") + "\n" +
+      "Cloud HTTP status: " + cloudStatusCode + "\n" +
+      "Cloud user ID: " +
+        (cloudRecord?.user_id || "No record") + "\n" +
+      "Supabase transactions: " + cloudCount + "\n\n" +
+
+      "IndexedDB transactions: " + localCount + "\n" +
+      "App memory transactions: " + appCount + "\n\n" +
+
+      "Pending sync: " + (pending ? "Yes" : "No") + "\n" +
+      "Pending transactions: " + pendingCount + "\n\n" +
+
+      "Session error: " +
+        (sessionError?.message || "None") + "\n" +
+      "Auth verification error: " +
+        (verifiedError?.message || "None") + "\n" +
+      "Last cloud update: " +
+        (cloudRecord?.updated_at || "No record");
+
+    alert(message);
 
   } catch (error) {
     alert("Diagnostic failed: " + error.message);
   }
 }
-
 function exportJSON() {
   download("my-money-backup-" + today() + ".json",
     JSON.stringify({ ...state, backupCreated: new Date().toISOString() }, null, 2),
