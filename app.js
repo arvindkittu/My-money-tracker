@@ -1678,14 +1678,34 @@ async function signUpCloud() {
   }
 
   if (data.session && data.user) {
-    cloudUser = data.user;
+    // Lock the dashboard before changing accounts.
+    showLoginGate("Loading your new account data...");
 
-    showAuthenticatedApp();
+    cloudUser = data.user;
+    const userId = cloudUser?.id;
+
+    if (!userId) {
+      showLoginGate("Unable to identify the new account.");
+      return;
+    }
 
     $("cloudEmail").value = email;
     $("cloudFullName").value = fullName;
 
     await loadCloudData();
+
+    // Unlock only after this account's local data is initialized.
+    if (
+      cloudUser?.id !== userId ||
+      activeStateUserId !== userId
+    ) {
+      $("loginGateStatus").textContent =
+        "Unable to load the new account's local data. Please refresh and try again.";
+      return;
+    }
+
+    showAuthenticatedApp();
+
     await processRecurring();
     render();
 
