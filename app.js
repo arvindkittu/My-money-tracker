@@ -805,35 +805,111 @@ function renderBudget() {
 }
 
 function drawTrend(id, n) {
-  let cv = $(id), ctx = cv.getContext("2d");
-  let w = cv.width, h = cv.height;
+  const cv = $(id);
+  const ctx = cv.getContext("2d");
+  const w = cv.width;
+  const h = cv.height;
+
   ctx.clearRect(0, 0, w, h);
 
-  let labels = [], vals = [];
+  const labels = [];
+  const vals = [];
+
   for (let i = n - 1; i >= 0; i--) {
-    let d = new Date();
+    const d = new Date();
     d.setDate(1);
     d.setMonth(d.getMonth() - i);
-    let m = d.toLocaleDateString("en-CA").slice(0, 7);
-    labels.push(d.toLocaleDateString(undefined, { month:"short" }));
-    vals.push(sum(monthTx(m).filter(t => t.type === "expense"), t => t.amount));
+
+    const m = d.toLocaleDateString("en-CA").slice(0, 7);
+
+    labels.push(
+      d.toLocaleDateString(undefined, { month: "short" })
+    );
+
+    vals.push(
+      sum(
+        monthTx(m).filter(t => t.type === "expense"),
+        t => t.amount
+      )
+    );
   }
 
-  let max = Math.max(1, ...vals), pad = 30;
-  ctx.fillStyle = getComputedStyle(document.body)
-    .getPropertyValue("--muted");
-  ctx.font = "12px sans-serif";
+  const max = Math.max(1, ...vals);
 
+  const left = 30;
+  const right = 30;
+  const top = 28;
+  const bottom = 40;
+
+  const plotW = w - left - right;
+  const plotH = h - top - bottom;
+  const slotW = plotW / n;
+  const barW = Math.min(54, slotW * 0.58);
+  const baseline = top + plotH;
+
+  const styles = getComputedStyle(document.body);
+
+  const accent = styles.getPropertyValue("--accent").trim();
+  const muted = styles.getPropertyValue("--muted").trim();
+  const line = styles.getPropertyValue("--line").trim();
+
+  // Horizontal guide lines
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= 3; i++) {
+    const y = top + (plotH / 3) * i;
+
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(w - right, y);
+    ctx.stroke();
+  }
+
+  // Bars, spending labels and month labels
   for (let i = 0; i < n; i++) {
-    let x = pad + i * (w - 2 * pad) / n + 12;
-    let bh = (h - 55) * vals[i] / max;
-    ctx.fillStyle = getComputedStyle(document.body)
-      .getPropertyValue("--accent");
-    ctx.fillRect(x, h - 30 - bh, Math.max(14, (w - 2 * pad) / n - 18), bh);
-    ctx.fillStyle = getComputedStyle(document.body)
-      .getPropertyValue("--muted");
-    ctx.fillText(labels[i], x, h - 10);
+    const center = left + slotW * (i + 0.5);
+    const barH = plotH * vals[i] / max;
+    const barTop = baseline - barH;
+
+    if (vals[i] > 0) {
+      ctx.fillStyle = accent;
+      ctx.fillRect(
+        center - barW / 2,
+        barTop,
+        barW,
+        Math.max(2, barH)
+      );
+
+      let amountLabel;
+
+      if (vals[i] >= 10000000) {
+        amountLabel = "₹" + (vals[i] / 10000000).toFixed(1) + "Cr";
+      } else if (vals[i] >= 100000) {
+        amountLabel = "₹" + (vals[i] / 100000).toFixed(1) + "L";
+      } else if (vals[i] >= 1000) {
+        amountLabel = "₹" + (vals[i] / 1000).toFixed(1) + "k";
+      } else {
+        amountLabel = "₹" + Math.round(vals[i]);
+      }
+
+      ctx.fillStyle = muted;
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        amountLabel,
+        center,
+        Math.max(16, barTop - 8)
+      );
+    }
+
+    ctx.fillStyle = muted;
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(labels[i], center, h - 12);
   }
+
+  ctx.textAlign = "left";
 }
 
 function renderCharts() {
