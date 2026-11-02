@@ -445,22 +445,101 @@ async function saveTx() {
   render();
 }
 
+function formatTransactionDate(value) {
+  if (!value) return "Date not set";
+
+  const match = String(value).match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+
+  if (!match) return String(value);
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  const date = new Date(year, month - 1, day);
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
+}
 function txHTML(t) {
-  return `<div class="item">
-    <div style="min-width:0">
-      <b>${escapeHTML(t.note || "Unnamed transaction")}</b>
-      <div class="small muted">${escapeHTML(t.date)}</div>
-    </div>
-    <div style="text-align:right;white-space:nowrap">
-      <b class="${t.type === "income" ? "positive" : "negative"}">
-        ${t.type === "income" ? "+" : "−"}${money(t.amount)}
-      </b>
-      <div class="small">
-        <button class="btn" onclick="editTx('${t.id}')">Edit</button>
-        <button class="btn danger" onclick="deleteTx('${t.id}')">×</button>
+  const isIncome = t.type === "income";
+
+  const typeLabel = isIncome
+    ? "Income"
+    : "Expense";
+
+  const typeClass = isIncome
+    ? "income"
+    : "expense";
+
+  const amountSign = isIncome ? "+" : "−";
+
+  return `
+    <div class="transaction-item">
+
+      <div class="transaction-main">
+
+        <span class="transaction-title">
+          ${escapeHTML(t.note || "Unnamed transaction")}
+        </span>
+
+        <div class="transaction-meta">
+
+          <span class="transaction-date">
+            ${escapeHTML(formatTransactionDate(t.date))}
+          </span>
+
+          <span class="transaction-type ${typeClass}">
+            ${typeLabel}
+          </span>
+
+        </div>
+
       </div>
+
+      <div class="transaction-side">
+
+        <div class="transaction-amount ${typeClass === "income" ? "positive" : "negative"}">
+          ${amountSign}${money(t.amount)}
+        </div>
+
+        <div class="transaction-actions">
+
+          <button
+            type="button"
+            class="transaction-action"
+            onclick="editTx('${t.id}')"
+            aria-label="Edit transaction">
+            Edit
+          </button>
+
+          <button
+            type="button"
+            class="transaction-action delete"
+            onclick="deleteTx('${t.id}')"
+            aria-label="Delete transaction">
+            Delete
+          </button>
+
+        </div>
+
+      </div>
+
     </div>
-  </div>`;
+  `;
 }
 
 
