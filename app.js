@@ -1420,6 +1420,11 @@ function showAuthenticatedApp() {
 
 function showLoginGate(message) {
   document.body.classList.add("auth-locked");
+  const profileMenu = $("profileMenu");
+
+if (profileMenu) {
+  profileMenu.open = false;
+}
 
   // Clear the previous account from application memory.
   state = createEmptyState();
@@ -1466,6 +1471,17 @@ function showProfilePage(id) {
 
   showPage(id);
 }
+document.addEventListener("click", event => {
+  const menu = $("profileMenu");
+
+  if (
+    menu &&
+    menu.open &&
+    !menu.contains(event.target)
+  ) {
+    menu.open = false;
+  }
+});
 async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
 }
