@@ -549,46 +549,45 @@ body.auth-locked .login-gate {
     <button class="btn primary" onclick="openTx()">＋ Add</button>
 
     <details id="profileMenu" class="profile-menu">
-      <summary class="profile-trigger"
-        aria-label="Open profile menu">
+  <summary class="profile-trigger"
+    aria-label="Open profile menu">
 
-        <span class="profile-avatar" id="profileAvatar">A</span>
-        <span class="profile-trigger-name" id="profileTriggerName">Account</span>
+    <span class="profile-avatar" id="profileAvatar">A</span>
+    <span class="profile-trigger-name" id="profileTriggerName">Account</span>
 
-      </summary>
+  </summary>
 
-      <div class="profile-panel">
-        <button
-  type="button"
-  class="profile-account profile-account-button"
-  onclick="showProfilePage('settings')"
-  aria-label="Open profile and settings">
+  <div class="profile-panel">
 
-  <span class="profile-avatar" id="profilePanelAvatar">A</span>
+    <button
+      type="button"
+      class="profile-account profile-account-button"
+      onclick="showProfilePage('settings')"
+      aria-label="Open profile and settings">
 
-  <span class="profile-account-text">
-    <strong id="profilePanelName">Account</strong>
-    <span id="profilePanelEmail" class="muted small"></span>
-  </span>
+      <span class="profile-avatar" id="profilePanelAvatar">A</span>
 
-  <span class="profile-account-arrow">›</span>
-</button>
-        </div>
+      <span class="profile-account-text">
+        <strong id="profilePanelName">Account</strong>
+        <span id="profilePanelEmail" class="muted small"></span>
+      </span>
 
-        <button type="button" class="profile-menu-item"
-          onclick="showProfilePage('settings')">
-          <span>⚙</span> Settings & backup
-        </button>
+      <span class="profile-account-arrow">›</span>
+    </button>
 
-        <button type="button"
-          class="profile-menu-item danger"
-          onclick="signOutCloud()">
-          <span>⇥</span> Sign out
-        </button>
-      </div>
-    </details>
+    <button
+      type="button"
+      class="profile-menu-item danger"
+      onclick="signOutCloud()">
+
+      <span>⇥</span> Sign out
+    </button>
+
+  </div>
+</details>
   </div>
 </div>
+  <div class="grid four" style="margin-top:16px">
 <div class="card">
 <div class="metric-label">Income this month</div>
 <div class="metric positive" id="incomeMetric">₹0</div>
