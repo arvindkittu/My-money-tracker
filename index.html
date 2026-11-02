@@ -118,6 +118,50 @@ overflow-wrap:anywhere
 .positive {color:var(--green)}
 .negative {color:var(--red)}
 
+/* Dashboard financial summary cards */
+
+.dashboard-summary-grid {
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.dashboard-summary-card {
+  min-width: 0;
+  min-height: 112px;
+  margin-bottom: 0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dashboard-summary-card .metric-label {
+  line-height: 1.4;
+  min-height: 34px;
+}
+
+.dashboard-summary-card .metric {
+  margin-top: 10px;
+  font-size: clamp(19px, 2.4vw, 25px);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 649px) {
+  .dashboard-summary-grid {
+    gap: 10px;
+  }
+
+  .dashboard-summary-card {
+    min-height: 104px;
+    padding: 14px;
+  }
+
+  .dashboard-summary-card .metric {
+    font-size: clamp(18px, 4.7vw, 22px);
+  }
+}
+
 .actions {
 display:flex;
 gap:8px;
@@ -826,23 +870,26 @@ body.auth-locked .login-gate {
 </details>
   </div>
 </div>
-  <div class="grid four" style="margin-top:16px">
-<div class="card">
-<div class="metric-label">Income this month</div>
-<div class="metric positive" id="incomeMetric">₹0</div>
-</div>
-<div class="card">
-<div class="metric-label">Expenses this month</div>
-<div class="metric negative" id="expenseMetric">₹0</div>
-</div>
-<div class="card">
-<div class="metric-label">Net cash flow</div>
-<div class="metric" id="netMetric">₹0</div>
-</div>
-<div class="card">
-<div class="metric-label">Monthly budget left</div>
-<div class="metric" id="budgetMetric">—</div>
-</div>
+  <div class="grid four dashboard-summary-grid">
+  <div class="card dashboard-summary-card">
+    <div class="metric-label">Income this month</div>
+    <div class="metric positive" id="incomeMetric">₹0</div>
+  </div>
+
+  <div class="card dashboard-summary-card">
+    <div class="metric-label">Expenses this month</div>
+    <div class="metric negative" id="expenseMetric">₹0</div>
+  </div>
+
+  <div class="card dashboard-summary-card">
+    <div class="metric-label">Net cash flow</div>
+    <div class="metric" id="netMetric">₹0</div>
+  </div>
+
+  <div class="card dashboard-summary-card">
+    <div class="metric-label">Monthly budget left</div>
+    <div class="metric" id="budgetMetric">—</div>
+  </div>
 </div>
 
 <div class="card">
