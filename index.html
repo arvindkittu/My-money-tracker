@@ -428,6 +428,81 @@ margin-top:6px
 }
 
 .type-buttons button {
+  /* Add/Edit transaction form */
+
+.transaction-dialog {
+  width: min(94%, 480px);
+  padding: 22px;
+  max-height: 88vh;
+}
+
+.transaction-dialog-header {
+  margin-bottom: 14px;
+}
+
+.transaction-dialog-header h2 {
+  margin: 0;
+}
+
+.transaction-form-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.transaction-form-grid > div {
+  min-width: 0;
+}
+
+.transaction-form-grid label {
+  font-size: 13px;
+  font-weight: 650;
+  margin-top: 4px;
+}
+
+.transaction-form-grid input {
+  min-height: 46px;
+  margin-top: 7px;
+}
+
+.transaction-form-grid #txAmount {
+  font-size: 19px;
+  font-weight: 750;
+}
+
+.transaction-dialog-actions {
+  margin-top: 22px;
+  gap: 10px;
+}
+
+.transaction-dialog-actions button {
+  min-height: 44px;
+}
+
+.transaction-dialog-actions .transaction-cancel {
+  flex: 0.8;
+}
+
+.transaction-dialog-actions .transaction-save {
+  flex: 1.4;
+}
+
+@media(max-width:420px) {
+  .transaction-dialog {
+    padding: 17px;
+    width: 95%;
+  }
+
+  .transaction-form-grid {
+    gap: 9px;
+  }
+
+  .transaction-dialog-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--panel);
+    padding-top: 10px;
+  }
+}
 padding:13px;
 font-size:14px
 }
@@ -1121,62 +1196,104 @@ My Money • Personal use • Offline-first
 
 <!-- ADD / EDIT TRANSACTION -->
 
-<dialog id="txDialog">
-<form id="txForm" method="dialog">
+<dialog id="txDialog" class="transaction-dialog">
+  <form id="txForm" method="dialog">
 
-<div class="row">
-<h2 id="txDialogTitle">Add transaction</h2>
-<button type="button" class="iconbtn"
-onclick="this.closest('dialog').close()">✕</button>
-</div>
+    <div class="row transaction-dialog-header">
+      <h2 id="txDialogTitle">Add transaction</h2>
 
-<input type="hidden" id="txId">
+      <button
+        type="button"
+        class="iconbtn"
+        aria-label="Close transaction form"
+        onclick="this.closest('dialog').close()">
+        ✕
+      </button>
+    </div>
 
-<div class="formgrid">
+    <input type="hidden" id="txId">
 
-<div class="wide">
-<label>Transaction type</label>
-<div class="type-buttons">
-<button type="button" class="btn primary"
-id="txExpenseBtn" onclick="setTxType('expense')">
-Expense
-</button>
-<button type="button" class="btn"
-id="txIncomeBtn" onclick="setTxType('income')">
-Income
-</button>
-</div>
-<select id="txType" hidden>
-<option value="expense">Expense</option>
-<option value="income">Income</option>
-</select>
-</div>
+    <div class="formgrid transaction-form-grid">
 
-<div>
-<label>Amount</label>
-<input type="number" id="txAmount" min="0.01" step="0.01" required>
-</div>
+      <div class="wide">
+        <label>Transaction type</label>
 
-<div>
-<label>Date</label>
-<input type="date" id="txDate" required>
-</div>
+        <div class="type-buttons">
+          <button
+            type="button"
+            class="btn primary"
+            id="txExpenseBtn"
+            onclick="setTxType('expense')">
+            Expense
+          </button>
 
-<div class="wide">
-<label>Note / Transaction name</label>
-<input id="txNote" placeholder="e.g. Groceries, salary, electricity bill">
-</div>
+          <button
+            type="button"
+            class="btn"
+            id="txIncomeBtn"
+            onclick="setTxType('income')">
+            Income
+          </button>
+        </div>
 
-</div>
+        <select id="txType" hidden>
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
 
-<div class="dialog-actions">
-<button type="button" class="btn"
-onclick="this.closest('dialog').close()">Cancel</button>
-<button type="button" class="btn primary"
-onclick="saveTx()">Save transaction</button>
-</div>
+      <div class="wide">
+        <label for="txAmount">Amount</label>
 
-</form>
+        <input
+          type="number"
+          id="txAmount"
+          min="0.01"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="Enter transaction amount"
+          required>
+      </div>
+
+      <div class="wide">
+        <label for="txDate">Transaction date</label>
+
+        <input
+          type="date"
+          id="txDate"
+          required>
+      </div>
+
+      <div class="wide">
+        <label for="txNote">Transaction name / description</label>
+
+        <input
+          type="text"
+          id="txNote"
+          placeholder="e.g. Groceries, salary, electricity bill">
+      </div>
+
+    </div>
+
+    <div class="dialog-actions transaction-dialog-actions">
+
+      <button
+        type="button"
+        class="btn transaction-cancel"
+        onclick="this.closest('dialog').close()">
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        class="btn primary transaction-save"
+        onclick="saveTx()">
+        Save transaction
+      </button>
+
+    </div>
+
+  </form>
 </dialog>
 
 <!-- SAVINGS GOAL -->
