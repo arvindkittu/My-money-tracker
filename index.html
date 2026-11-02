@@ -270,11 +270,19 @@ font-size:14px
 }
 /* Home profile menu */
 
+.dashboard-top-row {
+  align-items: flex-start;
+}
+
 .dashboard-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   min-width: 0;
+}
+
+.dashboard-header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  flex-shrink: 0;
 }
 
 .profile-menu {
@@ -283,17 +291,20 @@ font-size:14px
 }
 
 .profile-trigger {
+  width: 68px;
+  height: 68px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 7px;
-  padding: 5px 9px 5px 5px;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 30px;
+  border-radius: 50%;
   background: var(--panel);
   color: var(--text);
   cursor: pointer;
   list-style: none;
-  max-width: 155px;
 }
 
 .profile-trigger::-webkit-details-marker {
@@ -312,18 +323,19 @@ font-size:14px
   flex-shrink: 0;
 }
 
-.profile-trigger-name {
+.profile-trigger .profile-avatar {
+  width: 29px;
+  height: 29px;
   font-size: 13px;
-  font-weight: 650;
-  max-width: 82px;
+}
+
+.profile-trigger-name {
+  font-size: 10px;
+  font-weight: 700;
+  max-width: 56px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.profile-chevron {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .profile-menu[open] .profile-trigger {
@@ -336,6 +348,8 @@ font-size:14px
   right: 0;
   z-index: 20;
   width: min(280px, calc(100vw - 32px));
+  max-height: 75vh;
+  overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -390,20 +404,33 @@ font-size:14px
 }
 
 @media(max-width:420px) {
-  .dashboard-heading {
+  .dashboard-top-row {
     gap: 7px;
   }
 
+  .dashboard-header-actions {
+    gap: 6px;
+  }
+
+  .dashboard-header-actions > .btn {
+    padding: 9px 10px;
+  }
+
   .profile-trigger {
-    gap: 5px;
-    padding-right: 7px;
+    width: 58px;
+    height: 58px;
+  }
+
+  .profile-trigger .profile-avatar {
+    width: 24px;
+    height: 24px;
   }
 
   .profile-trigger-name {
-    max-width: 65px;
+    max-width: 46px;
   }
 }
-@media(min-width:650px) {
+  @media(min-width:650px) {
 main {padding:26px}
 .grid.four {grid-template-columns:repeat(4,1fr)}
 }
@@ -488,21 +515,26 @@ body.auth-locked .login-gate {
 
 <div class="row dashboard-top-row">
   <div class="dashboard-heading">
-    <div>
-      <h1>Overview</h1>
-      <div class="muted small" id="todayLabel"></div>
-    </div>
+    <h1>Overview</h1>
+    <div class="muted small" id="todayLabel"></div>
+  </div>
+
+  <div class="dashboard-header-actions">
+    <button class="btn primary" onclick="openTx()">＋ Add</button>
 
     <details id="profileMenu" class="profile-menu">
-      <summary class="profile-trigger" aria-label="Open profile menu">
+      <summary class="profile-trigger"
+        aria-label="Open profile menu">
+
         <span class="profile-avatar" id="profileAvatar">A</span>
         <span class="profile-trigger-name" id="profileTriggerName">Account</span>
-        <span class="profile-chevron">⌄</span>
+
       </summary>
 
       <div class="profile-panel">
         <div class="profile-account">
           <span class="profile-avatar" id="profilePanelAvatar">A</span>
+
           <div class="profile-account-text">
             <strong id="profilePanelName">Account</strong>
             <span id="profilePanelEmail" class="muted small"></span>
@@ -522,11 +554,7 @@ body.auth-locked .login-gate {
       </div>
     </details>
   </div>
-
-  <button class="btn primary" onclick="openTx()">＋ Add</button>
 </div>
-
-<div class="grid four" style="margin-top:16px">
 <div class="card">
 <div class="metric-label">Income this month</div>
 <div class="metric positive" id="incomeMetric">₹0</div>
