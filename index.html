@@ -154,6 +154,45 @@ gap:10px
 }
 
 .formgrid .wide {grid-column:1/-1}
+  /* Transaction filter layout */
+
+.transaction-filters {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.transaction-filters > div {
+  min-width: 0;
+}
+
+.transaction-filters select {
+  min-width: 0;
+  cursor: pointer;
+}
+
+@media(max-width:700px) {
+  .transaction-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .transaction-filters .filter-sort-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@media(max-width:420px) {
+  .transaction-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-filters .filter-sort-field {
+    grid-column: auto;
+  }
+
+  .transaction-filters .wide .formgrid {
+    grid-template-columns: 1fr;
+  }
+}
 
 .row {
 display:flex;
@@ -760,7 +799,7 @@ body.auth-locked .login-gate {
 <label for="txSearch">Search transactions</label>
 <input type="search" id="txSearch" placeholder="Search by name, note or amount">
 
-<div class="formgrid">
+<div class="formgrid transaction-filters">
 <div>
 <label>Date range</label>
 <select id="txPeriod">
@@ -782,7 +821,7 @@ body.auth-locked .login-gate {
 </select>
 </div>
 
-<div>
+<div class="filter-sort-field">
 <label>Sort by</label>
 <select id="txSort">
 <option value="newest">Newest first</option>
