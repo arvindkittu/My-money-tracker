@@ -41,6 +41,14 @@
 
 * {box-sizing:border-box}
 
+body.profile-page-open nav {
+  display: none !important;
+}
+
+.settings-page-top {
+  margin-bottom: 14px;
+}
+  
 body {
 margin:0;
 background:var(--bg);
@@ -280,7 +288,7 @@ font-size:14px
 
 .dashboard-header-actions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 9px;
   flex-shrink: 0;
 }
@@ -809,6 +817,16 @@ body.auth-locked .login-gate {
 </section>
 
 <section id="settings" class="page">
+
+<div class="settings-page-top">
+  <button
+    type="button"
+    class="btn"
+    onclick="showPage('dashboard')">
+    ← Back to Home
+  </button>
+</div>
+
 <h1>Settings & backup</h1>
 <p class="muted small">Your records are stored on this device and can be synchronized to your cloud account.</p>
 
