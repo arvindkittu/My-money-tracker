@@ -894,7 +894,7 @@ function drawTrend(id, n) {
       }
 
       ctx.fillStyle = muted;
-      ctx.font = "20px sans-serif";
+      ctx.font = "600 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
         amountLabel,
@@ -904,7 +904,7 @@ function drawTrend(id, n) {
     }
 
     ctx.fillStyle = muted;
-    ctx.font = "20px sans-serif";
+    ctx.font = "600 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(labels[i], center, h - 12);
   }
