@@ -268,7 +268,141 @@ margin-top:6px
 padding:13px;
 font-size:14px
 }
+/* Home profile menu */
 
+.dashboard-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.profile-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px 5px 5px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  list-style: none;
+  max-width: 155px;
+}
+
+.profile-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.profile-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.profile-trigger-name {
+  font-size: 13px;
+  font-weight: 650;
+  max-width: 82px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.profile-chevron {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile-menu[open] .profile-trigger {
+  border-color: var(--accent);
+}
+
+.profile-panel {
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  z-index: 20;
+  width: min(280px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.profile-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px 13px;
+  margin-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-account-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.profile-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.profile-menu-item:hover {
+  background: var(--bg);
+}
+
+.profile-menu-item span {
+  width: 22px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.profile-menu-item.danger {
+  color: var(--red);
+}
+
+@media(max-width:420px) {
+  .dashboard-heading {
+    gap: 7px;
+  }
+
+  .profile-trigger {
+    gap: 5px;
+    padding-right: 7px;
+  }
+
+  .profile-trigger-name {
+    max-width: 65px;
+  }
+}
 @media(min-width:650px) {
 main {padding:26px}
 .grid.four {grid-template-columns:repeat(4,1fr)}
@@ -350,7 +484,45 @@ body.auth-locked .login-gate {
 
 <main>
 
-<section id="dashboard" class="page active">
+<div class="row dashboard-top-row">
+  <div class="dashboard-heading">
+    <div>
+      <h1>Overview</h1>
+      <div class="muted small" id="todayLabel"></div>
+    </div>
+
+    <details id="profileMenu" class="profile-menu">
+      <summary class="profile-trigger" aria-label="Open profile menu">
+        <span class="profile-avatar" id="profileAvatar">A</span>
+        <span class="profile-trigger-name" id="profileTriggerName">Account</span>
+        <span class="profile-chevron">⌄</span>
+      </summary>
+
+      <div class="profile-panel">
+        <div class="profile-account">
+          <span class="profile-avatar" id="profilePanelAvatar">A</span>
+          <div class="profile-account-text">
+            <strong id="profilePanelName">Account</strong>
+            <span id="profilePanelEmail" class="muted small"></span>
+          </div>
+        </div>
+
+        <button type="button" class="profile-menu-item"
+          onclick="showProfilePage('settings')">
+          <span>⚙</span> Settings & backup
+        </button>
+
+        <button type="button"
+          class="profile-menu-item danger"
+          onclick="signOutCloud()">
+          <span>⇥</span> Sign out
+        </button>
+      </div>
+    </details>
+  </div>
+
+  <button class="btn primary" onclick="openTx()">＋ Add</button>
+</div>
 <div class="row">
 <div>
 <h1>Overview</h1>
@@ -685,15 +857,37 @@ My Money • Personal use • Offline-first
 </main>
 
 <nav>
-<button class="active" data-page="dashboard"><b>⌂</b>Home</button>
-<button data-page="transactions"><b>⇄</b>Activity</button>
-<button data-page="budget"><b>◫</b>Budget</button>
-<button data-page="analytics"><b>▥</b>Insights</button>
-<button data-page="goals"><b>◎</b>Goals</button>
-<button data-page="calendar"><b>▦</b>Calendar</button>
-<button data-page="recurring"><b>↻</b>Recurring</button>
-<button data-page="debts"><b>▤</b>Debt</button>
-<button data-page="settings"><b>⚙</b>More</button>
+  <button class="active" data-page="dashboard">
+    <b>⌂</b>Home
+  </button>
+
+  <button data-page="transactions">
+    <b>⇄</b>Activity
+  </button>
+
+  <button data-page="budget">
+    <b>◫</b>Budget
+  </button>
+
+  <button data-page="analytics">
+    <b>▥</b>Insights
+  </button>
+
+  <button data-page="goals">
+    <b>◎</b>Goals
+  </button>
+
+  <button data-page="calendar">
+    <b>▦</b>Calendar
+  </button>
+
+  <button data-page="recurring">
+    <b>↻</b>Recurring
+  </button>
+
+  <button data-page="debts">
+    <b>▤</b>Debt
+  </button>
 </nav>
 
 <!-- ADD / EDIT TRANSACTION -->
