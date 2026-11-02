@@ -1415,6 +1415,7 @@ function render() {
 }
 function showAuthenticatedApp() {
   document.body.classList.remove("auth-locked");
+  updateProfileMenu();
 }
 
 function showLoginGate(message) {
@@ -1438,9 +1439,32 @@ function showLoginGate(message) {
   });
 }
 function getCloudDisplayName() {
-  return cloudUser?.user_metadata?.full_name ||
-         cloudUser?.email ||
-         "Account";
+  const fullName =
+    cloudUser?.user_metadata?.full_name?.trim();
+
+  return fullName || cloudUser?.email || "Account";
+}
+function updateProfileMenu() {
+  const name = getCloudDisplayName();
+  const email = cloudUser?.email || "";
+  const initial = name.trim().charAt(0).toUpperCase() || "U";
+
+  $("profileAvatar").textContent = initial;
+  $("profilePanelAvatar").textContent = initial;
+
+  $("profileTriggerName").textContent = name;
+  $("profilePanelName").textContent = name;
+  $("profilePanelEmail").textContent = email;
+}
+
+function showProfilePage(id) {
+  const menu = $("profileMenu");
+
+  if (menu) {
+    menu.open = false;
+  }
+
+  showPage(id);
 }
 async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
@@ -1628,9 +1652,11 @@ async function initCloudAuth() {
     }
 
     if (event === "USER_UPDATED" && cloudUser) {
-      $("cloudFullName").value =
-        cloudUser.user_metadata?.full_name || "";
-    }
+  $("cloudFullName").value =
+    cloudUser.user_metadata?.full_name || "";
+
+  updateProfileMenu();
+}
   });
 }
 
@@ -1748,6 +1774,7 @@ async function saveCloudProfileName() {
   }
 
   cloudUser = data.user || cloudUser;
+  updateProfileMenu();
 
   updateCloudStatus("Profile updated: " + fullName);
 
