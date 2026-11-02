@@ -555,7 +555,18 @@ async function deleteTx(id) {
     render();
   }
 }
+function compareTransactionsNewestFirst(a, b, order) {
+  const dateOrder = String(b.date || "")
+    .localeCompare(String(a.date || ""));
 
+  if (dateOrder !== 0) {
+    return dateOrder;
+  }
+
+  // For transactions on the same date,
+  // show the most recently added one first.
+  return (order.get(b) ?? -1) - (order.get(a) ?? -1);
+}
 function renderDashboard() {
   let a = monthTx();
 
@@ -589,8 +600,14 @@ function renderDashboard() {
   $("budgetMetric").className =
     "metric " + (state.budget - exp < 0 ? "negative" : "");
 
+  const transactionOrder = new Map(
+    state.transactions.map((t, index) => [t, index])
+  );
+
   let recent = [...state.transactions]
-    .sort((x, y) => y.date.localeCompare(x.date))
+    .sort((x, y) =>
+      compareTransactionsNewestFirst(x, y, transactionOrder)
+    )
     .slice(0, 5);
 
   $("recentList").innerHTML = recent.length
@@ -692,22 +709,37 @@ function renderTransactions() {
     return true;
   });
 
+  const transactionOrder = new Map(
+    state.transactions.map((t, index) => [t, index])
+  );
+
   list.sort((a, b) => {
+
     if (sort === "oldest") {
-      return a.date.localeCompare(b.date);
+      const dateOrder = String(a.date || "")
+        .localeCompare(String(b.date || ""));
+
+      if (dateOrder !== 0) return dateOrder;
+
+      return (transactionOrder.get(a) ?? -1) -
+             (transactionOrder.get(b) ?? -1);
     }
 
     if (sort === "high") {
       return Number(b.amount) - Number(a.amount) ||
-        b.date.localeCompare(a.date);
+        compareTransactionsNewestFirst(a, b, transactionOrder);
     }
 
     if (sort === "low") {
       return Number(a.amount) - Number(b.amount) ||
-        b.date.localeCompare(a.date);
+        compareTransactionsNewestFirst(a, b, transactionOrder);
     }
 
-    return b.date.localeCompare(a.date);
+    return compareTransactionsNewestFirst(
+      a,
+      b,
+      transactionOrder
+    );
   });
 
   $("txResultCount").textContent =
