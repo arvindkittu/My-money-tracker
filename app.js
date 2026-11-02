@@ -894,7 +894,7 @@ function drawTrend(id, n) {
       }
 
       ctx.fillStyle = muted;
-      ctx.font = "12px sans-serif";
+      ctx.font = "14px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
         amountLabel,
@@ -904,7 +904,7 @@ function drawTrend(id, n) {
     }
 
     ctx.fillStyle = muted;
-    ctx.font = "12px sans-serif";
+    ctx.font = "14px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(labels[i], center, h - 12);
   }
