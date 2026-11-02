@@ -45,3 +45,6 @@ USING THE APP
 
 PRIVACY
 The app does not send financial data to a server. GitHub Pages serves the static app files only. Your entries stay in IndexedDB in the browser profile on your iPhone.
+
+Deployment verification update - 3 November 2026
+
