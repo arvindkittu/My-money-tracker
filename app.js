@@ -316,9 +316,19 @@ function escapeHTML(s) {
 
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p =>
-    p.classList.toggle("active", p.id === id));
+    p.classList.toggle("active", p.id === id)
+  );
+
   document.querySelectorAll("nav button").forEach(b =>
-    b.classList.toggle("active", b.dataset.page === id));
+    b.classList.toggle("active", b.dataset.page === id)
+  );
+
+  // Hide bottom navigation while Settings is open.
+  document.body.classList.toggle(
+    "profile-page-open",
+    id === "settings"
+  );
+
   render();
   window.scrollTo(0, 0);
 }
@@ -1420,6 +1430,7 @@ function showAuthenticatedApp() {
 
 function showLoginGate(message) {
   document.body.classList.add("auth-locked");
+  document.body.classList.remove("profile-page-open");
   const profileMenu = $("profileMenu");
 
 if (profileMenu) {
