@@ -1886,6 +1886,36 @@ body.dashboard-fixed .overview-transactions {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ===== Dashboard range selector and floating button ===== */
+
+body.dashboard-fixed .overview-range-switch {
+  gap: 16px !important;
+  margin: 5px 0 6px !important;
+}
+
+body.dashboard-fixed .overview-range-switch button {
+  min-width: 40px !important;
+  min-height: 29px !important;
+  padding: 4px 9px !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+}
+
+/* Move the floating Add button slightly higher */
+body.dashboard-fixed .floating-add-button {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: calc(env(safe-area-inset-bottom) + 18px) !important;
+  transform: translateX(-50%) !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  min-height: 46px !important;
+  font-size: 25px !important;
+  line-height: 1 !important;
+  z-index: 30 !important;
+}
+
 </style>
 </head>
 
