@@ -514,7 +514,7 @@ function drawOverviewChart(transactions) {
   const plotH = h - top - bottom;
   const baseline = top + plotH;
   const slot = plotW / periods.length;
-  const barW = Math.max(5, Math.min(19, slot * 0.58));
+  const barW = Math.max(4, Math.min(15, slot * 0.48));
 
   const styles = getComputedStyle(document.documentElement);
   const barColor = overviewType === "expense"
@@ -559,7 +559,7 @@ function drawOverviewChart(transactions) {
 
     if (showLabel) {
       ctx.fillStyle = muted;
-      ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.font = "36px -apple-system, BlinkMacSystemFont, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(periods[i].label, center, h - 10);
     }
