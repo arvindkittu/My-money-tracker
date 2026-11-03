@@ -314,16 +314,40 @@ function escapeHTML(s) {
   }[c]));
 }
 
+
+function closeAccountDrawer() {
+  document.body.classList.remove("drawer-open");
+
+  $("walletMenuBtn").setAttribute("aria-expanded", "false");
+  $("accountDrawer").setAttribute("aria-hidden", "true");
+}
+
+function openAccountDrawer() {
+  document.body.classList.add("drawer-open");
+
+  $("walletMenuBtn").setAttribute("aria-expanded", "true");
+  $("accountDrawer").setAttribute("aria-hidden", "false");
+}
+
+function toggleAccountDrawer() {
+  if (document.body.classList.contains("drawer-open")) {
+    closeAccountDrawer();
+  } else {
+    openAccountDrawer();
+  }
+}
+
 function showPage(id) {
+  closeAccountDrawer();
+
   document.querySelectorAll(".page").forEach(p =>
     p.classList.toggle("active", p.id === id)
   );
 
-  document.querySelectorAll("nav button").forEach(b =>
+  document.querySelectorAll(".app-nav button").forEach(b =>
     b.classList.toggle("active", b.dataset.page === id)
   );
 
-  // Hide bottom navigation while Settings is open.
   document.body.classList.toggle(
     "profile-page-open",
     id === "settings"
@@ -333,14 +357,23 @@ function showPage(id) {
   window.scrollTo(0, 0);
 }
 
-document.querySelectorAll("nav button").forEach(b =>
-  b.onclick = () => showPage(b.dataset.page));
+document.querySelectorAll(".app-nav button").forEach(b =>
+  b.onclick = () => showPage(b.dataset.page)
+);
 
 function setTheme() {
   document.documentElement.dataset.theme = state.theme;
-  $("themeBtn").textContent =
-    state.theme === "dark" ? "☀ Light" : "☾ Dark";
+
+  const isDark = state.theme === "dark";
+
+  $("drawerThemeIcon").textContent = isDark ? "☀" : "☾";
+  $("drawerThemeLabel").textContent =
+    isDark ? "Switch to Light mode" : "Switch to Dark mode";
 }
+
+$("walletMenuBtn").onclick = toggleAccountDrawer;
+$("closeDrawerBtn").onclick = closeAccountDrawer;
+$("drawerBackdrop").onclick = closeAccountDrawer;
 
 $("themeBtn").onclick = async () => {
   state.theme = state.theme === "dark" ? "light" : "dark";
@@ -348,6 +381,18 @@ $("themeBtn").onclick = async () => {
   await persist();
   renderCharts();
 };
+
+$("drawerLogoutBtn").onclick = () => {
+  closeAccountDrawer();
+  signOutCloud();
+};
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closeAccountDrawer();
+  }
+});
+
 
 function setTxType(type) {
   $("txType").value = type;
@@ -1671,14 +1716,8 @@ function showAuthenticatedApp() {
   updateProfileMenu();
 }
 
-function showLoginGate(message) {
-  document.body.classList.add("auth-locked");
-  document.body.classList.remove("profile-page-open");
-  const profileMenu = $("profileMenu");
-
-if (profileMenu) {
-  profileMenu.open = false;
-}
+closeAccountDrawer();
+document.body.classList.remove("profile-page-open");
 
   // Clear the previous account from application memory.
   state = createEmptyState();
@@ -1703,39 +1742,23 @@ function getCloudDisplayName() {
 
   return fullName || cloudUser?.email || "Account";
 }
+
 function updateProfileMenu() {
   const name = getCloudDisplayName();
   const email = cloudUser?.email || "";
   const initial = name.trim().charAt(0).toUpperCase() || "U";
 
-  $("profileAvatar").textContent = initial;
   $("profilePanelAvatar").textContent = initial;
-
-  $("profileTriggerName").textContent = name;
   $("profilePanelName").textContent = name;
   $("profilePanelEmail").textContent = email;
 }
 
+
 function showProfilePage(id) {
-  const menu = $("profileMenu");
-
-  if (menu) {
-    menu.open = false;
-  }
-
+  closeAccountDrawer();
   showPage(id);
 }
-document.addEventListener("click", event => {
-  const menu = $("profileMenu");
 
-  if (
-    menu &&
-    menu.open &&
-    !menu.contains(event.target)
-  ) {
-    menu.open = false;
-  }
-});
 async function updateCloudStatus(message) {
   $("cloudStatus").textContent = message;
 }
