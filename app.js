@@ -713,7 +713,7 @@ const labelDay = Number(periods[i].label);
 
 const showLabel =
   overviewRange === "1M"
-    ? [1, 5, 10, 15, 25, 30].includes(labelDay)
+    ? [3, 6, 9, 12, 15, 18, 21, 24, 27, 30].includes(labelDay)
     : true;
 
 if (showLabel) {
