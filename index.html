@@ -1315,6 +1315,230 @@ body.auth-locked > .drawer-backdrop,
 body.auth-locked > .floating-add-button {
   display: none !important;
 }
+/* ===== Compact fixed dashboard layout ===== */
+
+body.dashboard-fixed {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+
+body.dashboard-fixed .main-topbar {
+  position: relative;
+  top: auto;
+  flex: 0 0 auto;
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  gap: 8px;
+  padding: calc(7px + env(safe-area-inset-top)) 14px 5px;
+}
+
+body.dashboard-fixed .menu-trigger,
+body.dashboard-fixed .wallet-menu-trigger {
+  width: 38px;
+  height: 38px;
+}
+
+body.dashboard-fixed .menu-trigger svg,
+body.dashboard-fixed .wallet-menu-trigger svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.7;
+}
+
+body.dashboard-fixed .overview-switch {
+  width: min(100%, 205px);
+  padding: 3px;
+}
+
+body.dashboard-fixed .overview-switch button {
+  min-height: 36px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+body.dashboard-fixed main {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 760px;
+  padding: 6px 14px 84px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+body.dashboard-fixed #dashboard.page.active {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+body.dashboard-fixed .overview-summary {
+  flex: 0 0 auto;
+  margin: 7px 0 2px;
+}
+
+body.dashboard-fixed .overview-period-label {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+body.dashboard-fixed .overview-total {
+  font-size: 32px;
+  letter-spacing: -1px;
+}
+
+body.dashboard-fixed .overview-chart-wrap {
+  flex: 0 0 clamp(120px, 22dvh, 165px);
+  height: clamp(120px, 22dvh, 165px);
+  min-height: 0;
+  margin-top: 9px;
+  overflow: hidden;
+}
+
+body.dashboard-fixed .overview-range-switch {
+  flex: 0 0 auto;
+  gap: 18px;
+  margin: 7px 0 10px;
+}
+
+body.dashboard-fixed .overview-range-switch button {
+  min-width: 46px;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+body.dashboard-fixed .overview-transactions {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  padding: 2px 5px 18px;
+}
+
+body.dashboard-fixed .overview-transaction-row {
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 48px;
+  margin-bottom: 13px;
+}
+
+body.dashboard-fixed .overview-date-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+
+body.dashboard-fixed .overview-date-badge strong {
+  font-size: 13px;
+}
+
+body.dashboard-fixed .overview-date-badge span {
+  font-size: 9px;
+  letter-spacing: .7px;
+}
+
+body.dashboard-fixed .overview-transaction-note,
+body.dashboard-fixed .overview-transaction-amount {
+  font-size: 14px;
+}
+
+body.dashboard-fixed .floating-add-button {
+  width: 56px;
+  height: 56px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  font-size: 36px;
+}
+
+/* Smaller, consistent navigation icons */
+
+.nav-drawer .app-nav button {
+  min-height: 46px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.nav-drawer .app-nav button svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-drawer-header {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.nav-drawer-header button {
+  width: 36px;
+  height: 36px;
+  font-size: 23px;
+}
+
+/* More restrained account drawer typography */
+
+.account-drawer {
+  font-size: 14px;
+}
+
+.drawer-header {
+  font-size: 18px;
+}
+
+.drawer-header button {
+  width: 36px;
+  height: 36px;
+  font-size: 23px;
+}
+
+.drawer-action {
+  padding: 14px 8px;
+  font-size: 14px;
+}
+
+.drawer-action > span:first-child {
+  font-size: 18px;
+}
+
+.drawer-profile .profile-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 15px;
+}
+
+@media(max-height: 700px) {
+  body.dashboard-fixed .overview-chart-wrap {
+    flex-basis: 115px;
+    height: 115px;
+  }
+
+  body.dashboard-fixed .overview-summary {
+    margin-top: 3px;
+  }
+
+  body.dashboard-fixed .overview-total {
+    font-size: 29px;
+  }
+}
 </style>
 </head>
 
@@ -1741,15 +1965,48 @@ My Money • Personal use • Offline-first
   </div>
 
   <nav class="app-nav" aria-label="Main navigation">
-    <button class="active" data-page="dashboard"><b>⌂</b>Home</button>
-    <button data-page="transactions"><b>⇄</b>Activity</button>
-    <button data-page="budget"><b>◫</b>Budget</button>
-    <button data-page="analytics"><b>▥</b>Insights</button>
-    <button data-page="goals"><b>◎</b>Goals</button>
-    <button data-page="calendar"><b>▦</b>Calendar</button>
-    <button data-page="recurring"><b>↻</b>Recurring</button>
-    <button data-page="debts"><b>▤</b>Debt</button>
-  </nav>
+
+  <button class="active" data-page="dashboard">
+    <svg viewBox="0 0 24 24"><path d="m3.5 10 8.5-7 8.5 7v10a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg>
+    Home
+  </button>
+
+  <button data-page="transactions">
+    <svg viewBox="0 0 24 24"><path d="M4 8h15m-4-4 4 4-4 4M20 16H5m4 4-4-4 4-4"/></svg>
+    Activity
+  </button>
+
+  <button data-page="budget">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16m8-16v16"/></svg>
+    Budget
+  </button>
+
+  <button data-page="analytics">
+    <svg viewBox="0 0 24 24"><path d="M4 20V10m8 10V4m8 16v-7"/><path d="M2 20h20"/></svg>
+    Insights
+  </button>
+
+  <button data-page="goals">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+    Goals
+  </button>
+
+  <button data-page="calendar">
+    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2m4 0h2m-8 3h2m4 0h2"/></svg>
+    Calendar
+  </button>
+
+  <button data-page="recurring">
+    <svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.5-3"/></svg>
+    Recurring
+  </button>
+
+  <button data-page="debts">
+    <svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 10h18m-14 5h4"/></svg>
+    Debt
+  </button>
+
+</nav>
 
 </aside>
 
