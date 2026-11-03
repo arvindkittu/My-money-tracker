@@ -1711,6 +1711,10 @@ function render() {
   renderDebts();
   $("currency").value = state.currency;
 }
+function showAuthenticatedApp() {
+  document.body.classList.remove("auth-locked");
+  updateProfileMenu();
+}
 function showLoginGate(message) {
   document.body.classList.add("auth-locked");
 
