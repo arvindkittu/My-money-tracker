@@ -1851,6 +1851,41 @@ body.dashboard-fixed .floating-add-button {
   z-index: 30 !important;
 }
 
+/* ===== Extend dashboard into iPhone bottom safe area ===== */
+
+body.dashboard-fixed {
+  height: calc(100dvh + env(safe-area-inset-bottom)) !important;
+  min-height: calc(100dvh + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 0 !important;
+  overflow: hidden !important;
+}
+
+body.dashboard-fixed main {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+  overflow: hidden !important;
+}
+
+body.dashboard-fixed #dashboard.page.active {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.dashboard-fixed .overview-transactions {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
 </style>
 </head>
 
