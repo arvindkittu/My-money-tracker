@@ -1815,6 +1815,42 @@ body.dashboard-fixed .floating-add-button {
   z-index: 25;
 }
 
+/* ===== Remove all unnecessary bottom spacing ===== */
+
+body.dashboard-fixed main {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.dashboard-fixed #dashboard.page.active {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.dashboard-fixed .overview-transactions {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* Keep Add button at the actual bottom of the screen */
+body.dashboard-fixed .floating-add-button {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 8px !important;
+  transform: translateX(-50%) !important;
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 26px !important;
+  line-height: 1 !important;
+  z-index: 30 !important;
+}
+
 </style>
 </head>
 
