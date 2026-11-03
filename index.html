@@ -1688,6 +1688,60 @@ body.dashboard-fixed .floating-add-button {
     margin-bottom: 12px;
   }
 }
+
+/* ===== Final dashboard sizing adjustments ===== */
+
+/* Compact transaction rows */
+body.dashboard-fixed .overview-transaction-row {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 44px;
+  margin-bottom: 13px;
+}
+
+/* Smaller date badge */
+body.dashboard-fixed .overview-date-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+}
+
+body.dashboard-fixed .overview-date-badge strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+body.dashboard-fixed .overview-date-badge span {
+  font-size: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* Smaller transaction description */
+body.dashboard-fixed .overview-transaction-note {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+/* Smaller transaction amount */
+body.dashboard-fixed .overview-transaction-amount {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+/* Anchor Add button to the bottom of the viewport */
+body.dashboard-fixed .floating-add-button {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 8px);
+  transform: translateX(-50%);
+  z-index: 25;
+  width: 60px;
+  height: 60px;
+  font-size: 37px;
+  font-weight: 300;
+}
+
 </style>
 </head>
 
