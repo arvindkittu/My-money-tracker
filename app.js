@@ -628,6 +628,7 @@ function showPage(id) {
 
   document.body.classList.toggle(
     "profile-page-open",
+    document.body.classList.toggle("dashboard-fixed", id === "dashboard");
     id === "settings"
   );
 
@@ -1993,6 +1994,10 @@ function render() {
 }
 function showAuthenticatedApp() {
   document.body.classList.remove("auth-locked");
+  document.body.classList.toggle(
+    "dashboard-fixed",
+    document.getElementById("dashboard").classList.contains("active")
+  );
   updateProfileMenu();
 }
 function showLoginGate(message) {
