@@ -1916,6 +1916,119 @@ body.dashboard-fixed .floating-add-button {
   z-index: 30 !important;
 }
 
+/* ===== Dashboard transaction swipe interface ===== */
+
+body.dashboard-fixed .overview-range-switch {
+  gap: 16px !important;
+  margin: 5px 0 20px !important;
+}
+
+body.dashboard-fixed .overview-range-switch button {
+  font-size: 11px !important;
+}
+
+/* Transaction row container */
+body.dashboard-fixed .overview-transaction-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 11px;
+  overflow: hidden;
+  border-radius: 10px;
+  touch-action: pan-y;
+}
+
+/* Sliding transaction content */
+body.dashboard-fixed .overview-transaction-content {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  background: #000000;
+  transform: translateX(0);
+  transition: transform .22s ease;
+}
+
+/* Reveal Edit on left */
+body.dashboard-fixed .overview-transaction-row.swipe-edit-open
+.overview-transaction-content {
+  transform: translateX(62px);
+}
+
+/* Reveal Delete on right */
+body.dashboard-fixed .overview-transaction-row.swipe-delete-open
+.overview-transaction-content {
+  transform: translateX(-62px);
+}
+
+/* Swipe action buttons */
+body.dashboard-fixed .overview-swipe-action {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+body.dashboard-fixed .overview-swipe-action svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.dashboard-fixed .overview-swipe-edit {
+  left: 0;
+  background: #353535;
+}
+
+body.dashboard-fixed .overview-swipe-delete {
+  right: 0;
+  background: #ff453a;
+}
+
+/* Transaction text: white */
+body.dashboard-fixed .overview-transaction-note,
+body.dashboard-fixed .overview-transaction-amount {
+  color: #f5f5f7 !important;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+
+body.dashboard-fixed .overview-date-badge strong {
+  color: #f5f5f7 !important;
+  font-size: 11px !important;
+}
+
+/* Keep month abbreviation grey */
+body.dashboard-fixed .overview-date-badge span {
+  color: #777777 !important;
+  font-size: 8px !important;
+}
+
+/* Raise the floating Add button slightly */
+body.dashboard-fixed .floating-add-button {
+  bottom: calc(env(safe-area-inset-bottom) + 28px) !important;
+}
+
 </style>
 </head>
 
