@@ -361,6 +361,7 @@ function getOverviewTransactions() {
   return [...state.transactions];
 }
 
+
 function renderOverview() {
   const all = getOverviewTransactions();
 
@@ -387,6 +388,7 @@ function renderOverview() {
     ? sorted.slice(0, 40).map(t => {
         const parts = String(t.date).split("-");
         const day = parts[2] || "";
+
         const date = new Date(
           Number(parts[0]),
           Number(parts[1]) - 1,
@@ -398,27 +400,170 @@ function renderOverview() {
         }).toUpperCase();
 
         const sign = t.type === "income" ? "+" : "";
+        const transactionId = escapeHTML(t.id);
 
         return `
           <div class="overview-transaction-row"
-               onclick="editTx('${escapeHTML(t.id)}')">
-            <div class="overview-date-badge">
-              <strong>${escapeHTML(day)}</strong>
-              <span>${monthLabel}</span>
-            </div>
-            <div class="overview-transaction-note">
-              ${escapeHTML(t.note || "Unnamed transaction")}
-            </div>
-            <div class="overview-transaction-amount">
-              ${sign}${money(t.amount)}
+               data-transaction-id="${transactionId}">
+
+            <button
+              type="button"
+              class="overview-swipe-action overview-swipe-edit"
+              onclick="editTx('${transactionId}')"
+              aria-label="Edit transaction">
+
+              <svg viewBox="0 0 24 24">
+                <path d="M12 20h9"/>
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>
+              </svg>
+
+            </button>
+
+            <button
+              type="button"
+              class="overview-swipe-action overview-swipe-delete"
+              onclick="deleteTx('${transactionId}')"
+              aria-label="Delete transaction">
+
+              <svg viewBox="0 0 24 24">
+                <path d="M3 6h18"/>
+                <path d="M8 6V4h8v2"/>
+                <path d="m19 6-1 14H6L5 6"/>
+                <path d="M10 11v5m4-5v5"/>
+              </svg>
+
+            </button>
+
+            <div class="overview-transaction-content">
+
+              <div class="overview-date-badge">
+                <strong>${escapeHTML(day)}</strong>
+                <span>${monthLabel}</span>
+              </div>
+
+              <div class="overview-transaction-note">
+                ${escapeHTML(t.note || "Unnamed transaction")}
+              </div>
+
+              <div class="overview-transaction-amount">
+                ${sign}${money(t.amount)}
+              </div>
+
             </div>
           </div>
         `;
       }).join("")
     : '<div class="empty">No transactions found for this selection.</div>';
 
+  setupOverviewSwipeActions();
+
   drawOverviewChart(filtered);
 }
+
+
+/* ===== Dashboard transaction swipe handling ===== */
+
+function setupOverviewSwipeActions() {
+
+  const list = $("overviewTransactions");
+
+  if (!list || list.dataset.swipeActionsReady === "true") {
+    return;
+  }
+
+  list.dataset.swipeActionsReady = "true";
+
+  let swipeStart = null;
+
+  list.addEventListener("pointerdown", event => {
+
+    const target = event.target;
+
+    if (!target.closest) return;
+
+    if (target.closest(".overview-swipe-action")) {
+      return;
+    }
+
+    const row = target.closest(".overview-transaction-row");
+
+    if (!row) return;
+
+    swipeStart = {
+      row,
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId
+    };
+
+    try {
+      row.setPointerCapture(event.pointerId);
+    } catch (error) {
+      // Continue without pointer capture if unsupported.
+    }
+  });
+
+  list.addEventListener("pointerup", event => {
+
+    if (!swipeStart) return;
+
+    const swipe = swipeStart;
+    swipeStart = null;
+
+    if (swipe.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - swipe.x;
+    const deltaY = event.clientY - swipe.y;
+
+    // Ignore taps and vertical scrolling.
+    if (
+      Math.abs(deltaX) < 40 ||
+      Math.abs(deltaX) < Math.abs(deltaY) * 1.2
+    ) {
+      return;
+    }
+
+    const row = swipe.row;
+
+    // Swipe back to close an open action.
+    if (
+      row.classList.contains("swipe-delete-open") &&
+      deltaX > 0
+    ) {
+      row.classList.remove("swipe-delete-open");
+      return;
+    }
+
+    if (
+      row.classList.contains("swipe-edit-open") &&
+      deltaX < 0
+    ) {
+      row.classList.remove("swipe-edit-open");
+      return;
+    }
+
+    // Close any other open transaction.
+    list.querySelectorAll(".overview-transaction-row")
+      .forEach(item => {
+        item.classList.remove(
+          "swipe-edit-open",
+          "swipe-delete-open"
+        );
+      });
+
+    // Left swipe = Delete, right swipe = Edit.
+    if (deltaX < 0) {
+      row.classList.add("swipe-delete-open");
+    } else {
+      row.classList.add("swipe-edit-open");
+    }
+  });
+
+  list.addEventListener("pointercancel", () => {
+    swipeStart = null;
+  });
+}
+
 
 function drawOverviewChart(transactions) {
   const canvas = $("overviewChart");
@@ -568,12 +713,12 @@ const labelDay = Number(periods[i].label);
 
 const showLabel =
   overviewRange === "1M"
-    ? [1, 5, 10, 15, 20, 25, 30].includes(labelDay)
+    [1, 5, 10, 15, 25, 30].includes(labelDay)
     : true;
 
 if (showLabel) {
   ctx.fillStyle = muted;
-  ctx.font = "30px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.font = "26px -apple-system, BlinkMacSystemFont, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(periods[i].label, center, h - 10);
 }
