@@ -627,10 +627,14 @@ function showPage(id) {
   );
 
   document.body.classList.toggle(
-    "profile-page-open",
-    document.body.classList.toggle("dashboard-fixed", id === "dashboard");
-    id === "settings"
-  );
+  "profile-page-open",
+  id === "settings"
+);
+
+document.body.classList.toggle(
+  "dashboard-fixed",
+  id === "dashboard"
+);
 
   render();
   window.scrollTo(0, 0);
