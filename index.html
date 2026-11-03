@@ -977,6 +977,344 @@ body.auth-locked > nav {
 body.auth-locked .login-gate {
   display: block;
 }
+
+
+/* ===== Pitch-black reference design ===== */
+
+[data-theme="dark"] {
+  --bg: #000000;
+  --panel: #000000;
+  --text: #f5f5f7;
+  --muted: #777777;
+  --line: #1b1b1b;
+  --accent: #b7b7b7;
+  --green: #35a66b;
+  --red: #a83236;
+  --soft: #191919;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+body {
+  padding-bottom: 125px;
+  background: var(--bg);
+}
+
+.main-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+  padding: calc(12px + env(safe-area-inset-top)) 17px 10px;
+  background: var(--bg);
+  border: 0;
+}
+
+.menu-trigger,
+.wallet-menu-trigger {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.menu-trigger svg,
+.wallet-menu-trigger svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.overview-switch {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 30px;
+  background: #191919;
+  width: min(100%, 230px);
+}
+
+.overview-switch button {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 25px;
+  background: transparent;
+  color: #999999;
+  font: inherit;
+  font-size: 15px;
+}
+
+.overview-switch button.selected {
+  background: #3a3a3a;
+  color: #ffffff;
+}
+
+main {
+  max-width: 760px;
+  margin: auto;
+  padding: 18px 18px 130px;
+}
+
+.overview-summary {
+  text-align: center;
+  margin: 22px 0 10px;
+}
+
+.overview-period-label {
+  color: var(--muted);
+  font-size: 15px;
+  margin-bottom: 5px;
+}
+
+.overview-total {
+  color: var(--text);
+  font-size: 42px;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+}
+
+.overview-chart-wrap {
+  width: 100%;
+  height: 370px;
+  margin-top: 35px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.overview-chart-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.overview-range-switch {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  margin: 22px 0 48px;
+}
+
+.overview-range-switch button {
+  min-width: 58px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 28px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+}
+
+.overview-range-switch button.selected {
+  background: #191919;
+  color: #ffffff;
+}
+
+.overview-transactions {
+  display: grid;
+  gap: 24px;
+  padding: 0 12px 30px;
+}
+
+.overview-transaction-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.overview-date-badge {
+  width: 58px;
+  height: 58px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 15px;
+  background: #141414;
+  color: #999999;
+  line-height: 1.2;
+}
+
+.overview-date-badge strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.overview-date-badge span {
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+.overview-transaction-note {
+  min-width: 0;
+  overflow: hidden;
+  color: #a0a0a0;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-transaction-amount {
+  color: #aaaaaa;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.floating-add-button {
+  position: fixed;
+  z-index: 15;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: 74px;
+  height: 74px;
+  border: 0;
+  border-radius: 50%;
+  background: #373737;
+  color: #ffffff;
+  font-size: 46px;
+  font-weight: 300;
+  line-height: 1;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+/* Left navigation drawer */
+
+.nav-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: rgba(0, 0, 0, .58);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .28s ease, visibility .28s ease;
+}
+
+.nav-drawer {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 82vw);
+  padding: calc(18px + env(safe-area-inset-top)) 17px
+    max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--text);
+  border-right: 1px solid var(--line);
+  transform: translateX(-105%);
+  visibility: hidden;
+  transition: transform .28s ease, visibility .28s ease;
+}
+
+body.nav-drawer-open .nav-drawer-backdrop {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.nav-drawer-open .nav-drawer {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+body.nav-drawer-open {
+  overflow: hidden;
+}
+
+.nav-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  font-size: 21px;
+}
+
+.nav-drawer-header button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 27px;
+}
+
+.nav-drawer .app-nav {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.nav-drawer .app-nav button {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+
+.nav-drawer .app-nav button b {
+  display: inline-block;
+  width: 25px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.nav-drawer .app-nav button.active {
+  background: var(--soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
+body.profile-page-open .floating-add-button {
+  display: none;
+}
+
+body.auth-locked > .nav-drawer,
+body.auth-locked > .nav-drawer-backdrop,
+body.auth-locked > .account-drawer,
+body.auth-locked > .drawer-backdrop,
+body.auth-locked > .floating-add-button {
+  display: none !important;
+}
 </style>
 </head>
 
@@ -1028,67 +1366,67 @@ body.auth-locked .login-gate {
   </div>
 </section>
 
-<header>
-<div>
-<div class="brand">my<span>money</span></div>
-<div class="sub">Your personal finance space</div>
-</div>
+<header class="main-topbar">
+  <button type="button" class="menu-trigger" id="navMenuBtn"
+    aria-label="Open navigation menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16"></path>
+    </svg>
+  </button>
 
+  <div class="overview-switch" id="overviewTypeSwitch">
+    <button type="button" id="overviewExpenseBtn" class="selected"
+      onclick="setOverviewType('expense')">Expense</button>
+    <button type="button" id="overviewIncomeBtn"
+      onclick="setOverviewType('income')">Income</button>
+  </div>
+
+  <button type="button" class="wallet-menu-trigger" id="walletMenuBtn"
+    aria-label="Open account menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7.5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h12"></path>
+      <path d="M20 11h-4a2 2 0 0 0 0 4h4"></path>
+      <circle cx="16" cy="13" r=".7"></circle>
+    </svg>
+  </button>
 </header>
 
 <main>
 
 <section id="dashboard" class="page active">
 
-<div class="row dashboard-top-row">
-  <div class="dashboard-heading">
-    <h1>Overview</h1>
-    <div class="muted small" id="todayLabel"></div>
+  <div class="overview-summary">
+    <div class="overview-period-label" id="overviewPeriodLabel">November</div>
+    <div class="overview-total" id="overviewTotal">₹0</div>
   </div>
 
-  <div class="dashboard-header-actions">
-    <button class="btn primary" onclick="openTx()">＋ Add</button>
-
-   
-  </div>
-</div>
-  <div class="grid four dashboard-summary-grid">
-  <div class="card dashboard-summary-card">
-    <div class="metric-label">Income this month</div>
-    <div class="metric positive" id="incomeMetric">₹0</div>
+  <div class="overview-chart-wrap">
+    <canvas id="overviewChart" width="760" height="680"></canvas>
   </div>
 
-  <div class="card dashboard-summary-card">
-    <div class="metric-label">Expenses this month</div>
-    <div class="metric negative" id="expenseMetric">₹0</div>
+  <div class="overview-range-switch">
+    <button type="button" class="selected" id="range1M"
+      onclick="setOverviewRange('1M')">1M</button>
+    <button type="button" id="range1Y"
+      onclick="setOverviewRange('1Y')">1Y</button>
+    <button type="button" id="rangeAll"
+      onclick="setOverviewRange('All')">All</button>
   </div>
 
-  <div class="card dashboard-summary-card">
-    <div class="metric-label">Net cash flow</div>
-    <div class="metric" id="netMetric">₹0</div>
+  <div class="overview-transactions" id="overviewTransactions"></div>
+
+  <!-- Retained temporarily for compatibility with the current JavaScript.
+       We will remove this after the new dashboard rendering is connected. -->
+  <div class="legacy-dashboard-support" style="display:none" aria-hidden="true">
+    <div id="todayLabel"></div>
+    <div id="incomeMetric"></div>
+    <div id="expenseMetric"></div>
+    <div id="netMetric"></div>
+    <div id="budgetMetric"></div>
+    <div id="recentList"></div>
+    <canvas id="trendChart" width="650" height="220"></canvas>
   </div>
 
-  <div class="card dashboard-summary-card">
-    <div class="metric-label">Monthly budget left</div>
-    <div class="metric" id="budgetMetric">—</div>
-  </div>
-</div>
-
-<div class="card">
-<div class="row">
-<h2>Spending trend</h2>
-<span class="pill">Last 6 months</span>
-</div>
-<canvas id="trendChart" width="650" height="220"></canvas>
-</div>
-
-<div class="card">
-<div class="row">
-<h2>Recent transactions</h2>
-<button class="btn" onclick="showPage('transactions')">View all</button>
-</div>
-<div id="recentList"></div>
-</div>
 </section>
 
 <section id="transactions" class="page">
@@ -1391,7 +1729,17 @@ My Money • Personal use • Offline-first
 </main>
 
 
-<div class="bottom-dock">
+<div class="nav-drawer-backdrop" id="navDrawerBackdrop"></div>
+
+<aside class="nav-drawer" id="navDrawer" aria-label="Navigation menu"
+  aria-hidden="true">
+
+  <div class="nav-drawer-header">
+    <strong>Menu</strong>
+    <button type="button" id="closeNavDrawerBtn"
+      aria-label="Close navigation">×</button>
+  </div>
+
   <nav class="app-nav" aria-label="Main navigation">
     <button class="active" data-page="dashboard"><b>⌂</b>Home</button>
     <button data-page="transactions"><b>⇄</b>Activity</button>
@@ -1403,15 +1751,10 @@ My Money • Personal use • Offline-first
     <button data-page="debts"><b>▤</b>Debt</button>
   </nav>
 
-  <button
-    type="button"
-    class="wallet-menu-trigger"
-    id="walletMenuBtn"
-    aria-label="Open account menu"
-    aria-expanded="false">
-    <span>▱</span>
-  </button>
-</div>
+</aside>
+
+<button type="button" class="floating-add-button"
+  onclick="openTx()" aria-label="Add transaction">+</button>
 
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 
