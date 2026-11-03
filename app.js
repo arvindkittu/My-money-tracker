@@ -372,7 +372,6 @@ function renderOverview() {
     overviewRange === "1M"
       ? new Date().toLocaleDateString("en-IN", {
           month: "long",
-          year: "numeric"
         })
       : overviewRange === "1Y"
         ? "Last 12 months"
