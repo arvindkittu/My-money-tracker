@@ -1711,13 +1711,11 @@ function render() {
   renderDebts();
   $("currency").value = state.currency;
 }
-function showAuthenticatedApp() {
-  document.body.classList.remove("auth-locked");
-  updateProfileMenu();
-}
+function showLoginGate(message) {
+  document.body.classList.add("auth-locked");
 
-closeAccountDrawer();
-document.body.classList.remove("profile-page-open");
+  closeAccountDrawer();
+  document.body.classList.remove("profile-page-open");
 
   // Clear the previous account from application memory.
   state = createEmptyState();
@@ -1736,6 +1734,7 @@ document.body.classList.remove("profile-page-open");
     if ($(id)) $(id).value = "";
   });
 }
+
 function getCloudDisplayName() {
   const fullName =
     cloudUser?.user_metadata?.full_name?.trim();
