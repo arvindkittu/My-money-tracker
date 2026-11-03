@@ -552,17 +552,31 @@ function drawOverviewChart(transactions) {
       ctx.fill();
     }
 
-    const showLabel =
+    
+/* Draw a small tick for every calendar day */
+ctx.strokeStyle = line;
+ctx.lineWidth = 2;
+ctx.setLineDash([]);
+
+ctx.beginPath();
+ctx.moveTo(center, baseline);
+ctx.lineTo(center, baseline + 7);
+ctx.stroke();
+
+/* Show only selected calendar-day labels */
+const labelDay = Number(periods[i].label);
+
+const showLabel =
   overviewRange === "1M"
-    ? i % 2 === 0
+    ? [1, 5, 10, 15, 20, 25, 30].includes(labelDay)
     : true;
 
-    if (showLabel) {
-      ctx.fillStyle = muted;
-      ctx.font = "36px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(periods[i].label, center, h - 10);
-    }
+if (showLabel) {
+  ctx.fillStyle = muted;
+  ctx.font = "30px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(periods[i].label, center, h - 10);
+}
   });
 
   ctx.textAlign = "left";
