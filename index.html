@@ -744,6 +744,219 @@ margin-top:6px
   }
 }
 
+/* Bottom navigation with fixed wallet control */
+.bottom-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 12;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+
+.bottom-dock .app-nav {
+  position: static;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-start;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  scrollbar-width: none;
+}
+
+.bottom-dock .app-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.bottom-dock .app-nav button {
+  flex: 0 0 64px;
+  min-width: 64px;
+  padding: 5px 3px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.bottom-dock .app-nav button b {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.bottom-dock .app-nav button.active {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.wallet-menu-trigger {
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  align-self: center;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 29px;
+  cursor: pointer;
+}
+
+.wallet-menu-trigger:focus-visible,
+.account-drawer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Right-side account drawer */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: rgba(0, 0, 0, .48);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .28s ease, visibility .28s ease;
+}
+
+.account-drawer {
+  position: fixed;
+  z-index: 30;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 86vw);
+  padding: calc(18px + env(safe-area-inset-top)) 18px
+    max(20px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: var(--panel);
+  color: var(--text);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  transform: translateX(105%);
+  visibility: hidden;
+  transition: transform .28s ease, visibility .28s ease;
+}
+
+body.drawer-open .drawer-backdrop {
+  opacity: 1;
+  visibility: visible;
+}
+
+body.drawer-open .account-drawer {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+body.drawer-open {
+  overflow: hidden;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 26px;
+  font-size: 20px;
+}
+
+.drawer-header button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--text);
+  font-size: 27px;
+  cursor: pointer;
+}
+
+.drawer-profile {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 4px 20px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.drawer-profile .profile-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
+}
+
+.drawer-profile .profile-account-text {
+  flex: 1;
+}
+
+.drawer-profile .profile-account-text strong {
+  font-size: 15px;
+}
+
+.drawer-profile .profile-account-arrow {
+  margin-left: 0;
+}
+
+.drawer-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 17px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.drawer-action > span:first-child {
+  width: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.drawer-action.danger,
+.drawer-action.danger > span:first-child {
+  color: var(--red);
+}
+
+body.profile-page-open .bottom-dock {
+  display: none !important;
+}
+
+body.auth-locked > .bottom-dock,
+body.auth-locked > .drawer-backdrop,
+body.auth-locked > .account-drawer {
+  display: none !important;
+}
+
   @media(min-width:650px) {
 main {padding:26px}
 .grid.four {grid-template-columns:repeat(4,1fr)}
@@ -820,7 +1033,7 @@ body.auth-locked .login-gate {
 <div class="brand">my<span>money</span></div>
 <div class="sub">Your personal finance space</div>
 </div>
-<button class="iconbtn" id="themeBtn">☼ / ☾</button>
+
 </header>
 
 <main>
@@ -836,43 +1049,7 @@ body.auth-locked .login-gate {
   <div class="dashboard-header-actions">
     <button class="btn primary" onclick="openTx()">＋ Add</button>
 
-    <details id="profileMenu" class="profile-menu">
-  <summary class="profile-trigger"
-    aria-label="Open profile menu">
-
-    <span class="profile-avatar" id="profileAvatar">A</span>
-    <span class="profile-trigger-name" id="profileTriggerName">Account</span>
-
-  </summary>
-
-  <div class="profile-panel">
-
-    <button
-      type="button"
-      class="profile-account profile-account-button"
-      onclick="showProfilePage('settings')"
-      aria-label="Open profile and settings">
-
-      <span class="profile-avatar" id="profilePanelAvatar">A</span>
-
-      <span class="profile-account-text">
-        <strong id="profilePanelName">Account</strong>
-        <span id="profilePanelEmail" class="muted small"></span>
-      </span>
-
-      <span class="profile-account-arrow">›</span>
-    </button>
-
-    <button
-      type="button"
-      class="profile-menu-item danger"
-      onclick="signOutCloud()">
-
-      <span>⇥</span> Sign out
-    </button>
-
-  </div>
-</details>
+   
   </div>
 </div>
   <div class="grid four dashboard-summary-grid">
@@ -1213,39 +1390,65 @@ My Money • Personal use • Offline-first
 
 </main>
 
-<nav>
-  <button class="active" data-page="dashboard">
-    <b>⌂</b>Home
+
+<div class="bottom-dock">
+  <nav class="app-nav" aria-label="Main navigation">
+    <button class="active" data-page="dashboard"><b>⌂</b>Home</button>
+    <button data-page="transactions"><b>⇄</b>Activity</button>
+    <button data-page="budget"><b>◫</b>Budget</button>
+    <button data-page="analytics"><b>▥</b>Insights</button>
+    <button data-page="goals"><b>◎</b>Goals</button>
+    <button data-page="calendar"><b>▦</b>Calendar</button>
+    <button data-page="recurring"><b>↻</b>Recurring</button>
+    <button data-page="debts"><b>▤</b>Debt</button>
+  </nav>
+
+  <button
+    type="button"
+    class="wallet-menu-trigger"
+    id="walletMenuBtn"
+    aria-label="Open account menu"
+    aria-expanded="false">
+    <span>▱</span>
+  </button>
+</div>
+
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+<aside
+  class="account-drawer"
+  id="accountDrawer"
+  aria-label="Account menu"
+  aria-hidden="true">
+
+  <div class="drawer-header">
+    <strong>Account</strong>
+    <button type="button" id="closeDrawerBtn"
+      aria-label="Close menu">×</button>
+  </div>
+
+  <button type="button" class="drawer-profile"
+    onclick="showProfilePage('settings')">
+    <span class="profile-avatar" id="profilePanelAvatar">A</span>
+    <span class="profile-account-text">
+      <strong id="profilePanelName">Account</strong>
+      <span id="profilePanelEmail" class="muted small"></span>
+    </span>
+    <span class="profile-account-arrow">›</span>
   </button>
 
-  <button data-page="transactions">
-    <b>⇄</b>Activity
+  <button type="button" class="drawer-action" id="themeBtn">
+    <span id="drawerThemeIcon">☀</span>
+    <span id="drawerThemeLabel">Light mode</span>
   </button>
 
-  <button data-page="budget">
-    <b>◫</b>Budget
+  <button type="button" class="drawer-action danger"
+    id="drawerLogoutBtn">
+    <span>⇥</span>
+    <span>Log out</span>
   </button>
+</aside>
 
-  <button data-page="analytics">
-    <b>▥</b>Insights
-  </button>
-
-  <button data-page="goals">
-    <b>◎</b>Goals
-  </button>
-
-  <button data-page="calendar">
-    <b>▦</b>Calendar
-  </button>
-
-  <button data-page="recurring">
-    <b>↻</b>Recurring
-  </button>
-
-  <button data-page="debts">
-    <b>▤</b>Debt
-  </button>
-</nav>
 
 <!-- ADD / EDIT TRANSACTION -->
 
