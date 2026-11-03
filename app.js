@@ -314,6 +314,283 @@ function escapeHTML(s) {
   }[c]));
 }
 
+let overviewType = "expense";
+let overviewRange = "1M";
+
+function setOverviewType(type) {
+  overviewType = type;
+
+  $("overviewExpenseBtn").classList.toggle("selected", type === "expense");
+  $("overviewIncomeBtn").classList.toggle("selected", type === "income");
+
+  renderOverview();
+}
+
+function setOverviewRange(range) {
+  overviewRange = range;
+
+  ["1M", "1Y", "All"].forEach(value => {
+    $("range" + value).classList.toggle(
+      "selected",
+      value === range
+    );
+  });
+
+  renderOverview();
+}
+
+function getOverviewTransactions() {
+  const now = new Date();
+  const currentMonth = month();
+
+  if (overviewRange === "1M") {
+    return state.transactions.filter(t =>
+      t.date.startsWith(currentMonth)
+    );
+  }
+
+  if (overviewRange === "1Y") {
+    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+    const startKey =
+      start.getFullYear() + "-" +
+      String(start.getMonth() + 1).padStart(2, "0");
+
+    return state.transactions.filter(t => t.date >= startKey + "-01");
+  }
+
+  return [...state.transactions];
+}
+
+function renderOverview() {
+  const all = getOverviewTransactions();
+
+  const filtered = all.filter(t => t.type === overviewType);
+
+  const total = sum(filtered, t => Number(t.amount) || 0);
+
+  $("overviewPeriodLabel").textContent =
+    overviewRange === "1M"
+      ? new Date().toLocaleDateString("en-IN", {
+          month: "long",
+          year: "numeric"
+        })
+      : overviewRange === "1Y"
+        ? "Last 12 months"
+        : "All time";
+
+  $("overviewTotal").textContent = money(total);
+
+  const sorted = [...filtered].sort((a, b) =>
+    String(b.date).localeCompare(String(a.date))
+  );
+
+  $("overviewTransactions").innerHTML = sorted.length
+    ? sorted.slice(0, 40).map(t => {
+        const parts = String(t.date).split("-");
+        const day = parts[2] || "";
+        const date = new Date(
+          Number(parts[0]),
+          Number(parts[1]) - 1,
+          Number(parts[2])
+        );
+
+        const monthLabel = date.toLocaleDateString("en-IN", {
+          month: "short"
+        }).toUpperCase();
+
+        const sign = t.type === "income" ? "+" : "";
+
+        return `
+          <div class="overview-transaction-row"
+               onclick="editTx('${escapeHTML(t.id)}')">
+            <div class="overview-date-badge">
+              <strong>${escapeHTML(day)}</strong>
+              <span>${monthLabel}</span>
+            </div>
+            <div class="overview-transaction-note">
+              ${escapeHTML(t.note || "Unnamed transaction")}
+            </div>
+            <div class="overview-transaction-amount">
+              ${sign}${money(t.amount)}
+            </div>
+          </div>
+        `;
+      }).join("")
+    : '<div class="empty">No transactions found for this selection.</div>';
+
+  drawOverviewChart(filtered);
+}
+
+function drawOverviewChart(transactions) {
+  const canvas = $("overviewChart");
+  const ctx = canvas.getContext("2d");
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const periods = [];
+
+  if (overviewRange === "1M") {
+    const now = new Date();
+    const year = now.getFullYear();
+    const monthIndex = now.getMonth();
+    const days = new Date(year, monthIndex + 1, 0).getDate();
+
+    for (let day = 1; day <= days; day++) {
+      const key =
+        year + "-" +
+        String(monthIndex + 1).padStart(2, "0") + "-" +
+        String(day).padStart(2, "0");
+
+      periods.push({
+        key,
+        label: String(day)
+      });
+    }
+  } else {
+    const monthCount = overviewRange === "1Y"
+      ? 12
+      : Math.max(1, new Set(
+          transactions.map(t => String(t.date).slice(0, 7))
+        ).size);
+
+    let startDate;
+
+    if (overviewRange === "1Y") {
+      const now = new Date();
+      startDate = new Date(
+        now.getFullYear(),
+        now.getMonth() - 11,
+        1
+      );
+    } else {
+      const keys = transactions
+        .map(t => String(t.date).slice(0, 7))
+        .filter(Boolean)
+        .sort();
+
+      startDate = keys.length
+        ? new Date(
+            Number(keys[0].slice(0, 4)),
+            Number(keys[0].slice(5, 7)) - 1,
+            1
+          )
+        : new Date();
+    }
+
+    for (let i = 0; i < monthCount; i++) {
+      const d = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth() + i,
+        1
+      );
+
+      periods.push({
+        key: d.getFullYear() + "-" +
+          String(d.getMonth() + 1).padStart(2, "0"),
+        label: d.toLocaleDateString("en-IN", { month: "short" })
+      });
+    }
+  }
+
+  const values = periods.map(p => {
+    return sum(
+      transactions.filter(t =>
+        overviewRange === "1M"
+          ? t.date === p.key
+          : t.date.startsWith(p.key)
+      ),
+      t => Number(t.amount) || 0
+    );
+  });
+
+  const max = Math.max(1, ...values);
+  const left = 38;
+  const right = 12;
+  const top = 20;
+  const bottom = 48;
+  const plotW = w - left - right;
+  const plotH = h - top - bottom;
+  const baseline = top + plotH;
+  const slot = plotW / periods.length;
+  const barW = Math.max(5, Math.min(19, slot * 0.58));
+
+  const styles = getComputedStyle(document.documentElement);
+  const barColor = overviewType === "expense"
+    ? styles.getPropertyValue("--red").trim()
+    : styles.getPropertyValue("--green").trim();
+
+  const muted = styles.getPropertyValue("--muted").trim();
+  const line = styles.getPropertyValue("--line").trim();
+
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 8]);
+
+  ctx.beginPath();
+  ctx.moveTo(left, baseline);
+  ctx.lineTo(w - right, baseline);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+  values.forEach((value, i) => {
+    const center = left + slot * (i + 0.5);
+    const barH = plotH * value / max;
+
+    if (value > 0) {
+      ctx.fillStyle = barColor;
+      ctx.beginPath();
+      ctx.roundRect(
+        center - barW / 2,
+        baseline - barH,
+        barW,
+        Math.max(3, barH),
+        5
+      );
+      ctx.fill();
+    }
+
+    const showLabel =
+      overviewRange === "1M"
+        ? (i === 0 || (i + 1) % 2 === 1 || i === periods.length - 1)
+        : true;
+
+    if (showLabel) {
+      ctx.fillStyle = muted;
+      ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(periods[i].label, center, h - 10);
+    }
+  });
+
+  ctx.textAlign = "left";
+}
+function openNavDrawer() {
+  document.body.classList.add("nav-drawer-open");
+  $("navMenuBtn").setAttribute("aria-expanded", "true");
+  $("navDrawer").setAttribute("aria-hidden", "false");
+}
+
+function closeNavDrawer() {
+  document.body.classList.remove("nav-drawer-open");
+  $("navMenuBtn").setAttribute("aria-expanded", "false");
+  $("navDrawer").setAttribute("aria-hidden", "true");
+}
+
+function toggleNavDrawer() {
+  if (document.body.classList.contains("nav-drawer-open")) {
+    closeNavDrawer();
+  } else {
+    openNavDrawer();
+  }
+}
+
+$("navMenuBtn").onclick = toggleNavDrawer;
+$("closeNavDrawerBtn").onclick = closeNavDrawer;
+  $("navDrawerBackdrop").onclick = closeNavDrawer;
 
 function closeAccountDrawer() {
   document.body.classList.remove("drawer-open");
@@ -339,6 +616,7 @@ function toggleAccountDrawer() {
 
 function showPage(id) {
   closeAccountDrawer();
+  closeNavDrawer();
 
   document.querySelectorAll(".page").forEach(p =>
     p.classList.toggle("active", p.id === id)
@@ -390,6 +668,7 @@ $("drawerLogoutBtn").onclick = () => {
 document.addEventListener("keydown", event => {
   if (event.key === "Escape") {
     closeAccountDrawer();
+    closeNavDrawer();
   }
 });
 
@@ -1702,6 +1981,7 @@ async function clearData() {
 
 function render() {
   renderDashboard();
+  renderOverview();
   renderTransactions();
   renderBudget();
   renderAnalytics();
