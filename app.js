@@ -554,9 +554,9 @@ function drawOverviewChart(transactions) {
     }
 
     const showLabel =
-      overviewRange === "1M"
-        ? (i === 0 || (i + 1) % 2 === 1 || i === periods.length - 1)
-        : true;
+  overviewRange === "1M"
+    ? i % 2 === 0
+    : true;
 
     if (showLabel) {
       ctx.fillStyle = muted;
