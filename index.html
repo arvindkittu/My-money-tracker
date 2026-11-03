@@ -12,157 +12,6 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>My Money — Expense Tracker</title>
 
-
-/* ===== Dashboard refinement: reference design ===== */
-
-body.dashboard-fixed .main-topbar {
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
-  gap: 10px;
-  padding: calc(10px + env(safe-area-inset-top)) 17px 8px;
-}
-
-body.dashboard-fixed .menu-trigger,
-body.dashboard-fixed .wallet-menu-trigger {
-  width: 44px;
-  height: 44px;
-}
-
-body.dashboard-fixed .menu-trigger svg,
-body.dashboard-fixed .wallet-menu-trigger svg {
-  width: 22px;
-  height: 22px;
-  stroke-width: 1.6;
-}
-
-body.dashboard-fixed .overview-switch {
-  width: min(100%, 225px);
-  padding: 4px;
-  gap: 3px;
-}
-
-body.dashboard-fixed .overview-switch button {
-  min-height: 40px;
-  padding: 7px 12px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-body.dashboard-fixed main {
-  padding: 10px 17px 84px;
-}
-
-body.dashboard-fixed .overview-summary {
-  margin: 15px 0 3px;
-}
-
-body.dashboard-fixed .overview-period-label {
-  font-size: 14px;
-  margin-bottom: 5px;
-  letter-spacing: 0;
-}
-
-body.dashboard-fixed .overview-total {
-  font-size: 40px;
-  font-weight: 400;
-  letter-spacing: -1.4px;
-  line-height: 1.15;
-}
-
-body.dashboard-fixed .overview-chart-wrap {
-  flex: 0 0 clamp(165px, 24dvh, 205px);
-  height: clamp(165px, 24dvh, 205px);
-  margin-top: 17px;
-  overflow: hidden;
-}
-
-body.dashboard-fixed .overview-range-switch {
-  gap: 22px;
-  margin: 12px 0 19px;
-}
-
-body.dashboard-fixed .overview-range-switch button {
-  min-width: 50px;
-  min-height: 38px;
-  padding: 7px 13px;
-  font-size: 13px;
-}
-
-body.dashboard-fixed .overview-transactions {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: block;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  touch-action: pan-y;
-  padding: 3px 5px 22px;
-}
-
-body.dashboard-fixed .overview-transaction-row {
-  grid-template-columns: 54px minmax(0, 1fr) auto;
-  gap: 13px;
-  min-height: 54px;
-  margin-bottom: 17px;
-}
-
-body.dashboard-fixed .overview-date-badge {
-  width: 54px;
-  height: 54px;
-  border-radius: 13px;
-  background: #191919;
-}
-
-body.dashboard-fixed .overview-date-badge strong {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-body.dashboard-fixed .overview-date-badge span {
-  font-size: 10px;
-  letter-spacing: .6px;
-}
-
-body.dashboard-fixed .overview-transaction-note {
-  font-size: 14px;
-  font-weight: 450;
-  line-height: 1.4;
-}
-
-body.dashboard-fixed .overview-transaction-amount {
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-body.dashboard-fixed .floating-add-button {
-  width: 64px;
-  height: 64px;
-  bottom: calc(13px + env(safe-area-inset-bottom));
-  font-size: 40px;
-  font-weight: 300;
-}
-
-/* Keep the dashboard usable on shorter iPhone screens */
-@media (max-height: 700px) {
-  body.dashboard-fixed .overview-chart-wrap {
-    flex-basis: 150px;
-    height: 150px;
-  }
-
-  body.dashboard-fixed .overview-summary {
-    margin-top: 8px;
-  }
-
-  body.dashboard-fixed .overview-total {
-    font-size: 36px;
-  }
-
-  body.dashboard-fixed .overview-range-switch {
-    margin-bottom: 12px;
-  }
-}
-
 <style>
 :root {
 --bg:#f4f6fa;
@@ -1688,6 +1537,155 @@ body.dashboard-fixed .floating-add-button {
 
   body.dashboard-fixed .overview-total {
     font-size: 29px;
+  }
+}
+/* ===== Dashboard refinement: reference design ===== */
+
+body.dashboard-fixed .main-topbar {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 17px 8px;
+}
+
+body.dashboard-fixed .menu-trigger,
+body.dashboard-fixed .wallet-menu-trigger {
+  width: 44px;
+  height: 44px;
+}
+
+body.dashboard-fixed .menu-trigger svg,
+body.dashboard-fixed .wallet-menu-trigger svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.6;
+}
+
+body.dashboard-fixed .overview-switch {
+  width: min(100%, 225px);
+  padding: 4px;
+  gap: 3px;
+}
+
+body.dashboard-fixed .overview-switch button {
+  min-height: 40px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+body.dashboard-fixed main {
+  padding: 10px 17px 84px;
+}
+
+body.dashboard-fixed .overview-summary {
+  margin: 15px 0 3px;
+}
+
+body.dashboard-fixed .overview-period-label {
+  font-size: 14px;
+  margin-bottom: 5px;
+  letter-spacing: 0;
+}
+
+body.dashboard-fixed .overview-total {
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: -1.4px;
+  line-height: 1.15;
+}
+
+body.dashboard-fixed .overview-chart-wrap {
+  flex: 0 0 clamp(165px, 24dvh, 205px);
+  height: clamp(165px, 24dvh, 205px);
+  margin-top: 17px;
+  overflow: hidden;
+}
+
+body.dashboard-fixed .overview-range-switch {
+  gap: 22px;
+  margin: 12px 0 19px;
+}
+
+body.dashboard-fixed .overview-range-switch button {
+  min-width: 50px;
+  min-height: 38px;
+  padding: 7px 13px;
+  font-size: 13px;
+}
+
+body.dashboard-fixed .overview-transactions {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  padding: 3px 5px 22px;
+}
+
+body.dashboard-fixed .overview-transaction-row {
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 13px;
+  min-height: 54px;
+  margin-bottom: 17px;
+}
+
+body.dashboard-fixed .overview-date-badge {
+  width: 54px;
+  height: 54px;
+  border-radius: 13px;
+  background: #191919;
+}
+
+body.dashboard-fixed .overview-date-badge strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+body.dashboard-fixed .overview-date-badge span {
+  font-size: 10px;
+  letter-spacing: .6px;
+}
+
+body.dashboard-fixed .overview-transaction-note {
+  font-size: 14px;
+  font-weight: 450;
+  line-height: 1.4;
+}
+
+body.dashboard-fixed .overview-transaction-amount {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+body.dashboard-fixed .floating-add-button {
+  width: 64px;
+  height: 64px;
+  bottom: calc(13px + env(safe-area-inset-bottom));
+  font-size: 40px;
+  font-weight: 300;
+}
+
+/* Keep the dashboard usable on shorter iPhone screens */
+@media (max-height: 700px) {
+  body.dashboard-fixed .overview-chart-wrap {
+    flex-basis: 150px;
+    height: 150px;
+  }
+
+  body.dashboard-fixed .overview-summary {
+    margin-top: 8px;
+  }
+
+  body.dashboard-fixed .overview-total {
+    font-size: 36px;
+  }
+
+  body.dashboard-fixed .overview-range-switch {
+    margin-bottom: 12px;
   }
 }
 </style>
