@@ -1742,6 +1742,79 @@ body.dashboard-fixed .floating-add-button {
   font-weight: 300;
 }
 
+/* ===== Dashboard final layout correction ===== */
+
+/* Remove the unnecessary black space below the transaction list */
+body.dashboard-fixed main {
+  padding-bottom: 0 !important;
+}
+
+/* Allow transactions to scroll behind the floating button */
+body.dashboard-fixed .overview-transactions {
+  padding-bottom: 76px !important;
+}
+
+/* Smaller transaction rows and typography */
+body.dashboard-fixed .overview-transaction-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 9px;
+  min-height: 40px;
+  margin-bottom: 11px;
+}
+
+body.dashboard-fixed .overview-date-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+body.dashboard-fixed .overview-date-badge strong {
+  font-size: 11px;
+}
+
+body.dashboard-fixed .overview-date-badge span {
+  font-size: 8px;
+}
+
+body.dashboard-fixed .overview-transaction-note,
+body.dashboard-fixed .overview-transaction-amount {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Smaller header icons */
+body.dashboard-fixed .menu-trigger,
+body.dashboard-fixed .wallet-menu-trigger {
+  width: 38px;
+  height: 38px;
+}
+
+body.dashboard-fixed .menu-trigger svg,
+body.dashboard-fixed .wallet-menu-trigger svg {
+  width: 19px;
+  height: 19px;
+  stroke-width: 1.5;
+}
+
+/* Smaller floating Add button, horizontally centred */
+body.dashboard-fixed .floating-add-button {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 6px);
+  transform: translateX(-50%);
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 29px;
+  font-weight: 300;
+  line-height: 1;
+  z-index: 25;
+}
+
 </style>
 </head>
 
