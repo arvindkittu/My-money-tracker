@@ -713,6 +713,7 @@ margin-top:6px
   color: var(--red);
 }
 
+
 @media(max-width:420px) {
   .dashboard-top-row {
     gap: 7px;
@@ -729,17 +730,20 @@ margin-top:6px
   .profile-trigger {
     width: 58px;
     height: 58px;
+    gap: 0;
   }
 
   .profile-trigger .profile-avatar {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
 
   .profile-trigger-name {
-    max-width: 46px;
+    display: none;
   }
 }
+
   @media(min-width:650px) {
 main {padding:26px}
 .grid.four {grid-template-columns:repeat(4,1fr)}
