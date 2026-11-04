@@ -1,117 +1,25 @@
-const CACHE_NAME = "my-money-v26";
-
-const FILES_TO_CACHE = [
-  "./",
-  "./index.html",
-  "./app.js",
-  "./manifest.webmanifest",
-  "./icon.svg"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(FILES_TO_CACHE))
-  );
-
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
-    )
-  );
-
+const C = "my-money-v4";
+const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+const F = ["./", "./index.html", "./app.js", "./manifest.webmanifest", "./icon.svg"];
+self.addEventListener("install", e => { e.waitUntil(caches.open(C).then(async c => { await c.addAll(F); try { await c.put(CDN, await fetch(CDN, { mode: "no-cors" })); } catch (_) {} })); self.skipWaiting(); });
+self.addEventListener("activate", e => {
+  e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))));
   self.clients.claim();
 });
-
-self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET") return;
-
-  const url = new URL(event.request.url);
-
-  // Never cache Supabase API responses.
-  // Always allow the request to reach the live server.
-  if (url.hostname.endsWith(".supabase.co")) {
+// Network-first with a 3 s timeout, then cache, so a weak connection never hangs the app
+self.addEventListener("fetch", e => {
+  const r = e.request, u = new URL(r.url);
+  if (r.method !== "GET") return;
+  if (u.hostname === "cdn.jsdelivr.net") { // pinned library: cache-first so the app starts offline
+    e.respondWith(caches.match(r).then(m => m || fetch(r).then(res => { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); return res; })));
     return;
   }
-
-  // Handle only the application's normal cache strategy below.
-  const isAppRequest = url.origin === self.location.origin;
-
-  if (!isAppRequest) return;
-
-  // Always try to get fresh application HTML.
-  if (
-    url.pathname.endsWith("/") ||
-    url.pathname.endsWith("/index.html")
-  ) {
-    event.respondWith(
-      fetch(event.request, { cache: "no-store" })
-        .then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-
-            caches.open(CACHE_NAME).then(cache =>
-              cache.put(event.request, copy)
-            );
-          }
-
-          return response;
-        })
-        .catch(() =>
-          caches.match(event.request)
-            .then(cached =>
-              cached || caches.match("./index.html")
-            )
-        )
-    );
-
-    return;
-  }
-
-  // Always try to get fresh application JavaScript.
-  if (url.pathname.endsWith("/app.js")) {
-    event.respondWith(
-      fetch(event.request, { cache: "no-store" })
-        .then(response => {
-          if (response.ok) {
-            const copy = response.clone();
-
-            caches.open(CACHE_NAME).then(cache =>
-              cache.put(event.request, copy)
-            );
-          }
-
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-
-    return;
-  }
-
-  // Cache-first strategy for other application assets.
-  event.respondWith(
-    caches.match(event.request).then(cached =>
-      cached ||
-      fetch(event.request).then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-
-          caches.open(CACHE_NAME).then(cache =>
-            cache.put(event.request, copy)
-          );
-        }
-
-        return response;
-      })
-    )
-  );
+  if (u.origin !== location.origin) return;
+  const net = fetch(r, { cache: "no-store" }).then(res => {
+    if (res.ok) { const cp = res.clone(); caches.open(C).then(c => c.put(r, cp)); }
+    return res;
+  });
+  const wait = new Promise((_, rej) => setTimeout(rej, 3000));
+  e.respondWith(Promise.race([net, wait]).catch(async () =>
+    (await caches.match(r, { ignoreSearch: true })) || (r.mode === "navigate" && (await caches.match("./index.html"))) || net));
 });
