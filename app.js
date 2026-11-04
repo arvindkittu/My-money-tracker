@@ -1,2898 +1,326 @@
-const $ = id => document.getElementById(id);
-
-const SUPABASE_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcXd6aGZrdnlrdmRrZHVydGRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDk4MjcsImV4cCI6MjEwOTAyNTgyN30.PHhMIjvOHIAokPdoede5ZVfglaUC0QxOGu6spw_4cXU";
-
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
-
-let cloudUser = null;
-let cloudReady = false;
-let cloudSyncQueue = Promise.resolve();
-async function testSupabaseConnection() {
-  const { data, error } = await supabaseClient.auth.getSession();
-
-  if (error) {
-    alert("Supabase test failed: " + error.message);
-  } else {
-    alert("Supabase API connection successful.");
-  }
-}
-
-const DBNAME = "myMoneyDB", STORE = "state";
-
-let db;
-let activeStateKey = null;
-let activeStateUserId = null;
-
-function createEmptyState() {
-  return {
-    transactions: [],
-    budget: 0,
-    categoryBudgets: {},
-    goals: [],
-    recurring: [],
-    debts: [],
-    currency: "INR",
-    theme: "dark",
-    recurringRuns: {}
-  };
-}
-
-let state = createEmptyState();
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    let r = indexedDB.open(DBNAME, 2);
-
-    r.onupgradeneeded = () => {
-      const database = r.result;
-
-      if (!database.objectStoreNames.contains(STORE)) {
-        database.createObjectStore(STORE);
-      }
-
-      if (!database.objectStoreNames.contains("syncQueue")) {
-        database.createObjectStore("syncQueue");
-      }
-    };
-
-    r.onsuccess = () => {
-      db = r.result;
-      resolve();
-    };
-
-    r.onerror = () => reject(r.error);
-  });
-}
-function getAccountStateKey(userId) {
-  return "account:" + userId;
-}
-
-function readLocalState(key) {
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE)
-      .objectStore(STORE).get(key);
-
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function writeLocalState(key, data) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE, "readwrite");
-
-    transaction.objectStore(STORE).put(data, key);
-
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-}
-
-function readLegacyOwner() {
-  return new Promise((resolve, reject) => {
-    const request = db.transaction("syncQueue")
-      .objectStore("syncQueue").get("__legacy_owner__");
-
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function saveLegacyOwner(userId) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction("syncQueue", "readwrite");
-
-    transaction.objectStore("syncQueue").put(
-      userId,
-      "__legacy_owner__"
-    );
-
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-}
-
-async function loadAccountState(userId) {
-  if (!userId) {
-    throw new Error("A signed-in user is required.");
-  }
-
-  const accountKey = getAccountStateKey(userId);
-
-  let accountData = await readLocalState(accountKey);
-  let legacyOwner = await readLegacyOwner();
-
-  // Claim legacy data for the first account that initializes storage.
-  if (!legacyOwner) {
-    const legacyData = await readLocalState("app");
-
-    if (legacyData && !accountData) {
-      accountData = legacyData;
-      await writeLocalState(accountKey, accountData);
-    }
-
-    await saveLegacyOwner(userId);
-    legacyOwner = userId;
-  }
-
-  // Never copy legacy data when another account already owns it.
-  if (!accountData) {
-    accountData = createEmptyState();
-    await writeLocalState(accountKey, accountData);
-  }
-
-  state = {
-    ...createEmptyState(),
-    ...accountData
-  };
-
-  activeStateKey = accountKey;
-  activeStateUserId = userId;
-
-  return state;
-}
-async function load() {
-  state = createEmptyState();
-}
-
-function savePendingSync(snapshot, userId = cloudUser?.id) {
-  if (!userId) return Promise.resolve(false);
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction("syncQueue", "readwrite");
-
-    transaction.objectStore("syncQueue").put({
-      userId,
-      data: snapshot,
-      createdAt: Date.now() + "-" + crypto.randomUUID()
-    }, userId);
-
-    transaction.oncomplete = () => resolve(true);
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-}
-
-function getPendingSync(userId = cloudUser?.id) {
-  if (!userId) return Promise.resolve(null);
-
-  return new Promise((resolve, reject) => {
-    const request = db.transaction("syncQueue")
-      .objectStore("syncQueue").get(userId);
-
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-function clearPendingSyncIfCurrent(createdAt, userId = cloudUser?.id) {
-  if (!userId) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction("syncQueue", "readwrite");
-    const store = transaction.objectStore("syncQueue");
-    const request = store.get(userId);
-
-    request.onsuccess = () => {
-      if (request.result?.createdAt === createdAt) {
-        store.delete(userId);
-      }
-    };
-
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
-}
-
-async function processPendingSync() {
-  const userId = cloudUser?.id;
-
-  if (!userId || !cloudReady || !navigator.onLine) {
-    return false;
-  }
-
-  let syncSucceeded = true;
-
-  cloudSyncQueue = cloudSyncQueue.then(async () => {
-    if (!cloudUser || cloudUser.id !== userId ||
-        !cloudReady || !navigator.onLine) {
-      syncSucceeded = false;
-      return;
-    }
-
-    const pending = await getPendingSync(userId);
-
-    if (!pending) return;
-
-    const { error } = await supabaseClient
-      .from("user_app_state", {
-        fetch: (input, init) =>
-          fetch(input, { ...init, cache: "no-store" })
-      })
-      .upsert({
-        user_id: userId,
-        data: pending.data,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: "user_id"
-      });
-
-    if (error) throw error;
-
-    await clearPendingSyncIfCurrent(
-      pending.createdAt,
-      userId
-    );
-
-    if (cloudUser?.id === userId) {
-      updateCloudStatus(
-        "Logged in as " + getCloudDisplayName() + " · Synced"
-      );
-    }
-  }).catch(error => {
-    syncSucceeded = false;
-    updateCloudStatus("Cloud sync pending: " + error.message);
-  });
-
-  await cloudSyncQueue;
-
-  return syncSucceeded;
-}
-
-function persist() {
-  const snapshot = JSON.parse(JSON.stringify(state));
-  const userId = cloudUser?.id;
-
-  if (!userId || activeStateUserId !== userId) {
-    return Promise.reject(
-      new Error("Account storage is not initialized.")
-    );
-  }
-
-  const localSave = writeLocalState(
-    getAccountStateKey(userId),
-    snapshot
-  );
-
-  return localSave.then(async () => {
-    await savePendingSync(snapshot, userId);
-
-    if (!cloudUser || cloudUser.id !== userId) {
-      updateCloudStatus("Saved locally · Pending account sync");
-      return;
-    }
-
-    if (!cloudReady || !navigator.onLine) {
-      updateCloudStatus("Saved locally · Pending cloud sync");
-      return;
-    }
-
-    await processPendingSync();
-  });
-}
-const today = () => new Date().toLocaleDateString("en-CA");
-const month = () => today().slice(0, 7);
-const money = n => new Intl.NumberFormat("en-IN", {
-  style: "currency", currency: state.currency,
-  maximumFractionDigits: 0
-}).format(Number(n) || 0);
-const sum = (a, fn) => a.reduce((s, x) => s + fn(x), 0);
-const monthTx = (m = month()) =>
-  state.transactions.filter(t => t.date.startsWith(m));
-
-function escapeHTML(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => ({
-    "&":"&amp;", "<":"&lt;", ">":"&gt;",
-    '"':"&quot;", "'":"&#39;"
-  }[c]));
-}
-
-let overviewType = "expense";
-let overviewRange = "1M";
-
-function setOverviewType(type) {
-  overviewType = type;
-
-  $("overviewExpenseBtn").classList.toggle("selected", type === "expense");
-  $("overviewIncomeBtn").classList.toggle("selected", type === "income");
-
-  renderOverview();
-}
-
-function setOverviewRange(range) {
-  overviewRange = range;
-
-  ["1M", "1Y", "All"].forEach(value => {
-    $("range" + value).classList.toggle(
-      "selected",
-      value === range
-    );
-  });
-
-  renderOverview();
-}
-
-function getOverviewTransactions() {
-  const now = new Date();
-  const currentMonth = month();
-
-  if (overviewRange === "1M") {
-    return state.transactions.filter(t =>
-      t.date.startsWith(currentMonth)
-    );
-  }
-
-  if (overviewRange === "1Y") {
-    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-    const startKey =
-      start.getFullYear() + "-" +
-      String(start.getMonth() + 1).padStart(2, "0");
-
-    return state.transactions.filter(t => t.date >= startKey + "-01");
-  }
-
-  return [...state.transactions];
-}
-
-
-function renderOverview() {
-  const all = getOverviewTransactions();
-
-  const filtered = all.filter(t => t.type === overviewType);
-
-  const total = sum(filtered, t => Number(t.amount) || 0);
-
-  $("overviewPeriodLabel").textContent =
-    overviewRange === "1M"
-      ? new Date().toLocaleDateString("en-IN", {
-          month: "long",
-        })
-      : overviewRange === "1Y"
-        ? "Last 12 months"
-        : "All time";
-
-  $("overviewTotal").textContent = money(total);
-
-  const sorted = [...filtered].sort((a, b) =>
-    String(b.date).localeCompare(String(a.date))
-  );
-
-  $("overviewTransactions").innerHTML = sorted.length
-    ? sorted.slice(0, 40).map(t => {
-        const parts = String(t.date).split("-");
-        const day = parts[2] || "";
-
-        const date = new Date(
-          Number(parts[0]),
-          Number(parts[1]) - 1,
-          Number(parts[2])
-        );
-
-        const monthLabel = date.toLocaleDateString("en-IN", {
-          month: "short"
-        }).toUpperCase();
-
-        const sign = t.type === "income" ? "+" : "";
-        const transactionId = escapeHTML(t.id);
-
-        return `
-          <div class="overview-transaction-row"
-               data-transaction-id="${transactionId}">
-
-            <button
-              type="button"
-              class="overview-swipe-action overview-swipe-edit"
-              onclick="editTx('${transactionId}')"
-              aria-label="Edit transaction">
-
-              <svg viewBox="0 0 24 24">
-                <path d="M12 20h9"/>
-                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/>
-              </svg>
-
-            </button>
-
-            <button
-              type="button"
-              class="overview-swipe-action overview-swipe-delete"
-              onclick="deleteTx('${transactionId}')"
-              aria-label="Delete transaction">
-
-              <svg viewBox="0 0 24 24">
-                <path d="M3 6h18"/>
-                <path d="M8 6V4h8v2"/>
-                <path d="m19 6-1 14H6L5 6"/>
-                <path d="M10 11v5m4-5v5"/>
-              </svg>
-
-            </button>
-
-            <div class="overview-transaction-content">
-
-              <div class="overview-date-badge">
-                <strong>${escapeHTML(day)}</strong>
-                <span>${monthLabel}</span>
-              </div>
-
-              <div class="overview-transaction-note">
-                ${escapeHTML(t.note || "Unnamed transaction")}
-              </div>
-
-              <div class="overview-transaction-amount">
-                ${sign}${money(t.amount)}
-              </div>
-
-            </div>
-          </div>
-        `;
-      }).join("")
-    : '<div class="empty">No transactions found for this selection.</div>';
-
-  setupOverviewSwipeActions();
-
-  drawOverviewChart(filtered);
-}
-
-
-/* ===== Dashboard transaction swipe handling ===== */
-
-function setupOverviewSwipeActions() {
-
-  const list = $("overviewTransactions");
-
-  if (!list || list.dataset.swipeActionsReady === "true") {
-    return;
-  }
-
-  list.dataset.swipeActionsReady = "true";
-
-  let swipeStart = null;
-
-  list.addEventListener("pointerdown", event => {
-
-    const target = event.target;
-
-    if (!target.closest) return;
-
-    if (target.closest(".overview-swipe-action")) {
-      return;
-    }
-
-    const row = target.closest(".overview-transaction-row");
-
-    if (!row) return;
-
-    swipeStart = {
-      row,
-      x: event.clientX,
-      y: event.clientY,
-      pointerId: event.pointerId
-    };
-
-    try {
-      row.setPointerCapture(event.pointerId);
-    } catch (error) {
-      // Continue without pointer capture if unsupported.
-    }
-  });
-
-  list.addEventListener("pointerup", event => {
-
-    if (!swipeStart) return;
-
-    const swipe = swipeStart;
-    swipeStart = null;
-
-    if (swipe.pointerId !== event.pointerId) return;
-
-    const deltaX = event.clientX - swipe.x;
-    const deltaY = event.clientY - swipe.y;
-
-    // Ignore taps and vertical scrolling.
-    if (
-      Math.abs(deltaX) < 40 ||
-      Math.abs(deltaX) < Math.abs(deltaY) * 1.2
-    ) {
-      return;
-    }
-
-    const row = swipe.row;
-
-    // Swipe back to close an open action.
-    if (
-      row.classList.contains("swipe-delete-open") &&
-      deltaX > 0
-    ) {
-      row.classList.remove("swipe-delete-open");
-      return;
-    }
-
-    if (
-      row.classList.contains("swipe-edit-open") &&
-      deltaX < 0
-    ) {
-      row.classList.remove("swipe-edit-open");
-      return;
-    }
-
-    // Close any other open transaction.
-    list.querySelectorAll(".overview-transaction-row")
-      .forEach(item => {
-        item.classList.remove(
-          "swipe-edit-open",
-          "swipe-delete-open"
-        );
-      });
-
-    // Left swipe = Delete, right swipe = Edit.
-    if (deltaX < 0) {
-      row.classList.add("swipe-delete-open");
-    } else {
-      row.classList.add("swipe-edit-open");
-    }
-  });
-
-  list.addEventListener("pointercancel", () => {
-    swipeStart = null;
-  });
-}
-
-
-function drawOverviewChart(transactions) {
-  const canvas = $("overviewChart");
-  const ctx = canvas.getContext("2d");
-
-  const w = canvas.width;
-  const h = canvas.height;
-
-  ctx.clearRect(0, 0, w, h);
-
-  const periods = [];
-
-  if (overviewRange === "1M") {
-    const now = new Date();
-    const year = now.getFullYear();
-    const monthIndex = now.getMonth();
-    const days = new Date(year, monthIndex + 1, 0).getDate();
-
-    for (let day = 1; day <= days; day++) {
-      const key =
-        year + "-" +
-        String(monthIndex + 1).padStart(2, "0") + "-" +
-        String(day).padStart(2, "0");
-
-      periods.push({
-        key,
-        label: String(day)
-      });
-    }
-  } else {
-    const monthCount = overviewRange === "1Y"
-      ? 12
-      : Math.max(1, new Set(
-          transactions.map(t => String(t.date).slice(0, 7))
-        ).size);
-
-    let startDate;
-
-    if (overviewRange === "1Y") {
-      const now = new Date();
-      startDate = new Date(
-        now.getFullYear(),
-        now.getMonth() - 11,
-        1
-      );
-    } else {
-      const keys = transactions
-        .map(t => String(t.date).slice(0, 7))
-        .filter(Boolean)
-        .sort();
-
-      startDate = keys.length
-        ? new Date(
-            Number(keys[0].slice(0, 4)),
-            Number(keys[0].slice(5, 7)) - 1,
-            1
-          )
-        : new Date();
-    }
-
-    for (let i = 0; i < monthCount; i++) {
-      const d = new Date(
-        startDate.getFullYear(),
-        startDate.getMonth() + i,
-        1
-      );
-
-      periods.push({
-        key: d.getFullYear() + "-" +
-          String(d.getMonth() + 1).padStart(2, "0"),
-        label: d.toLocaleDateString("en-IN", { month: "short" })
-      });
-    }
-  }
-
-  const values = periods.map(p => {
-    return sum(
-      transactions.filter(t =>
-        overviewRange === "1M"
-          ? t.date === p.key
-          : t.date.startsWith(p.key)
-      ),
-      t => Number(t.amount) || 0
-    );
-  });
-
-  const max = Math.max(1, ...values);
-  const left = 38;
-  const right = 12;
-  const top = 20;
-  const bottom = 48;
-  const plotW = w - left - right;
-  const plotH = h - top - bottom;
-  const baseline = top + plotH;
-  const slot = plotW / periods.length;
-  const barW = Math.max(4, Math.min(15, slot * 0.48));
-
-  const styles = getComputedStyle(document.documentElement);
-  const barColor = overviewType === "expense"
-    ? styles.getPropertyValue("--red").trim()
-    : styles.getPropertyValue("--green").trim();
-
-  const muted = "#ffffff";
-  const line = styles.getPropertyValue("--line").trim();
-
-  ctx.strokeStyle = line;
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 8]);
-
-  ctx.beginPath();
-  ctx.moveTo(left, baseline);
-  ctx.lineTo(w - right, baseline);
-  ctx.stroke();
-
-  ctx.setLineDash([]);
-
-  values.forEach((value, i) => {
-    const center = left + slot * (i + 0.5);
-    const barH = plotH * value / max;
-
-    if (value > 0) {
-      ctx.fillStyle = barColor;
-      ctx.beginPath();
-      ctx.roundRect(
-        center - barW / 2,
-        baseline - barH,
-        barW,
-        Math.max(3, barH),
-        5
-      );
-      ctx.fill();
-    }
-
-    
-/* Draw a small tick for every calendar day */
-ctx.strokeStyle = line;
-ctx.lineWidth = 2;
-ctx.setLineDash([]);
-
-ctx.beginPath();
-ctx.moveTo(center, baseline);
-ctx.lineTo(center, baseline + 7);
-ctx.stroke();
-
-/* Show only selected calendar-day labels */
-const labelDay = Number(periods[i].label);
-
-const showLabel =
-  overviewRange === "1M"
-    ? [3, 6, 9, 12, 15, 18, 21, 24, 27, 30].includes(labelDay)
-    : true;
-
-if (showLabel) {
-  ctx.fillStyle = muted;
-  ctx.font = "26px -apple-system, BlinkMacSystemFont, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(periods[i].label, center, h - 10);
-}
-  });
-
-  ctx.textAlign = "left";
-}
-function openNavDrawer() {
-  document.body.classList.add("nav-drawer-open");
-  $("navMenuBtn").setAttribute("aria-expanded", "true");
-  $("navDrawer").setAttribute("aria-hidden", "false");
-}
-
-function closeNavDrawer() {
-  document.body.classList.remove("nav-drawer-open");
-  $("navMenuBtn").setAttribute("aria-expanded", "false");
-  $("navDrawer").setAttribute("aria-hidden", "true");
-}
-
-function toggleNavDrawer() {
-  if (document.body.classList.contains("nav-drawer-open")) {
-    closeNavDrawer();
-  } else {
-    openNavDrawer();
-  }
-}
-
-$("navMenuBtn").onclick = toggleNavDrawer;
-$("closeNavDrawerBtn").onclick = closeNavDrawer;
-  $("navDrawerBackdrop").onclick = closeNavDrawer;
-
-function closeAccountDrawer() {
-  document.body.classList.remove("drawer-open");
-
-  $("walletMenuBtn").setAttribute("aria-expanded", "false");
-  $("accountDrawer").setAttribute("aria-hidden", "true");
-}
-
-function openAccountDrawer() {
-  document.body.classList.add("drawer-open");
-
-  $("walletMenuBtn").setAttribute("aria-expanded", "true");
-  $("accountDrawer").setAttribute("aria-hidden", "false");
-}
-
-function toggleAccountDrawer() {
-  if (document.body.classList.contains("drawer-open")) {
-    closeAccountDrawer();
-  } else {
-    openAccountDrawer();
-  }
-}
-
-function showPage(id) {
-  closeAccountDrawer();
-  closeNavDrawer();
-
-  document.querySelectorAll(".page").forEach(p =>
-    p.classList.toggle("active", p.id === id)
-  );
-
-  document.querySelectorAll(".app-nav button").forEach(b =>
-    b.classList.toggle("active", b.dataset.page === id)
-  );
-
-  document.body.classList.toggle(
-  "profile-page-open",
-  id === "settings"
-);
-
-document.body.classList.toggle(
-  "dashboard-fixed",
-  id === "dashboard"
-);
-
-  render();
-  window.scrollTo(0, 0);
-}
-
-document.querySelectorAll(".app-nav button").forEach(b =>
-  b.onclick = () => showPage(b.dataset.page)
-);
-
-function setTheme() {
-  document.documentElement.dataset.theme = state.theme;
-
-  const isDark = state.theme === "dark";
-
-  $("drawerThemeIcon").textContent = isDark ? "☀" : "☾";
-  $("drawerThemeLabel").textContent =
-    isDark ? "Switch to Light mode" : "Switch to Dark mode";
-}
-
-$("walletMenuBtn").onclick = toggleAccountDrawer;
-$("closeDrawerBtn").onclick = closeAccountDrawer;
-$("drawerBackdrop").onclick = closeAccountDrawer;
-
-$("themeBtn").onclick = async () => {
-  state.theme = state.theme === "dark" ? "light" : "dark";
-  setTheme();
-  await persist();
-  renderCharts();
+"use strict";
+const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s), KEY = "mm3", TW = 27;
+const pad = n => String(n).padStart(2, "0");
+const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const today = () => iso(new Date());
+const r2 = n => Math.round(n * 100) / 100;
+const fmt = n => "₹" + (+n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const mname = (k, o) => new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-IN", o || { month: "long" });
+const sum = a => r2(a.reduce((s, t) => s + t.amount, 0));
+const DC = {
+  expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Other", "📦", "#9ca3af"]],
+  income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-
-$("drawerLogoutBtn").onclick = () => {
-  closeAccountDrawer();
-  signOutCloud();
-};
-
-document.addEventListener("keydown", event => {
-  if (event.key === "Escape") {
-    closeAccountDrawer();
-    closeNavDrawer();
-  }
-});
-
-
-function setTxType(type) {
-  $("txType").value = type;
-
-  $("txExpenseBtn").classList.toggle(
-    "primary", type === "expense"
-  );
-
-  $("txIncomeBtn").classList.toggle(
-    "primary", type === "income"
-  );
-}
-
-function openTx(t = null) {
-  $("txForm").reset();
-  $("txId").value = t?.id || "";
-
-  setTxType(t?.type || "expense");
-
-  $("txAmount").value = t?.amount || "";
-  $("txDate").value = t?.date || today();
-  $("txNote").value = t?.note || "";
-
-  $("txDialogTitle").textContent =
-    t ? "Edit transaction" : "Add transaction";
-
-  $("txDialog").showModal();
-}
-
-
-
-function setTxType(type) {
-  $("txType").value = type;
-
-  $("txExpenseBtn").classList.toggle(
-    "primary", type === "expense"
-  );
-
-  $("txIncomeBtn").classList.toggle(
-    "primary", type === "income"
-  );
-}
-
-
-/* Custom amount keypad */
-
-function addTxDigit(value) {
-  const input = $("txAmount");
-  let current = input.value || "";
-
-  if (value === ".") {
-    if (current.includes(".")) return;
-    current = current || "0";
-  } else {
-    if (current === "0") current = "";
-  }
-
-  if (current.replace(".", "").length >= 10) return;
-
-  input.value = current + value;
-  input.dispatchEvent(new Event("input", {
-    bubbles: true
-  }));
-}
-
-
-function backspaceTxDigit() {
-  const input = $("txAmount");
-
-  input.value = input.value.slice(0, -1);
-
-  input.dispatchEvent(new Event("input", {
-    bubbles: true
-  }));
-}
-
-function openTx(t = null) {
-  $("txForm").reset();
-  $("txId").value = t?.id || "";
-
-  setTxType(t?.type || "expense");
-
-  $("txAmount").value = t?.amount || "";
-  $("txDate").value = t?.date || today();
-  $("txNote").value = t?.note || "";
-
-  $("txDialogTitle").textContent =
-    t ? "Edit transaction" : "Add transaction";
-
-  $("txDialog").showModal();
-}
-
-async function saveTx() {
-  let amount = Number($("txAmount").value);
-
-  if (!(amount > 0)) {
-    alert("Enter an amount greater than zero.");
-    return;
-  }
-
-  let id = $("txId").value || crypto.randomUUID();
-
-  let tx = {
-    id,
-    type: $("txType").value,
-    amount,
-    date: $("txDate").value,
-    note: $("txNote").value.trim()
-  };
-
-  if (!tx.date) {
-    alert("Choose a date.");
-    return;
-  }
-
-  let i = state.transactions.findIndex(x => x.id === id);
-
-  if (i >= 0) {
-    state.transactions[i] = {
-      ...state.transactions[i],
-      ...tx
-    };
-  } else {
-    state.transactions.push(tx);
-  }
-
-  await persist();
-  $("txDialog").close();
-  render();
-}
-
-function formatTransactionDate(value) {
-  if (!value) return "Date not set";
-
-  const match = String(value).match(
-    /^(\d{4})-(\d{2})-(\d{2})$/
-  );
-
-  if (!match) return String(value);
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  const date = new Date(year, month - 1, day);
-
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return String(value);
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(date);
-}
-function txHTML(t) {
-  const isIncome = t.type === "income";
-
-  const typeLabel = isIncome
-    ? "Income"
-    : "Expense";
-
-  const typeClass = isIncome
-    ? "income"
-    : "expense";
-
-  const amountSign = isIncome ? "+" : "−";
-
-  return `
-    <div class="transaction-item">
-
-      <div class="transaction-main">
-
-        <span class="transaction-title">
-          ${escapeHTML(t.note || "Unnamed transaction")}
-        </span>
-
-        <div class="transaction-meta">
-
-          <span class="transaction-date">
-            ${escapeHTML(formatTransactionDate(t.date))}
-          </span>
-
-          <span class="transaction-type ${typeClass}">
-            ${typeLabel}
-          </span>
-
-        </div>
-
-      </div>
-
-      <div class="transaction-side">
-
-        <div class="transaction-amount ${typeClass === "income" ? "positive" : "negative"}">
-          ${amountSign}${money(t.amount)}
-        </div>
-
-        <div class="transaction-actions">
-
-          <button
-            type="button"
-            class="transaction-action"
-            onclick="editTx('${t.id}')"
-            aria-label="Edit transaction">
-            Edit
-          </button>
-
-          <button
-            type="button"
-            class="transaction-action delete"
-            onclick="deleteTx('${t.id}')"
-            aria-label="Delete transaction">
-            Delete
-          </button>
-
-        </div>
-
-      </div>
-
-    </div>
-  `;
-}
-
-
-function editTx(id) {
-  let t = state.transactions.find(x => x.id === id);
-  if (t) openTx(t);
-}
-
-async function deleteTx(id) {
-  if (confirm("Delete this transaction?")) {
-    state.transactions = state.transactions.filter(t => t.id !== id);
-    await persist();
-    render();
-  }
-}
-function compareTransactionsNewestFirst(a, b, order) {
-  const dateOrder = String(b.date || "")
-    .localeCompare(String(a.date || ""));
-
-  if (dateOrder !== 0) {
-    return dateOrder;
-  }
-
-  // For transactions on the same date,
-  // show the most recently added one first.
-  return (order.get(b) ?? -1) - (order.get(a) ?? -1);
-}
-function renderDashboard() {
-  let a = monthTx();
-
-  let inc = sum(
-    a.filter(t => t.type === "income"),
-    t => t.amount
-  );
-
-  let exp = sum(
-    a.filter(t => t.type === "expense"),
-    t => t.amount
-  );
-
-  $("todayLabel").textContent = new Date().toLocaleDateString(
-    undefined,
-    {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    }
-  );
-
-  $("incomeMetric").textContent = money(inc);
-  $("expenseMetric").textContent = money(exp);
-  $("netMetric").textContent = money(inc - exp);
-
-  $("budgetMetric").textContent =
-    state.budget ? money(state.budget - exp) : "—";
-
-  $("budgetMetric").className =
-    "metric " + (state.budget - exp < 0 ? "negative" : "");
-
-  const transactionOrder = new Map(
-    state.transactions.map((t, index) => [t, index])
-  );
-
-  let recent = [...state.transactions]
-    .sort((x, y) =>
-      compareTransactionsNewestFirst(x, y, transactionOrder)
-    )
-    .slice(0, 5);
-
-  $("recentList").innerHTML = recent.length
-    ? recent.map(txHTML).join("")
-    : '<div class="empty">Add your first transaction to get started.</div>';
-
-  drawTrend("trendChart", 6);
-}
-
-function getTxDateRange() {
-  const period = $("txPeriod").value;
-  const now = new Date();
-  const todayDate = today();
-
-  if (period === "today") {
-    return { start: todayDate, end: todayDate };
-  }
-
-  if (period === "month") {
-    const m = month();
-    return { start: m + "-01", end: m + "-31" };
-  }
-
-  if (period === "lastmonth") {
-    const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const last = new Date(y, d.getMonth() + 1, 0).getDate();
-
-    return {
-      start: y + "-" + m + "-01",
-      end: y + "-" + m + "-" + String(last).padStart(2, "0")
-    };
-  }
-
-  if (period === "week") {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const day = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - day);
-
-    const start = d.toLocaleDateString("en-CA");
-    const endDate = new Date(d);
-    endDate.setDate(endDate.getDate() + 6);
-
-    return {
-      start,
-      end: endDate.toLocaleDateString("en-CA")
-    };
-  }
-
-  if (period === "custom") {
-    return {
-      start: $("txStartDate").value,
-      end: $("txEndDate").value
-    };
-  }
-
-  return { start: "", end: "" };
-}
-
-
-function renderTransactions() {
-  const query = $("txSearch").value.trim().toLowerCase();
-  const type = $("txFilter").value;
-  const sort = $("txSort").value;
-  const range = getTxDateRange();
-
-  $("txCustomDates").hidden =
-    $("txPeriod").value !== "custom";
-
-  let list = state.transactions.filter(t => {
-    if (type !== "all" && t.type !== type) return false;
-
-    if (range.start && t.date < range.start) return false;
-    if (range.end && t.date > range.end) return false;
-
-    if (
-      $("txPeriod").value === "custom" &&
-      !range.start && !range.end
-    ) return false;
-
-    if (
-      $("txPeriod").value === "custom" &&
-      range.start && range.end &&
-      range.start > range.end
-    ) return false;
-
-    if (query) {
-      const searchable = [
-        t.note,
-        t.type,
-        t.date,
-        String(t.amount)
-      ].join(" ").toLowerCase();
-
-      if (!searchable.includes(query)) return false;
-    }
-
-    return true;
-  });
-
-  const transactionOrder = new Map(
-    state.transactions.map((t, index) => [t, index])
-  );
-
-  list.sort((a, b) => {
-
-    if (sort === "oldest") {
-      const dateOrder = String(a.date || "")
-        .localeCompare(String(b.date || ""));
-
-      if (dateOrder !== 0) return dateOrder;
-
-      return (transactionOrder.get(a) ?? -1) -
-             (transactionOrder.get(b) ?? -1);
-    }
-
-    if (sort === "high") {
-      return Number(b.amount) - Number(a.amount) ||
-        compareTransactionsNewestFirst(a, b, transactionOrder);
-    }
-
-    if (sort === "low") {
-      return Number(a.amount) - Number(b.amount) ||
-        compareTransactionsNewestFirst(a, b, transactionOrder);
-    }
-
-    return compareTransactionsNewestFirst(
-      a,
-      b,
-      transactionOrder
-    );
-  });
-
-  $("txResultCount").textContent =
-    list.length + (list.length === 1
-      ? " transaction"
-      : " transactions");
-
-  $("txList").innerHTML = list.length
-    ? list.map(txHTML).join("")
-    : '<div class="empty">No matching transactions. Try changing or clearing your filters.</div>';
-}
-
-function clearTxFilters() {
-  $("txSearch").value = "";
-  $("txPeriod").value = "month";
-  $("txFilter").value = "all";
-  $("txSort").value = "newest";
-  $("txStartDate").value = "";
-  $("txEndDate").value = "";
-
-  renderTransactions();
-}
-
-$("txSearch").addEventListener("input", renderTransactions);
-
-[
-  "txPeriod",
-  "txFilter",
-  "txSort",
-  "txStartDate",
-  "txEndDate"
-].forEach(id =>
-  $(id).addEventListener("change", renderTransactions)
-);
-
-
-function saveBudget() {
-  state.budget = Math.max(0, Number($("totalBudget").value) || 0);
-  persist().then(render);
-}
-
-
-function renderBudget() {
-  $("totalBudget").value = state.budget || "";
-
-  let spent = sum(
-    monthTx().filter(t => t.type === "expense"),
-    t => t.amount
-  );
-
-  $("budgetUsage").innerHTML = state.budget
-    ? `<div class="row">
-         <b>${money(spent)} spent</b>
-         <b>${money(state.budget)} budget</b>
-       </div>
-       <div class="bar">
-         <i style="width:${Math.min(100, spent / state.budget * 100)}%"></i>
-       </div>
-       <div class="small muted" style="margin-top:8px">
-         ${money(Math.max(0, state.budget - spent))} remaining
-       </div>`
-    : '<div class="muted small">Set a monthly budget to see usage.</div>';
-}
-
-function drawTrend(id, n) {
-  const cv = $(id);
-  const ctx = cv.getContext("2d");
-  const w = cv.width;
-  const h = cv.height;
-
-  ctx.clearRect(0, 0, w, h);
-
-  const labels = [];
-  const vals = [];
-
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-
-    const m = d.toLocaleDateString("en-CA").slice(0, 7);
-
-    labels.push(
-      d.toLocaleDateString(undefined, { month: "short" })
-    );
-
-    vals.push(
-      sum(
-        monthTx(m).filter(t => t.type === "expense"),
-        t => t.amount
-      )
-    );
-  }
-
-  const max = Math.max(1, ...vals);
-
-  const left = 30;
-  const right = 30;
-  const top = 28;
-  const bottom = 40;
-
-  const plotW = w - left - right;
-  const plotH = h - top - bottom;
-  const slotW = plotW / n;
-  const barW = Math.min(54, slotW * 0.58);
-  const baseline = top + plotH;
-
-  const styles = getComputedStyle(document.body);
-
-  const accent = styles.getPropertyValue("--accent").trim();
-  const muted = styles.getPropertyValue("--muted").trim();
-  const line = styles.getPropertyValue("--line").trim();
-
-  // Horizontal guide lines
-  ctx.strokeStyle = line;
-  ctx.lineWidth = 1;
-
-  for (let i = 0; i <= 3; i++) {
-    const y = top + (plotH / 3) * i;
-
-    ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(w - right, y);
-    ctx.stroke();
-  }
-
-  // Bars, spending labels and month labels
-  for (let i = 0; i < n; i++) {
-    const center = left + slotW * (i + 0.5);
-    const barH = plotH * vals[i] / max;
-    const barTop = baseline - barH;
-
-    if (vals[i] > 0) {
-      ctx.fillStyle = accent;
-      ctx.fillRect(
-        center - barW / 2,
-        barTop,
-        barW,
-        Math.max(2, barH)
-      );
-
-      let amountLabel;
-
-      if (vals[i] >= 10000000) {
-        amountLabel = "₹" + (vals[i] / 10000000).toFixed(1) + "Cr";
-      } else if (vals[i] >= 100000) {
-        amountLabel = "₹" + (vals[i] / 100000).toFixed(1) + "L";
-      } else if (vals[i] >= 1000) {
-        amountLabel = "₹" + (vals[i] / 1000).toFixed(1) + "k";
-      } else {
-        amountLabel = "₹" + Math.round(vals[i]);
-      }
-
-      ctx.fillStyle = muted;
-      ctx.font = "600 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(
-        amountLabel,
-        center,
-        Math.max(16, barTop - 8)
-      );
-    }
-
-    ctx.fillStyle = muted;
-    ctx.font = "600 16px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(labels[i], center, h - 12);
-  }
-
-  ctx.textAlign = "left";
-}
-
-function renderCharts() {
-  drawTrend("trendChart", 6);
-  drawTrend("analyticsChart", 6);
-}
-
-function drawIncomeExpenseChart() {
-  const cv = $("analyticsChart");
-  const ctx = cv.getContext("2d");
-  const w = cv.width, h = cv.height;
-  ctx.clearRect(0, 0, w, h);
-
-  const months = [];
-
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(1);
-    d.setMonth(d.getMonth() - i);
-
-    const key = d.getFullYear() + "-" +
-      String(d.getMonth() + 1).padStart(2, "0");
-
-    const items = monthTx(key);
-
-    months.push({
-      label: d.toLocaleDateString(undefined, { month: "short" }),
-      income: sum(items.filter(t => t.type === "income"), t => t.amount),
-      expense: sum(items.filter(t => t.type === "expense"), t => t.amount)
-    });
-  }
-
-  const max = Math.max(1, ...months.flatMap(m => [m.income, m.expense]));
-  const top = 28, bottom = 38, left = 24;
-  const chartH = h - top - bottom;
-  const groupW = (w - left * 2) / months.length;
-  const barW = Math.min(24, groupW * 0.27);
-
-  const green = getComputedStyle(document.body)
-    .getPropertyValue("--green").trim();
-  const red = getComputedStyle(document.body)
-    .getPropertyValue("--red").trim();
-  const muted = getComputedStyle(document.body)
-    .getPropertyValue("--muted").trim();
-
-  months.forEach((m, i) => {
-    const center = left + groupW * i + groupW / 2;
-    const incomeH = chartH * m.income / max;
-    const expenseH = chartH * m.expense / max;
-
-    ctx.fillStyle = green;
-    ctx.fillRect(center - barW - 2,
-      top + chartH - incomeH, barW, incomeH);
-
-    ctx.fillStyle = red;
-    ctx.fillRect(center + 2,
-      top + chartH - expenseH, barW, expenseH);
-
-    ctx.fillStyle = muted;
-    ctx.font = "12px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(m.label, center, h - 12);
-  });
-
-  ctx.textAlign = "left";
-  ctx.fillStyle = green;
-  ctx.fillRect(left, 7, 10, 10);
-  ctx.fillStyle = muted;
-  ctx.font = "11px sans-serif";
-  ctx.fillText("Income", left + 15, 16);
-
-  ctx.fillStyle = red;
-  ctx.fillRect(left + 88, 7, 10, 10);
-  ctx.fillStyle = muted;
-  ctx.fillText("Expenses", left + 103, 16);
-}
-
-
-function renderAnalytics() {
-  const current = monthTx();
-
-  const income = sum(
-    current.filter(t => t.type === "income"),
-    t => t.amount
-  );
-
-  const expenses = sum(
-    current.filter(t => t.type === "expense"),
-    t => t.amount
-  );
-
-  const net = income - expenses;
-  const dayOfMonth = new Date().getDate();
-  const dailyAverage = expenses / Math.max(1, dayOfMonth);
-  const savingsRate = income > 0 ? net / income * 100 : 0;
-
-  $("insightIncome").textContent = money(income);
-  $("insightExpense").textContent = money(expenses);
-  $("insightDaily").textContent = money(dailyAverage);
-  $("insightSavings").textContent = savingsRate.toFixed(1) + "%";
-
-  $("insightSavings").className =
-    "metric " + (savingsRate < 0 ? "negative" : "positive");
-
-  drawIncomeExpenseChart();
-
-  const previousDate = new Date();
-  previousDate.setDate(1);
-  previousDate.setMonth(previousDate.getMonth() - 1);
-
-  const previousMonth = previousDate.getFullYear() + "-" +
-    String(previousDate.getMonth() + 1).padStart(2, "0");
-
-  const previousItems = monthTx(previousMonth);
-
-  const previousExpenses = sum(
-    previousItems.filter(t => t.type === "expense"),
-    t => t.amount
-  );
-
-  const difference = expenses - previousExpenses;
-
-  let comparisonText;
-
-  if (previousExpenses === 0 && expenses > 0) {
-    comparisonText = "No expenses in the previous month";
-  } else if (previousExpenses === 0) {
-    comparisonText = "No expenses in either month";
-  } else {
-    const change = difference / previousExpenses * 100;
-
-    comparisonText =
-      (difference > 0 ? "Up " : difference < 0 ? "Down " : "No change ") +
-      Math.abs(change).toFixed(1) + "% compared with last month";
-  }
-
-  $("monthComparison").innerHTML = `
-    <div class="item">
-      <span>This month</span><b>${money(expenses)}</b>
-    </div>
-    <div class="item">
-      <span>Last month</span><b>${money(previousExpenses)}</b>
-    </div>
-    <div class="item">
-      <span>Difference</span>
-      <b class="${difference > 0 ? "negative" : difference < 0 ? "positive" : ""}">
-        ${difference > 0 ? "+" : difference < 0 ? "−" : ""}${money(Math.abs(difference))}
-      </b>
-    </div>
-    <div class="small muted" style="margin-top:8px">
-      ${comparisonText}
-    </div>`;
-
-  $("periodSummary").innerHTML = `
-    <div class="item">
-      <span>Income</span>
-      <b class="positive">${money(income)}</b>
-    </div>
-    <div class="item">
-      <span>Expenses</span>
-      <b class="negative">${money(expenses)}</b>
-    </div>
-    <div class="item">
-      <span>Net savings</span>
-      <b class="${net < 0 ? "negative" : "positive"}">${money(net)}</b>
-    </div>
-    <div class="item">
-      <span>Transactions</span><b>${current.length}</b>
-    </div>`;
-}
-
-
-function openGoal() {
-  $("goalName").value = "";
-  $("goalTarget").value = "";
-  $("goalSaved").value = "0";
-  $("goalDate").value = "";
-  $("goalDialog").showModal();
-}
-
-async function saveGoal() {
-  let name = $("goalName").value.trim();
-  let target = Number($("goalTarget").value);
-  if (!name || !(target > 0)) {
-    alert("Enter a goal name and target amount.");
-    return;
-  }
-  state.goals.push({
-    id: crypto.randomUUID(), name, target,
-    saved: Number($("goalSaved").value) || 0,
-    date: $("goalDate").value
-  });
-  await persist();
-  $("goalDialog").close();
-  render();
-}
-
-function renderGoals() {
-  $("goalList").innerHTML = state.goals.length
-    ? state.goals.map(g => `
-      <div style="padding:10px 0;border-bottom:1px solid var(--line)">
-        <div class="row"><b>${escapeHTML(g.name)}</b>
-          <span class="pill">${Math.min(100, Math.round(g.saved / g.target * 100))}%</span>
-        </div>
-        <div class="row small muted" style="margin-top:8px">
-          <span>${money(g.saved)} saved</span><span>Target ${money(g.target)}</span>
-        </div>
-        <div class="bar"><i style="width:${Math.min(100, g.saved / g.target * 100)}%"></i></div>
-        <div class="actions">
-          <button class="btn" onclick="addGoalMoney('${g.id}')">＋ Add savings</button>
-          <button class="btn danger" onclick="deleteGoal('${g.id}')">Delete</button>
-        </div>
-      </div>`).join("")
-    : '<div class="empty">Create your first savings goal.</div>';
-}
-
-async function addGoalMoney(id) {
-  let g = state.goals.find(x => x.id === id);
-  let v = Number(prompt("How much did you save?", "1000"));
-  if (g && v > 0) {
-    g.saved += v;
-    await persist();
-    render();
-  }
-}
-
-async function deleteGoal(id) {
-  if (confirm("Delete this goal?")) {
-    state.goals = state.goals.filter(g => g.id !== id);
-    await persist();
-    render();
-  }
-}
-
-function renderCalendar() {
-  let m = $("calMonth").value || month();
-  let [y, mo] = m.split("-").map(Number);
-  let first = new Date(y, mo - 1, 1);
-  let days = new Date(y, mo, 0).getDate();
-  let offset = (first.getDay() + 6) % 7;
-
-  let html = "<div style='display:grid;grid-template-columns:repeat(7,1fr);text-align:center;gap:5px'>" +
-    ["M","T","W","T","F","S","S"].map(x =>
-      `<b class="muted small">${x}</b>`).join("");
-
-  for (let i = 0; i < offset; i++) html += "<span></span>";
-
-  for (let d = 1; d <= days; d++) {
-    let date = `${m}-${String(d).padStart(2, "0")}`;
-    let count = state.transactions.filter(t => t.date === date).length;
-    html += `<button class="btn" style="padding:10px 0"
-      onclick="selectDay('${date}')">${d}
-      ${count ? `<span style="display:block;color:var(--accent);font-size:9px">● ${count}</span>` : ""}
-    </button>`;
-  }
-
-  $("calendarGrid").innerHTML = html + "</div>";
-}
-
-function selectDay(date) {
-  $("selectedDayTitle").textContent = date;
-  let list = state.transactions.filter(t => t.date === date);
-  $("selectedDayList").innerHTML = list.length
-    ? list.map(txHTML).join("")
-    : "No transactions on this date.";
-}
-
-$("calMonth").value = month();
-$("calMonth").onchange = renderCalendar;
-
-
-function setRecurringType(type) {
-  $("recType").value = type;
-
-  $("recExpenseBtn").classList.toggle(
-    "primary", type === "expense"
-  );
-
-  $("recIncomeBtn").classList.toggle(
-    "primary", type === "income"
-  );
-}
-
-function openRecurring(r = null) {
-  $("recId").value = r?.id || "";
-
-  setRecurringType(r?.type || "expense");
-
-  $("recAmount").value = r?.amount || "";
-  $("recStart").value = r?.start || today();
-  $("recNote").value = r?.note || "";
-  $("recFreq").value = r?.frequency || "monthly";
-
-  $("recDialogTitle").textContent =
-    r ? "Edit recurring transaction" : "Recurring transaction";
-
-  $("recSaveBtn").textContent =
-    r ? "Update recurring item" : "Save recurring item";
-
-  $("recDialog").showModal();
-}
-
-async function saveRecurring() {
-  const amount = Number($("recAmount").value);
-  const start = $("recStart").value;
-  const id = $("recId").value;
-
-  if (!(amount > 0) || !start) {
-    alert("Enter a valid amount and start date.");
-    return;
-  }
-
-  const existing = state.recurring.find(r => r.id === id);
-
-  const item = {
-    id: id || crypto.randomUUID(),
-    type: $("recType").value,
-    amount,
-    frequency: $("recFreq").value,
-    start,
-    note: $("recNote").value.trim(),
-    active: existing ? existing.active : true
-  };
-
-  if (existing) {
-    Object.assign(existing, item);
-  } else {
-    state.recurring.push(item);
-  }
-
-  await persist();
-  $("recDialog").close();
-
-  await processRecurring();
-  render();
-}
-
-function advanceRecurringDate(date, frequency) {
-  const next = new Date(date);
-  const originalDay = next.getDate();
-
-  if (frequency === "weekly") {
-    next.setDate(next.getDate() + 7);
-  } else {
-    const months = frequency === "quarterly" ? 3 :
-      frequency === "yearly" ? 12 : 1;
-
-    next.setDate(1);
-    next.setMonth(next.getMonth() + months);
-
-    const lastDay = new Date(
-      next.getFullYear(),
-      next.getMonth() + 1,
-      0
-    ).getDate();
-
-    next.setDate(Math.min(originalDay, lastDay));
-  }
-
-  return next;
-}
-
-function formatLocalDate(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0")
-  ].join("-");
-}
-
-function getNextRecurringDate(r) {
-  if (!r.start) return "—";
-
-  let due = new Date(r.start + "T12:00:00");
-  const now = new Date(today() + "T12:00:00");
-  let guard = 0;
-
-  while (due <= now && guard++ < 500) {
-    due = advanceRecurringDate(due, r.frequency);
-  }
-
-  return formatLocalDate(due);
-}
-
-async function processRecurring() {
-  let changed = false;
-
-  for (const r of state.recurring) {
-    if (!r.active || !r.start) continue;
-
-    const last = state.recurringRuns[r.id] || "";
-    let due = new Date(r.start + "T12:00:00");
-    const now = new Date(today() + "T12:00:00");
-    let guard = 0;
-
-    while (due <= now && guard++ < 500) {
-      const ds = formatLocalDate(due);
-
-      if (
-        ds > last &&
-        !state.transactions.some(t =>
-          t.recurringId === r.id && t.date === ds
-        )
-      ) {
-        state.transactions.push({
-  id: crypto.randomUUID(),
-  type: r.type,
-  amount: r.amount,
-  note: r.note || "Recurring",
-  date: ds,
-  recurringId: r.id
-});
-
-        state.recurringRuns[r.id] = ds;
-        changed = true;
-      }
-
-      due = advanceRecurringDate(due, r.frequency);
-    }
-  }
-
-  if (changed) await persist();
-}
-
-function renderRecurring() {
-  $("recurringList").innerHTML = state.recurring.length
-    ? state.recurring.map(r => `
-      <div class="item">
-        <div style="min-width:0">
-          <b>${escapeHTML(r.note || (r.type === "income" ? "Recurring income" : "Recurring expense"))}</b>
-
-          <div class="small muted">
-            ${escapeHTML(r.frequency)} ·
-            ${escapeHTML(r.type)} ·
-            ${money(r.amount)}
-          </div>
-
-          <div class="small muted">
-            Next due: ${getNextRecurringDate(r)}
-          </div>
-
-          <div class="small">
-            <span class="pill">
-              ${r.active ? "Active" : "Paused"}
-            </span>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn"
-            onclick="openRecurring(state.recurring.find(x => x.id === '${r.id}'))">
-            Edit
-          </button>
-
-          <button class="btn"
-            onclick="toggleRecurring('${r.id}')">
-            ${r.active ? "Pause" : "Resume"}
-          </button>
-
-          <button class="btn danger"
-            onclick="removeRecurring('${r.id}')">
-            ×
-          </button>
-        </div>
-      </div>
-    `).join("")
-    : '<div class="empty">No recurring items yet.</div>';
-}
-
-async function toggleRecurring(id) {
-  let r = state.recurring.find(x => x.id === id);
-  r.active = !r.active;
-  await persist();
-  render();
-}
-
-async function removeRecurring(id) {
-  if (confirm("Remove this recurring item?")) {
-    state.recurring = state.recurring.filter(x => x.id !== id);
-    await persist();
-    render();
-  }
-}
-
-function openDebt() {
-  $("debtName").value = "";
-  ["debtOriginal", "debtBalance", "debtEmi"].forEach(id => $(id).value = "");
-  $("debtDue").value = "";
-  $("debtDialog").showModal();
-}
-
-async function saveDebt() {
-  let name = $("debtName").value.trim();
-  let original = Number($("debtOriginal").value);
-  let balance = Number($("debtBalance").value);
-
-  if (!name || !(original > 0) || balance < 0) {
-    alert("Enter a name, original amount and valid balance.");
-    return;
-  }
-
-  state.debts.push({
-    id: crypto.randomUUID(), name, original, balance,
-    emi: Number($("debtEmi").value) || 0,
-    due: $("debtDue").value
-  });
-
-  await persist();
-  $("debtDialog").close();
-  render();
-}
-
-function renderDebts() {
-  let total = sum(state.debts, d => d.balance);
-  $("debtSummary").innerHTML = `
-    <div class="metric">${money(total)}</div>
-    <div class="muted small">Total outstanding balance · ${state.debts.length} account(s)</div>`;
-
-  $("debtList").innerHTML = state.debts.length
-    ? state.debts.map(d => `
-      <div class="item">
-        <div><b>${escapeHTML(d.name)}</b>
-          <div class="small muted">Outstanding ${money(d.balance)} · EMI ${money(d.emi)}
-          ${d.due ? " · Due " + d.due : ""}</div>
-        </div>
-        <div>
-          <button class="btn" onclick="payDebt('${d.id}')">Record payment</button>
-          <button class="btn danger" onclick="removeDebt('${d.id}')">×</button>
-        </div>
-      </div>`).join("")
-    : '<div class="empty">No debts or EMIs added.</div>';
-}
-
-async function payDebt(id) {
-  let d = state.debts.find(x => x.id === id);
-  let v = Number(prompt("Payment amount", String(d.emi || 0)));
-
-  if (d && v > 0) {
-    d.balance = Math.max(0, d.balance - v);
-    state.transactions.push({
-  id: crypto.randomUUID(),
-  type: "expense",
-  amount: v,
-  date: today(),
-  note: "Debt payment: " + d.name
-});
-    await persist();
-    render();
-  }
-}
-
-async function removeDebt(id) {
-  if (confirm("Remove this debt record?")) {
-    state.debts = state.debts.filter(d => d.id !== id);
-    await persist();
-    render();
-  }
-}
-
-function saveCurrency() {
-  state.currency = $("currency").value;
-  persist().then(render);
-}
-
-function download(name, content, type) {
-  let a = document.createElement("a");
-  let url = URL.createObjectURL(new Blob([content], { type }));
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function downloadCloudCSV() {
-  try {
-    if (!cloudUser) {
-      alert("Please sign in first.");
-      return;
-    }
-
-    const { data, error } = await supabaseClient
-      .from("user_app_state")
-      .select("user_id, data, updated_at")
-      .eq("user_id", cloudUser.id)
-      .single();
-
-    if (error) throw error;
-
-    const transactions = Array.isArray(data.data?.transactions)
-      ? data.data.transactions
-      : [];
-
-    alert(
-      "CLOUD DIAGNOSTICS\n\n" +
-      "Logged-in user ID:\n" + cloudUser.id +
-      "\n\nDatabase record user ID:\n" + data.user_id +
-      "\n\nTransactions returned: " + transactions.length +
-      "\n\nLast updated:\n" + data.updated_at
-    );
-
-  } catch (error) {
-    alert("Cloud diagnostic failed: " + error.message);
-  }
-}
-
-async function diagnoseTransactions() {
-  try {
-    if (!cloudUser) {
-      alert("Please sign in before checking transaction counts.");
-      return;
-    }
-
-    const userId = cloudUser.id;
-
-    // Verify the locally stored Supabase session.
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-
-    // Verify the signed-in user against Supabase Auth.
-    const { data: verifiedData, error: verifiedError } =
-      await supabaseClient.auth.getUser();
-
-    // Read this account's IndexedDB record.
-    const localRecord = await readLocalState(
-      getAccountStateKey(userId)
-    );
-
-    // Inspect pending offline changes without modifying them.
-    const pending = await getPendingSync(userId);
-
-    // Read the cloud record.
-    const {
-      data: cloudRecord,
-      error: cloudError,
-      status: cloudStatusCode
-    } = await supabaseClient
-      .from("user_app_state", {
-        fetch: (input, init) =>
-          fetch(input, { ...init, cache: "no-store" })
-      })
-      .select("user_id, data, updated_at")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (cloudError) throw cloudError;
-
-    const sessionUserId =
-      sessionData?.session?.user?.id || "No session";
-
-    const verifiedUserId =
-      verifiedData?.user?.id || "Not verified";
-
-    const localCount =
-      localRecord?.transactions?.length ?? 0;
-
-    const appCount =
-      state.transactions?.length ?? 0;
-
-    const cloudCount =
-      cloudRecord?.data?.transactions?.length ?? 0;
-
-    const pendingCount =
-      pending?.data?.transactions?.length ?? 0;
-
-    const message =
-      "SYNC DIAGNOSTICS\n\n" +
-
-      "Signed-in ID: " + userId + "\n" +
-      "Session ID: " + sessionUserId + "\n" +
-      "Verified Auth ID: " + verifiedUserId + "\n" +
-      "Active local user: " +
-        (activeStateUserId || "None") + "\n\n" +
-
-      "Project: " + new URL(SUPABASE_URL).host + "\n" +
-      "Online: " + navigator.onLine + "\n" +
-      "Cloud ready: " + cloudReady + "\n\n" +
-
-      "Cloud row: " +
-        (cloudRecord ? "Found" : "Not found") + "\n" +
-      "Cloud HTTP status: " + cloudStatusCode + "\n" +
-      "Cloud user ID: " +
-        (cloudRecord?.user_id || "No record") + "\n" +
-      "Supabase transactions: " + cloudCount + "\n\n" +
-
-      "IndexedDB transactions: " + localCount + "\n" +
-      "App memory transactions: " + appCount + "\n\n" +
-
-      "Pending sync: " + (pending ? "Yes" : "No") + "\n" +
-      "Pending transactions: " + pendingCount + "\n\n" +
-
-      "Session error: " +
-        (sessionError?.message || "None") + "\n" +
-      "Auth verification error: " +
-        (verifiedError?.message || "None") + "\n" +
-      "Last cloud update: " +
-        (cloudRecord?.updated_at || "No record");
-
-    alert(message);
-
-  } catch (error) {
-    alert("Diagnostic failed: " + error.message);
-  }
-}
-function exportJSON() {
-  download("my-money-backup-" + today() + ".json",
-    JSON.stringify({ ...state, backupCreated: new Date().toISOString() }, null, 2),
-    "application/json");
-}
-
-async function restoreJSON() {
-  let f = $("restoreFile").files[0];
-  if (!f) {
-    alert("Choose a JSON backup file.");
-    return;
-  }
-
-  try {
-    let data = JSON.parse(await f.text());
-    if (!Array.isArray(data.transactions)) throw Error();
-
-    if (!confirm("Restore will replace the current app data. Continue?")) return;
-
-    state = { ...state, ...data };
-    delete state.backupCreated;
-    await persist();
-    setTheme();
-    render();
-    alert("Backup restored.");
-  } catch (e) {
-    alert("This file does not look like a valid My Money backup.");
-  }
-}
-
-async function clearData() {
-  if (confirm("Permanently delete all app records? Export a backup first.")) {
-    state = {
-      transactions: [], budget: 0, categoryBudgets: {},
-      goals: [], recurring: [], debts: [],
-      currency: "INR", theme: state.theme, recurringRuns: {}
-    };
-    await persist();
-    render();
-  }
-}
-
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0 });
+let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+if (!S || !Array.isArray(S.tx)) S = fresh();
+S.del = S.del || {}; S.su = S.su || 0;
+const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
+const save = () => { saveLocal(); schedSync(); };
+let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
+const budgetFor = m => { const k = Object.keys(S.budgets).filter(x => x <= m).sort().pop(); return k ? S.budgets[k] : 0; };
+const catInfo = (t, n) => S.cats[t].find(c => c[0] === n) || ["Other", "📦", "#9ca3af"];
+const sheet = $("#sheet"), scrim = $("#scrim");
+const showSheet = () => { scrim.classList.add("on"); sheet.classList.add("open"); };
+const hideSheet = () => { scrim.classList.remove("on"); sheet.classList.remove("open"); if (document.activeElement) document.activeElement.blur(); };
+scrim.onclick = hideSheet;
+
+/* ---------- Dashboard ---------- */
 function render() {
-  renderDashboard();
-  renderOverview();
-  renderTransactions();
-  renderBudget();
-  renderAnalytics();
-  renderGoals();
-  renderCalendar();
-  renderRecurring();
-  renderDebts();
-  $("currency").value = state.currency;
-}
-function showAuthenticatedApp() {
-  document.body.classList.remove("auth-locked");
-  document.body.classList.toggle(
-    "dashboard-fixed",
-    document.getElementById("dashboard").classList.contains("active")
-  );
-  updateProfileMenu();
-}
-function showLoginGate(message) {
-  document.body.classList.add("auth-locked");
-
-  closeAccountDrawer();
-  document.body.classList.remove("profile-page-open");
-
-  // Clear the previous account from application memory.
-  state = createEmptyState();
-  activeStateKey = null;
-  activeStateUserId = null;
-  cloudReady = false;
-
-  $("loginGateStatus").textContent = message;
-
-  [
-    "gateEmail",
-    "gatePassword",
-    "cloudEmail",
-    "cloudPassword"
-  ].forEach(id => {
-    if ($(id)) $(id).value = "";
-  });
-}
-
-function getCloudDisplayName() {
-  const fullName =
-    cloudUser?.user_metadata?.full_name?.trim();
-
-  return fullName || cloudUser?.email || "Account";
-}
-
-function updateProfileMenu() {
-  const name = getCloudDisplayName();
-  const email = cloudUser?.email || "";
-  const initial = name.trim().charAt(0).toUpperCase() || "U";
-
-  $("profilePanelAvatar").textContent = initial;
-  $("profilePanelName").textContent = name;
-  $("profilePanelEmail").textContent = email;
-}
-
-
-function showProfilePage(id) {
-  closeAccountDrawer();
-  showPage(id);
-}
-
-async function updateCloudStatus(message) {
-  $("cloudStatus").textContent = message;
-}
-
-async function loadCloudData() {
-  const userId = cloudUser?.id;
-
-  if (!userId) {
-    cloudReady = false;
-    return;
-  }
-
-  cloudReady = false;
-
-  try {
-    // Load this account's local data first.
-    await loadAccountState(userId);
-
-    if (cloudUser?.id !== userId) return;
-
-    // Upload pending offline changes before downloading cloud data.
-    const pending = await getPendingSync(userId);
-
-    if (pending) {
-      cloudReady = true;
-
-      const synced = await processPendingSync();
-
-      if (!synced) {
-        cloudReady = false;
-
-        updateCloudStatus(
-          "Pending local changes could not be uploaded. Local data is preserved."
-        );
-
-        setTheme();
-        render();
-        return;
-      }
-
-      cloudReady = false;
-    }
-
-    updateCloudStatus("Downloading cloud data...");
-
-    const { data, error } = await supabaseClient
-      .from("user_app_state", {
-        fetch: (input, init) =>
-          fetch(input, { ...init, cache: "no-store" })
-      })
-      .select("data, updated_at")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    if (!data || !data.data) {
-      cloudReady = true;
-
-      setTheme();
-      render();
-
-      updateCloudStatus(
-        "Logged in as " + getCloudDisplayName() +
-        " · Local data loaded · No cloud backup yet"
-      );
-
-      return;
-    }
-
-    if (cloudUser?.id !== userId) return;
-
-    const cloudData = data.data;
-
-    if (!Array.isArray(cloudData.transactions)) {
-      throw new Error("Cloud transaction data is invalid.");
-    }
-
-    // Replace the active account's state with its cloud data.
-    state = {
-      ...createEmptyState(),
-      ...cloudData,
-      transactions: cloudData.transactions
-    };
-
-    // Save only under this account's local storage key.
-    const accountKey = getAccountStateKey(userId);
-
-    await writeLocalState(accountKey, state);
-
-    // Verify the account-specific local save.
-    const localData = await readLocalState(accountKey);
-
-    const localCount = localData?.transactions?.length ?? 0;
-    const cloudCount = cloudData.transactions.length;
-
-    if (localCount !== cloudCount) {
-      throw new Error(
-        "Local verification failed. Cloud: " +
-        cloudCount + ", Local: " + localCount
-      );
-    }
-
-    if (cloudUser?.id !== userId) return;
-
-    setTheme();
-    render();
-
-    cloudReady = true;
-
-    updateCloudStatus(
-      "Logged in as " + getCloudDisplayName() +
-      " · Cloud data loaded · " + cloudCount +
-      " transactions"
-    );
-
-  } catch (error) {
-    cloudReady = false;
-
-    updateCloudStatus(
-      "Cloud download failed: " + error.message
-    );
-  }
-}
-
-async function initCloudAuth() {
-  const { data, error } =
-    await supabaseClient.auth.getSession();
-
-  if (error) {
-    cloudReady = false;
-
-    showLoginGate(
-      "Unable to check your account: " + error.message
-    );
-
-    return;
-  }
-
-  cloudUser = data.session?.user || null;
-
-  if (cloudUser) {
-    const userId = cloudUser.id;
-
-    // Keep the dashboard locked until this account's data is loaded.
-    showLoginGate("Loading your account data...");
-
-    $("cloudEmail").value = cloudUser.email || "";
-    $("cloudFullName").value =
-      cloudUser.user_metadata?.full_name || "";
-
-    updateCloudStatus("Loading cloud data...");
-
-    await loadCloudData();
-
-    if (
-      cloudUser?.id === userId &&
-      activeStateUserId === userId
-    ) {
-      showAuthenticatedApp();
-      render();
-    } else {
-      showLoginGate(
-        "Unable to load your account's local data. Please refresh and sign in again."
-      );
-    }
+  $$("#typeSeg button").forEach(b => b.classList.toggle("on", b.dataset.t === type));
+  $$("#rangeSeg button").forEach(b => b.classList.toggle("on", b.dataset.r === range));
+  const yr = String(new Date().getFullYear()), all = S.tx.filter(t => t.type === type);
+  const list = range === "1M" ? all.filter(t => t.date.startsWith(vm)) : range === "1Y" ? all.filter(t => t.date.startsWith(yr)) : all;
+  $("#period").textContent = range === "1M" ? mname(vm) : range === "1Y" ? yr : "All time";
+  const tot = sum(list), bud = budgetFor(vm), isB = type === "expense" && range === "1M";
+  $("#total").textContent = fmt(tot);
+  const bl = $("#bl");
+  bl.textContent = isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : "";
+  bl.className = "bl" + (isB && bud && tot > bud ? " over" : "");
+  chart(list);
+  const L = $("#list");
+  if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
+  if (range === "1M") {
+    L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
+      `<button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${type}">${fmt(t.amount)}</span></button>`).join("");
   } else {
-    cloudReady = false;
-
-    showLoginGate(
-      "Sign in to access your personal finance dashboard."
-    );
+    const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + t.amount; });
+    L.innerHTML = Object.keys(by).sort().reverse().map(k =>
+      `<button class="row mr" data-m="${k}"><span class="n">${mname(k)}${range === "All" ? " " + k.slice(0, 4) : ""}</span><span class="a ${type}">${fmt(r2(by[k]))}</span><span class="chev">›</span></button>`).join("");
   }
-
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    cloudUser = session?.user || null;
-
-    if (event === "SIGNED_OUT" || !cloudUser) {
-      cloudReady = false;
-
-      showLoginGate(
-        "You have signed out. Sign in to continue."
-      );
-    }
-
-    if (event === "USER_UPDATED" && cloudUser) {
-  $("cloudFullName").value =
-    cloudUser.user_metadata?.full_name || "";
-
-  updateProfileMenu();
-}
-  });
 }
 
-async function signUpCloud() {
-  const fromGate =
-    document.body.classList.contains("auth-locked");
-
-  const fullName = $(
-    fromGate ? "gateFullName" : "cloudFullName"
-  ).value.trim();
-
-  const email = $(
-    fromGate ? "gateEmail" : "cloudEmail"
-  ).value.trim();
-
-  const password = $(
-    fromGate ? "gatePassword" : "cloudPassword"
-  ).value;
-
-  if (!fullName) {
-    alert("Please enter your full name.");
-    return;
-  }
-
-  if (!email || password.length < 6) {
-    alert("Enter a valid email and a password with at least 6 characters.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo:
-        "https://arvindkittu.github.io/My-money-tracker/",
-      data: {
-        full_name: fullName
-      }
-    }
-  });
-
-  if (error) {
-    alert("Account creation failed: " + error.message);
-    return;
-  }
-
-  if (data.session && data.user) {
-    // Lock the dashboard before changing accounts.
-    showLoginGate("Loading your new account data...");
-
-    cloudUser = data.user;
-    const userId = cloudUser?.id;
-
-    if (!userId) {
-      showLoginGate("Unable to identify the new account.");
-      return;
-    }
-
-    $("cloudEmail").value = email;
-    $("cloudFullName").value = fullName;
-
-    await loadCloudData();
-
-    // Unlock only after this account's local data is initialized.
-    if (
-      cloudUser?.id !== userId ||
-      activeStateUserId !== userId
-    ) {
-      $("loginGateStatus").textContent =
-        "Unable to load the new account's local data. Please refresh and try again.";
-      return;
-    }
-
-    showAuthenticatedApp();
-
-    await processRecurring();
-    render();
-
-    alert("Account created successfully.");
+function chart(list) {
+  const c = $("#chart"), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  const x = c.getContext("2d"); x.scale(dpr, dpr);
+  const keys = [], lab = [], now = new Date(), tk = today();
+  if (range === "1M") {
+    const y = +vm.slice(0, 4), m = +vm.slice(5, 7), n = new Date(y, m, 0).getDate();
+    for (let d = 1; d <= n; d++) { keys.push(vm + "-" + pad(d)); lab.push(d); }
   } else {
-    if (fromGate) {
-      $("gateEmail").value = email;
-      $("gatePassword").value = "";
-      $("loginGateStatus").textContent =
-        "Account created. Please verify your email, then sign in.";
-    } else {
-      alert(
-        "Account created. Please check your email for confirmation."
-      );
+    let sy = now.getFullYear(), sm = 0, cnt = 12;
+    if (range === "All") {
+      const f = list.map(t => t.date.slice(0, 7)).sort()[0];
+      if (f) { sy = +f.slice(0, 4); sm = +f.slice(5, 7) - 1; }
+      else { sm = now.getMonth(); }
+      cnt = Math.max(1, (now.getFullYear() - sy) * 12 + now.getMonth() - sm + 1);
+    }
+    for (let i = 0; i < cnt; i++) {
+      const d = new Date(sy, sm + i, 1);
+      keys.push(d.getFullYear() + "-" + pad(d.getMonth() + 1));
+      lab.push(d.toLocaleDateString("en", { month: "narrow" }));
     }
   }
-}
-async function saveCloudProfileName() {
-  if (!cloudUser) {
-    alert("Please sign in first.");
-    return;
-  }
-
-  const fullName = $("cloudFullName").value.trim();
-
-  if (!fullName) {
-    alert("Please enter your full name.");
-    return;
-  }
-
-  const { data, error } = await supabaseClient.auth.updateUser({
-    data: {
-      full_name: fullName
+  const vals = keys.map(k => list.filter(t => t.date.startsWith(k)).reduce((a, t) => a + t.amount, 0));
+  const L = 26, R = 26, top = 10, base = H - 46, slot = (W - L - R) / keys.length;
+  const bw = Math.min(range === "1M" ? 12 : 30, slot * .55), max = Math.max(1, ...vals);
+  x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
+  x.beginPath(); x.moveTo(L, base); x.lineTo(W - R, base); x.stroke(); x.setLineDash([]);
+  const td = +today().slice(8), isCur = range === "1M" && vm === tk.slice(0, 7);
+  x.font = "15px -apple-system,sans-serif"; x.textAlign = "center";
+  vals.forEach((v, i) => {
+    const cx = L + slot * (i + .5);
+    if (v > 0) {
+      const h = Math.max(4, (base - top) * v / max);
+      x.fillStyle = type === "expense" ? "#ff5f5f" : "#4ade80";
+      x.beginPath(); (x.roundRect || x.rect).call(x, cx - bw / 2, base - h, bw, h, 4); x.fill();
     }
+    const d = lab[i];
+    const show = range !== "1M" || d === 1 || (isCur && d === td) || (d >= 9 && (d - 9) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
+    if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, H - 14); }
+    if (isCur && d === td) { x.fillStyle = "#4ade80"; x.beginPath(); x.arc(cx, base - 12, 3.5, 0, 7); x.fill(); }
   });
-
-  if (error) {
-    alert("Profile update failed: " + error.message);
-    return;
-  }
-
-  cloudUser = data.user || cloudUser;
-  updateProfileMenu();
-
-  updateCloudStatus("Profile updated: " + fullName);
-
-  alert("Your profile name has been updated successfully.");
-}
-async function changeCloudPassword() {
-  if (!cloudUser) {
-    alert("Please sign in before changing your password.");
-    return;
-  }
-
-  const newPassword = $("newCloudPassword").value;
-  const confirmPassword = $("confirmCloudPassword").value;
-
-  if (newPassword.length < 6) {
-    alert("Your new password must contain at least 6 characters.");
-    return;
-  }
-
-  if (newPassword !== confirmPassword) {
-    alert("The new passwords do not match.");
-    return;
-  }
-
-  try {
-    const { error } = await supabaseClient.auth.updateUser({
-      password: newPassword
-    });
-
-    if (error) {
-      alert("Password update failed: " + error.message);
-      return;
-    }
-
-    $("newCloudPassword").value = "";
-    $("confirmCloudPassword").value = "";
-
-    alert("Your password has been updated successfully.");
-
-  } catch (error) {
-    alert("Password update failed: " + error.message);
-  }
-}
-async function signInCloud() {
-  const fromGate =
-    document.body.classList.contains("auth-locked");
-
-  const email = $(fromGate ? "gateEmail" : "cloudEmail")
-    .value.trim();
-
-  const password = $(fromGate ? "gatePassword" : "cloudPassword")
-    .value;
-
-  if (!email || !password) {
-    alert("Enter your email and password.");
-    return;
-  }
-
-  const { data, error } =
-    await supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
-  if (error) {
-    if (fromGate) {
-      $("loginGateStatus").textContent =
-        "Sign-in failed: " + error.message;
-    } else {
-      alert("Sign-in failed: " + error.message);
-    }
-    return;
-  }
-
-  // Lock and clear the previous account before loading the new one.
-  showLoginGate("Loading your account data...");
-
-  cloudUser = data.user || data.session?.user;
-  const userId = cloudUser?.id;
-
-  if (!userId) {
-    showLoginGate("Unable to identify the signed-in account.");
-    return;
-  }
-
-  $("cloudEmail").value = email;
-  $("cloudFullName").value =
-    cloudUser.user_metadata?.full_name || "";
-
-  await loadCloudData();
-
-  if (
-    cloudUser?.id !== userId ||
-    activeStateUserId !== userId
-  ) {
-    $("loginGateStatus").textContent =
-      "Your account's local data could not be loaded. Please refresh and try again.";
-    return;
-  }
-
-  showAuthenticatedApp();
-
-  await processRecurring();
-  render();
-
-  alert("Signed in successfully.");
 }
 
-async function signOutCloud() {
-  if (cloudUser) {
-    const pending = await getPendingSync(cloudUser.id);
-
-    if (pending) {
-      if (navigator.onLine && cloudReady) {
-        await processPendingSync();
-      }
-
-      const remaining = await getPendingSync(cloudUser.id);
-
-      if (remaining && !confirm(
-        "Some changes are still waiting to sync.\n\n" +
-        "They will remain saved locally for this account.\n\n" +
-        "Do you still want to sign out?"
-      )) {
-        return;
-      }
-    }
-  }
-
-  const { error } = await supabaseClient.auth.signOut();
-
-  if (error) {
-    alert("Sign-out failed: " + error.message);
-    return;
-  }
-
-  cloudUser = null;
-  cloudReady = false;
-
-  showLoginGate(
-    "You have signed out successfully. Sign in to continue."
-  );
+/* ---------- Add / edit sheet ---------- */
+function openAdd(t) {
+  D = t ? { id: t.id, type: t.type, amt: String(t.amount), note: t.note || "", cat: t.cat, date: t.date, panel: "keys" }
+        : { type, amt: "", note: "", cat: type === "expense" ? "Other" : "Salary", date: today(), panel: "keys" };
+  D.cm = D.date.slice(0, 7); sheet.className = "sheet"; drawAdd(); showSheet();
 }
-
-async function testSupabaseConnection() {
-  try {
-    const response = await fetch(
-      SUPABASE_URL + "/auth/v1/settings",
-      {
-        method: "GET",
-        headers: {
-          "apikey": SUPABASE_KEY,
-          "Authorization": "Bearer " + SUPABASE_KEY
-        }
-      }
-    );
-
-    const result = await response.json();
-
-    if (response.ok) {
-      alert("Supabase connection successful! API key is valid.");
-    } else {
-      alert(
-        "Supabase connection failed. HTTP " +
-        response.status + ": " +
-        (result.message || result.msg || JSON.stringify(result))
-      );
-    }
-  } catch (error) {
-    alert("Connection error: " + error.message);
+function calendar() {
+  const y = +D.cm.slice(0, 4), m = +D.cm.slice(5, 7), first = new Date(y, m - 1, 1), off = (first.getDay() + 6) % 7;
+  const n = new Date(y, m, 0).getDate(), t = today();
+  let h = `<div class="cal"><div class="ch"><button data-cm="-1">‹</button><b>${first.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</b><button data-cm="1" ${D.cm >= t.slice(0, 7) ? "disabled" : ""}>›</button></div><div class="cg">`
+    + "MTWTFSS".split("").map(d => `<small>${d}</small>`).join("") + "<span></span>".repeat(off);
+  for (let d = 1; d <= n; d++) {
+    const ds = D.cm + "-" + pad(d), f = ds > t;
+    h += `<button data-d="${ds}" class="${ds === D.date ? "sel" : ""} ${f ? "fut" : ""}" ${f ? "disabled" : ""}>${d}</button>`;
   }
+  return h + "</div></div>";
 }
-
-async function checkCloudData() {
-  try {
-    alert("Checking Supabase database...");
-
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-
-    if (sessionError) {
-      alert("Session error: " + sessionError.message);
-      return;
-    }
-
-    const user = sessionData.session?.user;
-
-    if (!user) {
-      cloudUser = null;
-      updateCloudStatus("Not signed in.");
-      alert("No active login session. Please sign in again.");
-      return;
-    }
-
-    cloudUser = user;
-
-    const { data, error } = await supabaseClient
-      .from("user_app_state")
-      .select("user_id, updated_at")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      alert(
-        "Database error: " +
-        error.message +
-        "\nCode: " + (error.code || "Not available")
-      );
-      return;
-    }
-
-    if (!data) {
-      alert(
-        "SUCCESS: Supabase database is accessible.\n\n" +
-        "No cloud backup exists yet.\n" +
-        "Your existing records remain safely on this device."
-      );
-      return;
-    }
-
-    alert(
-      "SUCCESS: Cloud backup found.\n\n" +
-      "Last updated: " + data.updated_at
-    );
-
-  } catch (error) {
-    alert("Unexpected error: " + error.message);
-  }
+function drawAdd() {
+  const c = catInfo(D.type, D.cat);
+  let body;
+  if (D.panel === "cats") {
+    body = '<div class="cats">' + S.cats[D.type].map(k => `<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button>`).join("")
+      + '<button class="crow" id="addCat"><span class="ce">＋</span><span class="cn">Add category</span></button></div>';
+  } else if (D.panel === "cal") body = calendar();
+  else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" data-k="save">Save</button></div>';
+  const dl = D.date === today() ? "Today" : new Date(+D.date.slice(0, 4), +D.date.slice(5, 7) - 1, +D.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  sheet.classList.toggle("p", D.panel !== "keys");
+  sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button>' : ""}
+  <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
+  <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
+  <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
+  <div class="chips"><button class="chip" id="catBtn">${c[1]} ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn">📅 ${dl}</button></div>${body}`;
 }
-
-
-window.uploadLocalDataToCloud = async function() {
-  try {
-    const { data: sessionData, error: sessionError } =
-      await supabaseClient.auth.getSession();
-
-    if (sessionError) {
-      alert("Login check failed: " + sessionError.message);
-      return;
+function key(k) {
+  if (k === "save") return saveTx();
+  if (k === "<") D.amt = D.amt.slice(0, -1);
+  else if (D.amt.length < 9 && !(D.amt === "" && k === "0")) D.amt += k;
+  const a = $("#amt"); a.innerHTML = "<span>₹</span>" + (D.amt || 0); a.classList.toggle("z", !D.amt);
+}
+function saveTx() {
+  const a = +D.amt || 0;
+  if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
+  const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
+  const i = S.tx.findIndex(t => t.id === tx.id);
+  if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
+  save(); hideSheet(); type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render();
+}
+sheet.oninput = e => { if (e.target.id === "note") D.note = e.target.value; };
+sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
+sheet.onclick = e => {
+  const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
+  if (d.st) { D.type = d.st; if (!S.cats[D.type].some(c => c[0] === D.cat)) D.cat = D.type === "expense" ? "Other" : "Salary"; D.panel = "keys"; drawAdd(); }
+  else if (d.k !== undefined) key(d.k);
+  else if (d.cat !== undefined) { D.cat = d.cat; D.panel = "keys"; drawAdd(); }
+  else if (b.id === "catBtn") { D.panel = D.panel === "cats" ? "keys" : "cats"; drawAdd(); }
+  else if (b.id === "dateBtn") { D.panel = D.panel === "cal" ? "keys" : "cal"; drawAdd(); }
+  else if (b.id === "addCat") {
+    const n = (prompt("Category name") || "").trim().slice(0, 20), list = S.cats[D.type];
+    if (n && !list.some(c => c[0].toLowerCase() === n.toLowerCase())) {
+      const em = (prompt("Emoji (optional)") || "").trim() || "🏷️";
+      list.splice(list.length - 1, 0, [n, em, ["#f59e0b", "#60a5fa", "#f472b6", "#34d399", "#a78bfa"][n.length % 5]]);
+      S.su = Date.now(); save(); D.cat = n; D.panel = "keys"; drawAdd();
     }
-
-    const user = sessionData.session?.user;
-
-    if (!user) {
-      alert("Please sign in first.");
-      return;
-    }
-
-    const transactionCount = state.transactions.length;
-
-    if (!confirm(
-      "Update your cloud backup with the latest local data?\n\n" +
-      "Transactions: " + transactionCount +
-      "\nYour existing cloud backup will be updated."
-    )) return;
-
-    const cloudData = JSON.parse(JSON.stringify(state));
-
-    const { error: uploadError } = await supabaseClient
-      .from("user_app_state")
-      .upsert({
-        user_id: user.id,
-        data: cloudData,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: "user_id"
-      });
-
-    if (uploadError) {
-      alert("Cloud update failed: " + uploadError.message);
-      return;
-    }
-
-    alert(
-      "SUCCESS! Your cloud backup has been updated.\n" +
-      "Transactions: " + transactionCount
-    );
-
-  } catch (error) {
-    alert("Unexpected error: " + error.message);
   }
+  else if (d.cm) { const dt = new Date(+D.cm.slice(0, 4), +D.cm.slice(5, 7) - 1 + +d.cm, 1); D.cm = dt.getFullYear() + "-" + pad(dt.getMonth() + 1); drawAdd(); }
+  else if (d.d) { D.date = d.d; D.panel = "keys"; drawAdd(); }
+  else if (b.id === "delTx") { if (confirm("Delete this transaction?")) { S.del[D.id] = Date.now(); S.tx = S.tx.filter(t => t.id !== D.id); save(); hideSheet(); render(); } }
+  else if (b.id === "setBudget") { if (B > 0) S.budgets[vm] = B; else delete S.budgets[vm]; S.su = Date.now(); save(); hideSheet(); render(); }
 };
-let cloudRetryInProgress = false;
 
-async function retryPendingSync() {
-  if (
-    cloudRetryInProgress ||
-    !cloudUser ||
-    !navigator.onLine
-  ) {
-    return;
+/* ---------- Budget sheet ---------- */
+function openBudget() {
+  B = budgetFor(vm) || 50000;
+  const pk = iso(new Date(+vm.slice(0, 4), +vm.slice(5, 7) - 2, 1)).slice(0, 7);
+  const sp = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk))), pb = budgetFor(pk);
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>Set your ${mname(vm)} budget</h3><p class="sub">How much do you want to spend this month?</p>
+  <div class="big" id="bv">₹ ${B.toLocaleString("en-IN")}</div>
+  <div class="rwrap"><div class="ruler" id="ruler"><div class="rail"><div class="ticks" style="width:${500 * TW}px"></div></div></div><i class="ind"></i></div>
+  <div class="kl" id="kl">${B / 1000}K</div>
+  <div class="last"><small>LAST MONTH</small><div>${fmt(sp)}${pb ? " of " + fmt(pb) + " budget" : " spent"}</div>${pb ? (sp <= pb ? '<p class="ok">You stayed within budget. Keep it up.</p>' : '<p class="bad">You went over budget by ' + fmt(r2(sp - pb)) + ".</p>") : ""}</div>
+  <button class="save wide" id="setBudget">Set Budget</button>`;
+  showSheet();
+  const r = $("#ruler"); r.scrollLeft = B / 1000 * TW;
+  requestAnimationFrame(() => { r.scrollLeft = B / 1000 * TW; });
+  r.onscroll = () => { B = Math.max(0, Math.min(500, Math.round(r.scrollLeft / TW))) * 1000; $("#bv").textContent = "₹ " + B.toLocaleString("en-IN"); $("#kl").textContent = B / 1000 + "K"; };
+}
+
+/* ---------- Insights & settings pages ---------- */
+function renderIns() {
+  $$("#insTabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  const el = $("#insBody"), ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), tot = sum(ex);
+  if (!ex.length) { el.innerHTML = '<div class="empty" style="text-align:center">No expenses in ' + mname(vm) + "</div>"; return; }
+  if (tab === "spending") {
+    const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
+    el.innerHTML = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([n, v]) => { const c = catInfo("expense", n);
+      return `<div class="srow"><span class="ce">${c[1]}</span><div><div class="sl"><b>${esc(n)}</b><em>${fmt(r2(v))}</em></div><div class="bar"><i style="width:${v / tot * 100}%;background:${c[2]}"></i></div></div></div>`; }).join("");
+  } else {
+    const y = +vm.slice(0, 4), m = +vm.slice(5, 7), dim = new Date(y, m, 0).getDate(), cur = vm === today().slice(0, 7);
+    const days = cur ? new Date().getDate() : dim, avg = tot / days, bud = budgetFor(vm);
+    const pk = iso(new Date(y, m - 2, 1)).slice(0, 7), prev = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk)));
+    const cards = [["Spent in " + mname(vm), fmt(tot)], ["Daily average", fmt(r2(avg))]];
+    if (cur) cards.push(["Projected month-end", fmt(Math.round(avg * dim))]);
+    if (bud) cards.push([tot > bud ? "Over budget by" : "Left in budget", fmt(r2(Math.abs(bud - tot)))]);
+    if (prev) cards.push(["Vs last month", (tot >= prev ? "+" : "−") + Math.round(Math.abs(tot - prev) / prev * 100) + "%"]);
+    el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("");
   }
-
-  cloudRetryInProgress = true;
-
+}
+$("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
+const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); } $("#" + id).classList.add("open"); };
+$$("[data-close]").forEach(b => b.onclick = () => b.closest(".page").classList.remove("open"));
+$("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
+$("#bk").onclick = async () => {
+  const f = new File([JSON.stringify(S, null, 1)], "my-money-backup-" + today() + ".json", { type: "application/json" });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+};
+$("#imp").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   try {
-    if (!cloudReady) {
-      await loadCloudData();
-    } else {
-      await processPendingSync();
+    const o = JSON.parse(await f.text()); let n;
+    if (Array.isArray(o.tx)) n = { ...fresh(), ...o };
+    else if (Array.isArray(o.transactions)) { // backup from the old My Money app
+      n = fresh();
+      n.tx = o.transactions.filter(t => t && t.date && +t.amount > 0).map(t => ({ id: t.id || crypto.randomUUID(), type: t.type === "income" ? "income" : "expense", amount: +t.amount, date: String(t.date).slice(0, 10), note: t.note || "", cat: "Other", u: Date.now() }));
+      if (+o.budget > 0) n.budgets[today().slice(0, 7)] = +o.budget;
+    } else throw 0;
+    if (!confirm("Replace current data with " + n.tx.length + " transactions from this file?")) return;
+    const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
+  } catch (err) { alert("That file is not a valid backup."); }
+};
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+
+/* ---------- Cloud sync (Supabase) ---------- */
+const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFtcXd6aGZrdnlrdmRrZHVydGRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDk4MjcsImV4cCI6MjEwOTAyNTgyN30.PHhMIjvOHIAokPdoede5ZVfglaUC0QxOGu6spw_4cXU";
+const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+let user = null, syncMsg = "", syncing = false, st = null;
+const schedSync = () => { if (user) { clearTimeout(st); st = setTimeout(syncNow, 1500); } };
+function setMsg(m) { syncMsg = m; refreshAcct(); }
+function refreshAcct() {
+  $("#acct").textContent = user ? "☁️ " + user.email + (syncMsg ? " · " + syncMsg : "") : "☁️ Sign in to sync";
+  $("#lo").hidden = !user;
+}
+// Merge two states: transactions by id (newest edit wins, deletes tracked), settings newest-wins
+function merge(a, b) {
+  if (!b || !Array.isArray(b.tx)) return a;
+  const now = Date.now(), del = {}, m = new Map();
+  [a.del, b.del].forEach(o => Object.entries(o || {}).forEach(([k, v]) => { if (now - v < 90 * 864e5) del[k] = Math.max(del[k] || 0, v); }));
+  [...a.tx, ...b.tx].forEach(t => { const c = m.get(t.id); if (!c || (t.u || 0) > (c.u || 0)) m.set(t.id, t); });
+  Object.entries(del).forEach(([id, ts]) => { const t = m.get(id); if (t && ts >= (t.u || 0)) m.delete(id); });
+  const s = (b.su || 0) > (a.su || 0) ? b : a;
+  return { tx: [...m.values()], del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+}
+async function syncNow() {
+  if (!sb || !user || syncing || !navigator.onLine) return;
+  syncing = true; setMsg("Syncing…");
+  try {
+    for (let i = 0; i < 3; i++) {
+      const { data: row, error } = await sb.from("user_app_state").select("data,updated_at").eq("user_id", user.id).maybeSingle();
+      if (error) throw error;
+      S = merge(S, row && row.data && row.data.v2);
+      const now = new Date().toISOString(), data = { ...(row && row.data || {}), v2: JSON.parse(JSON.stringify(S)) }; // keeps the old app's data untouched
+      const r = row
+        ? await sb.from("user_app_state").update({ data, updated_at: now }).eq("user_id", user.id).eq("updated_at", row.updated_at).select("user_id")
+        : await sb.from("user_app_state").insert({ user_id: user.id, data, updated_at: now }).select("user_id");
+      if (r.error) { if (r.error.code === "23505") continue; throw r.error; }
+      if (r.data && r.data.length) { saveLocal(); render(); setMsg("Synced " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })); return; }
     }
-  } finally {
-    cloudRetryInProgress = false;
-  }
+    setMsg("Conflict, will retry");
+  } catch (e) { setMsg("Sync failed: " + (e.message || e)); }
+  finally { syncing = false; }
 }
-
-async function init() {
-  await openDB();
-  await load();
-  setTheme();
-  $("currency").value = state.currency;
-
- await initCloudAuth();
-
-window.addEventListener("online", retryPendingSync);
-
-window.addEventListener("offline", () => {
-  if (cloudUser) {
-    updateCloudStatus(
-      "Offline · Changes will sync when connection returns"
-    );
+function claimDevice() {
+  const own = localStorage.getItem("mm3owner");
+  if (own && own !== user.id) {
+    if (confirm("This device holds data from a different account. Replace it with this account's data?")) { S = fresh(); saveLocal(); render(); }
+    else { sb.auth.signOut(); return false; }
   }
+  localStorage.setItem("mm3owner", user.id); return true;
+}
+function openAuth() {
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>Sign in</h3><p class="sub">Sync your data across devices</p>
+  <input class="fi" id="em" type="email" autocomplete="email" placeholder="Email">
+  <input class="fi" id="pw" type="password" autocomplete="current-password" placeholder="Password (min 6 characters)">
+  <div class="msg" id="am"></div><button class="save wide" id="si" style="margin-top:6px">Sign in</button>
+  <button class="ghost" id="su2">Create account</button><button class="ghost" id="fp">Forgot password?</button>`;
+  showSheet();
+}
+sheet.addEventListener("click", async e => {
+  const id = e.target.id; if (!["si", "su2", "fp"].includes(id)) return;
+  const em = $("#em").value.trim(), pw = $("#pw").value, am = $("#am");
+  if (!sb) { am.textContent = "Cloud library not loaded. Go online and reload."; return; }
+  if (!em) { am.textContent = "Enter your email."; return; }
+  if (id !== "fp" && pw.length < 6) { am.textContent = "Password must be at least 6 characters."; return; }
+  am.textContent = "Please wait…";
+  try {
+    if (id === "fp") { const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname }); if (error) throw error; am.textContent = "Password reset email sent."; return; }
+    const r = id === "si" ? await sb.auth.signInWithPassword({ email: em, password: pw }) : await sb.auth.signUp({ email: em, password: pw });
+    if (r.error) throw r.error;
+    if (r.data.session) hideSheet(); else am.textContent = "Check your email to confirm, then sign in.";
+  } catch (err) { am.textContent = err.message || "Something went wrong."; }
 });
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") {
-    retryPendingSync();
-  }
+if (sb) sb.auth.onAuthStateChange((ev, s) => {
+  user = s ? s.user : null; refreshAcct();
+  if (ev === "PASSWORD_RECOVERY") setTimeout(() => { const p = prompt("Enter a new password (min 6 characters)"); if (p && p.length >= 6) sb.auth.updateUser({ password: p }).then(r => alert(r.error ? r.error.message : "Password updated.")); }, 0);
+  if (user && (ev === "SIGNED_IN" || ev === "INITIAL_SESSION")) setTimeout(() => { if (claimDevice()) syncNow(); }, 0);
 });
+addEventListener("online", syncNow);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncNow(); });
+$("#acct").onclick = () => user ? syncNow() : openAuth();
+$("#lo").onclick = async () => { if (confirm("Log out? Your data stays on this device.")) { await sb.auth.signOut(); setMsg(""); } };
 
-if (cloudUser && activeStateUserId === cloudUser.id) {
-  await processRecurring();
-}
-
-  render();
-
-  if ("serviceWorker" in navigator &&
-      location.protocol.startsWith("http")) {
-    navigator.serviceWorker.register("./sw.js").catch(console.error);
-  }
-}
-
-init();
-
+/* ---------- Wiring ---------- */
+$("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
+$("#rangeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { range = b.dataset.r; render(); } };
+$("#list").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.id) openAdd(S.tx.find(t => t.id === b.dataset.id));
+  else if (b.dataset.m) { vm = b.dataset.m; range = "1M"; render(); }
+};
+$("#bl").onclick = () => { if (type === "expense" && range === "1M") openBudget(); };
+$("#fab").onclick = () => openAdd();
+$("#menuBtn").onclick = () => openPage("insights");
+$("#walletBtn").onclick = () => openPage("settings");
+addEventListener("resize", render);
+render();
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
