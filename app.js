@@ -12,10 +12,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0 });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [] });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0;
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || [];
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -125,7 +125,7 @@ function drawAdd() {
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
-  <div class="chips"><button class="chip" id="catBtn"><span class="e">${c[1]}</span> ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button></div>${body}`;
+  <div class="chips"><button class="chip" id="catBtn"><span class="e">${c[1]}</span> ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}</div>${body}`;
 }
 function key(k) {
   if (k === "save") return saveTx();
@@ -139,6 +139,7 @@ function saveTx() {
   const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
+  if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
   save(); hideSheet(); type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render();
 }
 sheet.oninput = e => { if (e.target.id === "note") D.note = e.target.value; };
@@ -160,6 +161,7 @@ sheet.onclick = e => {
   }
   else if (d.cm) { const dt = new Date(+D.cm.slice(0, 4), +D.cm.slice(5, 7) - 1 + +d.cm, 1); D.cm = dt.getFullYear() + "-" + pad(dt.getMonth() + 1); drawAdd(); }
   else if (d.d) { D.date = d.d; D.panel = "keys"; drawAdd(); }
+  else if (b.id === "repBtn") { D.rep = !D.rep; drawAdd(); }
   else if (b.id === "delTx") { if (confirm("Delete this transaction?")) { S.del[D.id] = Date.now(); S.tx = S.tx.filter(t => t.id !== D.id); save(); hideSheet(); render(); } }
   else if (b.id === "setBudget") { if (B > 0) S.budgets[vm] = B; else delete S.budgets[vm]; S.su = Date.now(); save(); hideSheet(); render(); }
 };
@@ -225,7 +227,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -241,12 +243,16 @@ function refreshAcct() {
 // Merge two states: transactions by id (newest edit wins, deletes tracked), settings newest-wins
 function merge(a, b) {
   if (!b || !Array.isArray(b.tx)) return a;
-  const now = Date.now(), del = {}, m = new Map();
+  const now = Date.now(), del = {};
   [a.del, b.del].forEach(o => Object.entries(o || {}).forEach(([k, v]) => { if (now - v < 90 * 864e5) del[k] = Math.max(del[k] || 0, v); }));
-  [...a.tx, ...b.tx].forEach(t => { const c = m.get(t.id); if (!c || (t.u || 0) > (c.u || 0)) m.set(t.id, t); });
-  Object.entries(del).forEach(([id, ts]) => { const t = m.get(id); if (t && ts >= (t.u || 0)) m.delete(id); });
+  const mix = (x = [], y = []) => {
+    const m = new Map();
+    [...x, ...y].forEach(t => { const c = m.get(t.id); if (!c || (t.u || 0) > (c.u || 0)) m.set(t.id, t); });
+    Object.entries(del).forEach(([id, ts]) => { const t = m.get(id); if (t && ts >= (t.u || 0)) m.delete(id); });
+    return [...m.values()];
+  };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: [...m.values()], del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -304,9 +310,40 @@ if (sb) sb.auth.onAuthStateChange((ev, s) => {
   if (user && (ev === "SIGNED_IN" || ev === "INITIAL_SESSION")) setTimeout(() => { if (claimDevice()) syncNow(); }, 0);
 });
 addEventListener("online", syncNow);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) syncNow(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); syncNow(); });
 $("#acct").onclick = () => user ? syncNow() : openAuth();
 $("#lo").onclick = async () => { if (confirm("Log out? Your data stays on this device.")) { await sb.auth.signOut(); setMsg(""); } };
+/* ---------- Recurring ---------- */
+function runRecurring() {
+  const now = new Date(), cur = now.getFullYear() + "-" + pad(now.getMonth() + 1), t = today();
+  let changed = false;
+  S.rec.forEach(r => {
+    let y = +r.last.slice(0, 4), m = +r.last.slice(5, 7);
+    for (let g = 0; g < 120; g++) {
+      m++; if (m > 12) { m = 1; y++; }
+      const ym = y + "-" + pad(m);
+      if (ym > cur) break;
+      const date = ym + "-" + pad(Math.min(r.day, new Date(y, m, 0).getDate()));
+      if (date > t) break;
+      const id = "r_" + r.id + "_" + ym;
+      if (!S.del[id] && !S.tx.some(x => x.id === id)) S.tx.push({ id, type: r.type, amount: r.amount, date, note: r.note, cat: r.cat, u: new Date(date + "T00:00:00").getTime() });
+      r.last = ym; r.u = Date.now(); changed = true;
+    }
+  });
+  if (changed) { save(); render(); }
+}
+function openRec() {
+  sheet.className = "sheet";
+  const L = S.rec.map(r => { const c = catInfo(r.type, r.cat); return `<div class="rrow"><span class="ce">${c[1]}</span><span class="n">${esc(r.note || r.cat)}<small>Monthly on day ${r.day}</small></span><span class="a ${r.type}">${fmt(r.amount)}</span><button data-rdel="${esc(r.id)}" style="color:#f87171">✕</button></div>`; }).join("");
+  sheet.innerHTML = `<div class="hd"></div><h3>Recurring</h3><p class="sub">Added automatically every month</p>${L || '<div class="empty" style="text-align:center">None yet. Turn on 🔁 when adding a transaction.</div>'}`;
+  showSheet();
+}
+sheet.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b && b.dataset.rdel && confirm("Stop this recurring entry? Past entries stay.")) {
+    S.del[b.dataset.rdel] = Date.now(); S.rec = S.rec.filter(r => r.id !== b.dataset.rdel); save(); openRec();
+  }
+});
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
@@ -318,9 +355,11 @@ $("#list").onclick = e => {
 };
 $("#bl").onclick = () => { if (type === "expense" && range === "1M") openBudget(); };
 $("#fab").onclick = () => openAdd();
+$("#rcBtn").onclick = openRec;
 $("#menuBtn").onclick = () => openPage("insights");
 $("#walletBtn").onclick = () => openPage("settings");
 addEventListener("resize", render);
 render();
+runRecurring();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
