@@ -666,7 +666,7 @@ function drawOverviewChart(transactions) {
     ? styles.getPropertyValue("--red").trim()
     : styles.getPropertyValue("--green").trim();
 
-  const muted = styles.getPropertyValue("--muted").trim();
+  const muted = "#ffffff";
   const line = styles.getPropertyValue("--line").trim();
 
   ctx.strokeStyle = line;
@@ -865,6 +865,7 @@ function openTx(t = null) {
 }
 
 
+
 function setTxType(type) {
   $("txType").value = type;
 
@@ -875,6 +876,39 @@ function setTxType(type) {
   $("txIncomeBtn").classList.toggle(
     "primary", type === "income"
   );
+}
+
+
+/* Custom amount keypad */
+
+function addTxDigit(value) {
+  const input = $("txAmount");
+  let current = input.value || "";
+
+  if (value === ".") {
+    if (current.includes(".")) return;
+    current = current || "0";
+  } else {
+    if (current === "0") current = "";
+  }
+
+  if (current.replace(".", "").length >= 10) return;
+
+  input.value = current + value;
+  input.dispatchEvent(new Event("input", {
+    bubbles: true
+  }));
+}
+
+
+function backspaceTxDigit() {
+  const input = $("txAmount");
+
+  input.value = input.value.slice(0, -1);
+
+  input.dispatchEvent(new Event("input", {
+    bubbles: true
+  }));
 }
 
 function openTx(t = null) {
