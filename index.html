@@ -2029,6 +2029,312 @@ body.dashboard-fixed .floating-add-button {
   bottom: calc(env(safe-area-inset-bottom) + 28px) !important;
 }
 
+/* ===== Dashboard final visual refinements ===== */
+
+/* Slightly larger floating Add button */
+body.dashboard-fixed .floating-add-button {
+  width: 50px !important;
+  height: 50px !important;
+  min-width: 50px !important;
+  min-height: 50px !important;
+  font-size: 29px !important;
+  bottom: calc(env(safe-area-inset-bottom) + 28px) !important;
+}
+
+/* Month above chart in white */
+body.dashboard-fixed .overview-period-label {
+  color: #f5f5f7 !important;
+}
+
+/* Chart calendar numbers in white */
+body.dashboard-fixed #overviewChart {
+  opacity: 1;
+}
+
+/* ===== Transaction bottom sheet ===== */
+
+dialog.transaction-dialog {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: auto !important;
+  bottom: 0 !important;
+  margin: 0 auto !important;
+
+  width: 100% !important;
+  max-width: 560px !important;
+  height: 76dvh !important;
+  max-height: calc(100dvh - env(safe-area-inset-top) - 12px) !important;
+
+  padding: 18px 24px calc(18px + env(safe-area-inset-bottom)) !important;
+
+  border: 0 !important;
+  border-top: 1px solid #292929 !important;
+  border-radius: 30px 30px 0 0 !important;
+
+  background: #171717 !important;
+  color: #f5f5f7 !important;
+
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
+dialog.transaction-dialog[open] {
+  animation: transactionSheetUp .32s cubic-bezier(.22,.8,.25,1) both;
+}
+
+@keyframes transactionSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+dialog.transaction-dialog::backdrop {
+  background: rgba(0,0,0,.58);
+  animation: transactionBackdropIn .25s ease both;
+}
+
+@keyframes transactionBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Form layout */
+.transaction-dialog form {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: 0;
+}
+
+/* Drag handle */
+.tx-sheet-handle {
+  width: 38px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 10px;
+  background: #555555;
+  margin: 0 auto 26px;
+}
+
+/* Header */
+.transaction-dialog-header {
+  justify-content: flex-end;
+  min-height: 24px;
+  margin: -18px 0 12px !important;
+}
+
+.transaction-dialog-header h2 {
+  display: none;
+}
+
+.transaction-dialog-header .iconbtn {
+  width: 30px;
+  height: 30px;
+  color: #888888;
+  background: transparent;
+  border: 0;
+}
+
+/* Expense / Income pill */
+.tx-type-switch {
+  display: flex;
+  width: min(100%, 280px);
+  margin: 0 auto 42px;
+  padding: 4px;
+  gap: 3px;
+  border-radius: 40px;
+  background: #252525;
+}
+
+.tx-type-switch button {
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  border-radius: 30px;
+  background: transparent;
+  color: #999999;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+}
+
+.tx-type-switch button svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+}
+
+.tx-type-switch button.primary {
+  background: #414141;
+  color: #ffffff;
+}
+
+/* Amount display */
+.tx-amount-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 38px;
+}
+
+.tx-amount-display .currency-symbol {
+  color: #a0a0a0;
+  font-size: 36px;
+  font-weight: 400;
+}
+
+.tx-amount-display input {
+  width: 70%;
+  max-width: 230px;
+  min-height: 68px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f5f5f7 !important;
+  text-align: left;
+  font-size: 48px !important;
+  font-weight: 400 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Description */
+.tx-description {
+  margin-bottom: 24px;
+}
+
+.tx-description input {
+  width: 100%;
+  min-height: 42px !important;
+  margin: 0 !important;
+  padding: 5px 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid #292929 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  font-size: 15px !important;
+}
+
+.tx-description input::placeholder {
+  color: #686868;
+}
+
+/* Date row */
+.tx-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 22px;
+}
+
+.tx-date-row label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #eeeeee;
+  font-size: 14px;
+}
+
+.tx-date-row svg {
+  width: 19px;
+  height: 19px;
+  stroke: #999999;
+  fill: none;
+  stroke-width: 1.7;
+}
+
+.tx-date-row input {
+  width: 125px;
+  min-height: 34px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  text-align: right;
+}
+
+/* Number pad */
+.tx-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 12px;
+  margin-top: auto;
+}
+
+.tx-keypad button {
+  min-height: 58px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: #ffffff;
+  font-size: 25px;
+  font-weight: 500;
+}
+
+.tx-keypad button:active {
+  background: #303030;
+}
+
+.tx-keypad .tx-backspace {
+  font-size: 25px;
+  color: #bdbdbd;
+}
+
+.tx-keypad .tx-decimal {
+  font-size: 24px;
+}
+
+.tx-keypad .tx-save {
+  grid-column: 1 / -1;
+  min-height: 52px;
+  margin-top: 7px;
+  border-radius: 32px;
+  background: #eeeeee;
+  color: #111111;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Hide old Cancel / Save row */
+.transaction-dialog-actions {
+  display: none !important;
+}
+
+@media (max-height: 720px) {
+  dialog.transaction-dialog {
+    height: 82dvh !important;
+    padding-top: 12px !important;
+  }
+
+  .tx-type-switch {
+    margin-bottom: 22px;
+  }
+
+  .tx-amount-display {
+    margin-bottom: 22px;
+  }
+
+  .tx-keypad button {
+    min-height: 47px;
+  }
+}
+
 </style>
 </head>
 
@@ -2542,8 +2848,11 @@ My Money • Personal use • Offline-first
 
 <!-- ADD / EDIT TRANSACTION -->
 
+
 <dialog id="txDialog" class="transaction-dialog">
   <form id="txForm" method="dialog">
+
+    <div class="tx-sheet-handle"></div>
 
     <div class="row transaction-dialog-header">
       <h2 id="txDialogTitle">Add transaction</h2>
@@ -2551,7 +2860,7 @@ My Money • Personal use • Offline-first
       <button
         type="button"
         class="iconbtn"
-        aria-label="Close transaction form"
+        aria-label="Close"
         onclick="this.closest('dialog').close()">
         ✕
       </button>
@@ -2559,88 +2868,120 @@ My Money • Personal use • Offline-first
 
     <input type="hidden" id="txId">
 
-    <div class="formgrid transaction-form-grid">
+    <div class="tx-type-switch">
 
-      <div class="wide">
-        <label>Transaction type</label>
+      <button
+        type="button"
+        class="primary"
+        id="txExpenseBtn"
+        onclick="setTxType('expense')">
 
-        <div class="type-buttons">
-          <button
-            type="button"
-            class="btn primary"
-            id="txExpenseBtn"
-            onclick="setTxType('expense')">
-            Expense
-          </button>
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3v18M5 12h14"/>
+        </svg>
+        Expense
+      </button>
 
-          <button
-            type="button"
-            class="btn"
-            id="txIncomeBtn"
-            onclick="setTxType('income')">
-            Income
-          </button>
-        </div>
+      <button
+        type="button"
+        id="txIncomeBtn"
+        onclick="setTxType('income')">
 
-        <select id="txType" hidden>
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-        </select>
-      </div>
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3v18M5 12h14"/>
+        </svg>
+        Income
+      </button>
 
-      <div class="wide">
-        <label for="txAmount">Amount</label>
+    </div>
 
-        <input
-          type="number"
-          id="txAmount"
-          min="0.01"
-          step="0.01"
-          inputmode="decimal"
-          placeholder="Enter transaction amount"
-          required>
-      </div>
+    <select id="txType" hidden>
+      <option value="expense">Expense</option>
+      <option value="income">Income</option>
+    </select>
 
-      <div class="wide">
-        <label for="txDate">Transaction date</label>
+    <div class="tx-amount-display">
+      <span class="currency-symbol">₹</span>
+
+      <input
+        type="number"
+        id="txAmount"
+        min="0.01"
+        step="0.01"
+        inputmode="none"
+        placeholder="0"
+        readonly
+        required>
+    </div>
+
+    <div class="tx-description">
+      <input
+        type="text"
+        id="txNote"
+        placeholder="Description"
+        autocomplete="off">
+    </div>
+
+    <div class="tx-date-row">
+      <label>
+        <svg viewBox="0 0 24 24">
+          <rect x="3" y="5" width="18" height="16" rx="2"/>
+          <path d="M16 3v4M8 3v4M3 10h18"/>
+        </svg>
 
         <input
           type="date"
           id="txDate"
           required>
-      </div>
+      </label>
+    </div>
 
-      <div class="wide">
-        <label for="txNote">Transaction name / description</label>
+    <div class="tx-keypad">
 
-        <input
-          type="text"
-          id="txNote"
-          placeholder="e.g. Groceries, salary, electricity bill">
-      </div>
+      <button type="button" onclick="addTxDigit('1')">1</button>
+      <button type="button" onclick="addTxDigit('2')">2</button>
+      <button type="button" onclick="addTxDigit('3')">3</button>
+
+      <button type="button" onclick="addTxDigit('4')">4</button>
+      <button type="button" onclick="addTxDigit('5')">5</button>
+      <button type="button" onclick="addTxDigit('6')">6</button>
+
+      <button type="button" onclick="addTxDigit('7')">7</button>
+      <button type="button" onclick="addTxDigit('8')">8</button>
+      <button type="button" onclick="addTxDigit('9')">9</button>
+
+      <button
+        type="button"
+        class="tx-backspace"
+        onclick="backspaceTxDigit()">
+        ⌫
+      </button>
+
+      <button type="button" onclick="addTxDigit('0')">0</button>
+
+      <button
+        type="button"
+        class="tx-decimal"
+        onclick="addTxDigit('.')">
+        .
+      </button>
+
+      <button
+        type="button"
+        class="tx-save"
+        onclick="saveTx()">
+        Save
+      </button>
 
     </div>
 
-    <div class="dialog-actions transaction-dialog-actions">
-
-      <button
-        type="button"
-        class="btn transaction-cancel"
-        onclick="this.closest('dialog').close()">
-        Cancel
-      </button>
-
-      <button
-        type="button"
-        class="btn primary transaction-save"
-        onclick="saveTx()">
-        Save transaction
-      </button>
-
+    <div class="transaction-dialog-actions">
+      <button type="button" onclick="saveTx()">Save transaction</button>
     </div>
 
   </form>
 </dialog>
+
 
 <!-- SAVINGS GOAL -->
 
