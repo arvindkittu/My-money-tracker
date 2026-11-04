@@ -1,5 +1,5 @@
 "use strict";
-const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s), KEY = "mm3", TW = 27;
+const $ = s => document.querySelector(s), $$ = s => document.querySelectorAll(s), KEY = "mm3", TW = 9;
 const pad = n => String(n).padStart(2, "0");
 const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 const today = () => iso(new Date());
@@ -75,11 +75,11 @@ function chart(list) {
   }
   const vals = keys.map(k => list.filter(t => t.date.startsWith(k)).reduce((a, t) => a + t.amount, 0));
   const L = 26, R = 26, top = 10, base = H - 46, slot = (W - L - R) / keys.length;
-  const bw = Math.min(range === "1M" ? 12 : 30, slot * .55), max = Math.max(1, ...vals);
+  const bw = Math.min(range === "1M" ? 14 : 24, slot * .68), max = Math.max(1, ...vals);
   x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
   x.beginPath(); x.moveTo(L, base); x.lineTo(W - R, base); x.stroke(); x.setLineDash([]);
   const td = +today().slice(8), isCur = range === "1M" && vm === tk.slice(0, 7);
-  x.font = "15px -apple-system,sans-serif"; x.textAlign = "center";
+  x.font = "13px -apple-system,sans-serif"; x.textAlign = "center";
   vals.forEach((v, i) => {
     const cx = L + slot * (i + .5);
     if (v > 0) {
@@ -90,7 +90,7 @@ function chart(list) {
     const d = lab[i];
     const show = range !== "1M" || d === 1 || (isCur && d === td) || (d >= 9 && (d - 9) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
     if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, H - 14); }
-    if (isCur && d === td) { x.fillStyle = "#4ade80"; x.beginPath(); x.arc(cx, base - 12, 3.5, 0, 7); x.fill(); }
+    if (isCur && d === td) { x.fillStyle = "#4ade80"; x.beginPath(); x.arc(cx, base - 12, 3, 0, 7); x.fill(); }
   });
 }
 
@@ -125,7 +125,7 @@ function drawAdd() {
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
-  <div class="chips"><button class="chip" id="catBtn">${c[1]} ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn">📅 ${dl}</button></div>${body}`;
+  <div class="chips"><button class="chip" id="catBtn"><span class="e">${c[1]}</span> ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button></div>${body}`;
 }
 function key(k) {
   if (k === "save") return saveTx();
