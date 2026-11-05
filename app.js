@@ -12,10 +12,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Investment", "📈", "#22d3ee"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], inv: [] });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], inv: [], snaps: [] });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.inv = S.inv || []; ensureInvCat();
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.inv = S.inv || []; S.snaps = S.snaps || []; ensureInvCat();
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -231,7 +231,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S.inv.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S.inv.forEach(r => del[r.id] = Date.now()); S.snaps.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -256,7 +256,7 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), inv: mix(a.inv, b.inv), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), inv: mix(a.inv, b.inv), snaps: mix(a.snaps, b.snaps), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -314,7 +314,7 @@ if (sb) sb.auth.onAuthStateChange((ev, s) => {
   if (user && (ev === "SIGNED_IN" || ev === "INITIAL_SESSION")) setTimeout(() => { if (claimDevice()) syncNow(); }, 0);
 });
 addEventListener("online", syncNow);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); syncNow(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); snapNow(); refreshPrices({ auto: true, quiet: true }); syncNow(); } });
 $("#acct").onclick = () => user ? syncNow() : openAuth();
 $("#lo").onclick = async () => { if (confirm("Log out? Your data stays on this device.")) { await sb.auth.signOut(); setMsg(""); } };
 
@@ -393,7 +393,7 @@ function payEmi(id) {
   S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: l.name + " EMI", cat: "EMI", u: Date.now() });
   save(); renderIns(); render();
 }
-function finishForm() { save(); hideSheet(); F = null; renderIns(); render(); }
+function finishForm() { snapNow(); save(); hideSheet(); const rid = F && F.kind === "inv" && F.ik ? F.id : ""; F = null; renderIns(); render(); if (rid) refreshPrices({ id: rid, quiet: true }); }
 sheet.addEventListener("click", e => {
   const id = e.target.id;
   if (!F || !["fsave", "fdel", "psave"].includes(id)) return;
@@ -405,13 +405,13 @@ sheet.addEventListener("click", e => {
     const g = S.goals.find(x => x.id === F.id); g.saved = r2(g.saved + a); g.u = Date.now(); finishForm(); return;
   }
   const name = v("name").trim();
-  const o = F.kind === "inv" ? { name, kind: F.ik, invested: num(v("invested")), value: num(v("value")) } : G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
+  const o = F.kind === "inv" ? { name, kind: F.ik, invested: num(v("invested")), value: num(v("value")), units: num(v("units")), sym: v("sym").trim() } : G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
   if (F.kind === "loan") o.paid = Math.min(o.paid, o.total);
   if (F.kind === "inv" && !(o.value > 0)) o.value = o.invested;
   const need = F.kind === "inv" ? o.invested : G ? o.target : o.total;
   if (!name || !(need > 0)) { alert("Enter a name and an amount greater than zero."); return; }
   const ex = list.find(x => x.id === F.id);
-  if (ex) Object.assign(ex, o, { u: Date.now() }); else list.push({ id: crypto.randomUUID(), ...o, u: Date.now() });
+  if (ex) Object.assign(ex, o, { u: Date.now() }); else { const nid = crypto.randomUUID(); F.id = nid; list.push({ id: nid, ...o, u: Date.now() }); }
   finishForm();
 });
 $("#insBody").onclick = e => {
@@ -443,7 +443,7 @@ function openInv(id) {
   const f = (lab, k, val, mode, extra) => `<div class="lab">${lab}</div><input class="fi" data-f="${k}" type="text" inputmode="${mode}" value="${esc(val)}" ${extra}>`;
   sheet.className = "sheet";
   sheet.innerHTML = `<div class="hd"></div>${it.id ? '<button class="del" id="fdel">Delete</button>' : ""}<h3>${it.id ? "Edit" : "New"} investment</h3><p class="sub"></p><div class="seg mid" style="width:100%;margin-bottom:14px">${Object.entries(IK).map(([k, v]) => `<button data-ik="${k}" class="${k === F.ik ? "on" : ""}" style="flex:1;padding:6px 2px">${v[0]}</button>`).join("")}</div>`
-    + f("Name", "name", it.name || "", "text", 'maxlength="30"') + f("Amount invested (₹)", "invested", it.invested || "", "decimal", 'placeholder="0"') + f("Current value (₹)", "value", it.value || "", "decimal", 'placeholder="Same as invested"')
+    + f("Name", "name", it.name || "", "text", 'maxlength="30"') + f("Amount invested (₹)", "invested", it.invested || "", "decimal", 'placeholder="0"') + f("Current value (₹)", "value", it.value || "", "decimal", 'placeholder="Same as invested"') + f("Units / grams held (for live price)", "units", it.units || "", "decimal", 'placeholder="optional"') + f("Ticker or scheme code (live price)", "sym", it.sym || "", "text", 'placeholder="Stocks: RELIANCE.BSE · Funds: use Find · Gold: leave empty" autocapitalize="characters"') + '<button class="ghost" id="mfFind">🔎 Find mutual fund code from Name</button><div id="mfRes"></div>'
     + '<button class="save wide" id="fsave">Save</button>';
   showSheet();
 }
@@ -463,10 +463,143 @@ sheet.addEventListener("click", e => {
     const a = num(sheet.querySelector('[data-f="amt"]').value); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
     const x = S.inv.find(h => h.id === F.id); if (!x) return;
     x.invested = r2(x.invested + a); x.value = r2(x.value + a); x.u = Date.now();
+    if (x.units > 0 && x.px > 0) x.units = Math.round((x.units + a / x.px) * 1e4) / 1e4;
     if (F.log) { ensureInvCat(); S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: x.name, cat: "Investment", u: Date.now() }); }
     finishForm();
   }
 });
+
+/* ---------- Live prices, refresh, monthly snapshots, reminder ---------- */
+const PK = () => { try { return JSON.parse(localStorage.getItem("mm3pk")) || {}; } catch (e) { return {}; } };
+const getJSON = async (url, ms = 9000) => {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); } finally { clearTimeout(t); }
+};
+async function goldPerGram() {
+  const g = await getJSON("https://api.gold-api.com/price/XAU"); let fx;
+  try { fx = (await getJSON("https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR")).rates.INR; }
+  catch (e) { fx = (await getJSON("https://open.er-api.com/v6/latest/USD")).rates.INR; }
+  if (!(g.price > 0) || !(fx > 0)) throw new Error("bad gold data");
+  return g.price / 31.1035 * fx * (1 + (parseFloat(PK().adj) || 0) / 100); // 24K, per gram, INR
+}
+async function priceFor(h, cache) {
+  if (h.kind === "gold") return cache.gold || (cache.gold = await goldPerGram());
+  if (h.kind === "mf") {
+    const j = await getJSON("https://api.mfapi.in/mf/" + encodeURIComponent(h.sym) + "/latest");
+    const p = parseFloat(j.data && j.data[0] && j.data[0].nav); if (!(p > 0)) throw new Error("no NAV"); return p;
+  }
+  const pk = PK(); if (!pk.key) throw new Error("add a stock API key in ⚙️");
+  if (pk.prov === "td") {
+    const j = await getJSON("https://api.twelvedata.com/price?symbol=" + encodeURIComponent(h.sym) + "&apikey=" + encodeURIComponent(pk.key));
+    const p = parseFloat(j.price); if (!(p > 0)) throw new Error(j.message || "no price"); return p;
+  }
+  const j = await getJSON("https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=" + encodeURIComponent(h.sym) + "&apikey=" + encodeURIComponent(pk.key));
+  const p = parseFloat(j["Global Quote"] && j["Global Quote"]["05. price"]); if (!(p > 0)) throw new Error(j.Note || j.Information || "no price"); return p;
+}
+let refreshing = false, invNote = "";
+function setNote(m) { invNote = m; const el = $("#invNote"); if (el) { el.textContent = m; el.className = ""; } }
+async function refreshPrices(o = {}) {
+  if (refreshing) return;
+  const hs = S.inv.filter(h => h.units > 0 && (h.kind === "gold" || h.sym) && (!o.id || h.id === o.id) && (!o.auto || Date.now() - (h.pu || 0) > 432e5));
+  if (!hs.length) { if (!o.quiet) alert("Nothing to refresh yet. Add units (grams for gold) and a ticker or scheme code to a holding."); return; }
+  if (!navigator.onLine) { if (!o.quiet) alert("You're offline."); return; }
+  refreshing = true; setNote("Refreshing prices…");
+  const cache = {}, bad = []; let ok = 0;
+  for (const h of hs) {
+    try { const p = await priceFor(h, cache); h.px = p; h.value = r2(h.units * p); h.pu = Date.now(); h.u = Date.now(); ok++; }
+    catch (e) { bad.push(h.name + ": " + (e.name === "AbortError" ? "timed out" : e.message || "failed")); }
+  }
+  refreshing = false;
+  if (ok) { snapNow(); save(); }
+  setNote(ok + " updated" + (bad.length ? " · " + bad.length + " failed (" + bad[0] + ")" : ""));
+  if (tab === "invest" && $("#insights").classList.contains("open")) renderIns();
+  setTimeout(() => { invNote = ""; if (tab === "invest" && $("#insights").classList.contains("open")) renderIns(); }, 8000);
+}
+function updateDot() {
+  const last = Math.max(0, ...S.inv.map(h => Math.max(h.pu || 0, h.u || 0)));
+  $("#menuBtn").classList.toggle("dot", S.inv.length > 0 && Date.now() - last > 7 * 864e5);
+}
+function snapNow() {
+  updateDot();
+  if (!S.inv.length) return;
+  const ym = today().slice(0, 7), id = "s_" + ym, inv = r2(S.inv.reduce((a, h) => a + h.invested, 0)), val = r2(S.inv.reduce((a, h) => a + h.value, 0));
+  const s = S.snaps.find(x => x.id === id);
+  if (s && s.invested === inv && s.value === val) return;
+  if (s) Object.assign(s, { invested: inv, value: val, u: Date.now() }); else S.snaps.push({ id, ym, invested: inv, value: val, u: Date.now() });
+  save();
+}
+function invStatus() {
+  if (invNote) return { t: invNote, old: false };
+  if (!S.inv.length) return { t: "", old: false };
+  const last = Math.max(...S.inv.map(h => Math.max(h.pu || 0, h.u || 0))), days = Math.floor((Date.now() - last) / 864e5), pu = Math.max(...S.inv.map(h => h.pu || 0));
+  if (days >= 7) return { t: "Not updated for " + days + " days. Tap Refresh or update values.", old: true };
+  return { t: pu ? "Prices updated " + new Date(pu).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Values entered manually", old: false };
+}
+function drawHist(c) {
+  if (!c) return;
+  const ss = [...S.snaps].sort((a, b) => a.ym.localeCompare(b.ym)).slice(-12);
+  const dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight; c.width = W * dpr; c.height = H * dpr;
+  const x = c.getContext("2d"); x.scale(dpr, dpr);
+  const mx = Math.max(1, ...ss.map(s => Math.max(s.value, s.invested))), base = H - 22, slot = W / Math.max(ss.length, 4), bw = Math.min(26, slot * .6);
+  x.font = "11px -apple-system,sans-serif"; x.textAlign = "center";
+  ss.forEach((s, i) => {
+    const cx = slot * (i + .5), h = Math.max(3, (base - 8) * s.value / mx), ih = (base - 8) * s.invested / mx;
+    x.fillStyle = s.value >= s.invested ? "#4ade80" : "#ff5f5f"; x.beginPath(); (x.roundRect || x.rect).call(x, cx - bw / 2, base - h, bw, h, 4); x.fill();
+    x.fillStyle = "#fff"; x.fillRect(cx - bw / 2 - 2, base - ih - 1, bw + 4, 2);
+    x.fillStyle = "#9a9a9a"; x.fillText(mname(s.ym, { month: "narrow" }), cx, H - 6);
+  });
+}
+const baseRenderInv = renderInv;
+renderInv = el => {
+  baseRenderInv(el);
+  const st = invStatus();
+  el.insertAdjacentHTML("afterbegin", `<div class="gf" style="margin:0 0 12px"><small id="invNote" class="${st.old ? "bad" : ""}">${esc(st.t)}</small><button data-iset="1">⚙️</button><button class="pri" data-iref="1">↻ Refresh</button></div>`);
+  const ic = el.querySelector(".icard");
+  if (ic && S.snaps.length) {
+    const rows = [...S.snaps].sort((a, b) => b.ym.localeCompare(a.ym)).slice(0, 6).map(s => { const g = r2(s.value - s.invested); return `<div class="hl"><span>${mname(s.ym)} ${s.ym.slice(0, 4)}</span><span>${fmt(s.value)} <span class="${g >= 0 ? "ok" : "bad"}">${g >= 0 ? "+" : "−"}${fmt(Math.abs(g))}</span></span></div>`; }).join("");
+    ic.insertAdjacentHTML("afterend", `<div class="icard"><small>Portfolio by month · bar = value, line = invested</small><canvas id="hist" style="width:100%;height:130px;margin:10px 0 6px"></canvas>${rows}</div>`);
+    drawHist(el.querySelector("#hist"));
+  }
+};
+function openPK() {
+  const p = PK(); F = { kind: "pk", prov: p.prov || "av" };
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>Price settings</h3><p class="sub">Mutual funds and gold need no key. Stocks need a free API key, saved on this device only.</p>
+  <div class="seg mid" style="width:100%;margin-bottom:14px">${[["av", "Alpha Vantage"], ["td", "Twelve Data"]].map(([k, n]) => `<button data-pv="${k}" class="${k === F.prov ? "on" : ""}" style="flex:1;padding:6px 2px">${n}</button>`).join("")}</div>
+  <div class="lab">Stock API key</div><input class="fi" data-f="key" value="${esc(p.key || "")}" autocapitalize="off" autocomplete="off" placeholder="Paste key">
+  <div class="lab">Gold adjustment % (Indian retail is usually above spot)</div><input class="fi" data-f="adj" inputmode="decimal" value="${esc(p.adj || "")}" placeholder="0">
+  <button class="save wide" id="pksave">Save</button>`;
+  showSheet();
+}
+sheet.addEventListener("click", async e => {
+  if (!F) return;
+  const b = e.target.closest("button"); if (!b) return;
+  if (F.kind === "pk") {
+    if (b.dataset.pv) { F.prov = b.dataset.pv; sheet.querySelectorAll("[data-pv]").forEach(x => x.classList.toggle("on", x === b)); }
+    else if (b.id === "pksave") { const g = k => sheet.querySelector('[data-f="' + k + '"]').value.trim(); localStorage.setItem("mm3pk", JSON.stringify({ prov: F.prov, key: g("key"), adj: g("adj") })); F = null; hideSheet(); }
+  } else if (F.kind === "inv" && b.id === "mfFind") {
+    const q = sheet.querySelector('[data-f="name"]').value.trim(); if (q.length < 3) { alert("Type part of the fund name in Name first."); return; }
+    const box = $("#mfRes"); box.innerHTML = '<div class="lab">Searching…</div>';
+    try {
+      const r = await getJSON("https://api.mfapi.in/mf/search?q=" + encodeURIComponent(q));
+      box.innerHTML = r.slice(0, 6).map(m => `<button class="ghost" style="height:auto;padding:8px 4px;text-align:left;font-size:13px" data-code="${m.schemeCode}">${esc(m.schemeName)}</button>`).join("") || '<div class="lab">No match. Try fewer words.</div>';
+    } catch (err) { box.innerHTML = '<div class="lab">Search failed: ' + esc(err.message) + "</div>"; }
+  } else if (F.kind === "inv" && b.dataset.code) {
+    sheet.querySelector('[data-f="sym"]').value = b.dataset.code; $("#mfRes").innerHTML = '<div class="lab">Selected scheme code ' + esc(b.dataset.code) + "</div>";
+  }
+});
+$("#insBody").addEventListener("click", e => {
+  const d = (e.target.closest("button") || {}).dataset; if (!d) return;
+  if (d.iref) refreshPrices({}); else if (d.iset) openPK();
+});
+async function calReminder() {
+  const d = new Date(); d.setMonth(d.getMonth() + 1, 1);
+  const ds = d.getFullYear() + pad(d.getMonth() + 1) + "01";
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//My Money//EN", "BEGIN:VEVENT", "UID:my-money-refresh@mymoney", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", "DTSTART:" + ds + "T090000", "DTEND:" + ds + "T091500", "RRULE:FREQ=MONTHLY", "SUMMARY:Update My Money portfolio", "DESCRIPTION:Open My Money > Insights > Invest > Refresh.", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Update My Money portfolio", "TRIGGER:PT0S", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const f = new File([ics], "my-money-reminder.ics", { type: "text/calendar" });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+}
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
@@ -479,10 +612,12 @@ $("#list").onclick = e => {
 $("#bl").onclick = () => { if (type === "expense" && range === "1M") openBudget(); };
 $("#fab").onclick = () => openAdd();
 $("#rcBtn").onclick = openRec;
+$("#remBtn").onclick = calReminder;
 $("#menuBtn").onclick = () => openPage("insights");
 $("#walletBtn").onclick = () => openPage("settings");
 addEventListener("resize", render);
 render();
 runRecurring();
+snapNow(); setTimeout(() => refreshPrices({ auto: true, quiet: true }), 1500);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
