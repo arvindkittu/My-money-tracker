@@ -93,6 +93,12 @@ header{flex:none}
 #home{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;padding:50px 0 0}
 #home>*{flex:none}
 #list{flex:1 1 auto;min-height:0;width:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:120px}
+.gcard{background:var(--seg);border-radius:20px;padding:16px;margin-bottom:12px}
+.gh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}.gh b{font-size:15px}.gh span{color:#bbb;font-size:13px}
+.gf{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--mut)}.gf small{flex:1;font-size:12px}
+.gf button{font-size:13px;padding:6px 12px;border-radius:16px;background:#2a2a2a}.gf .pri{background:#d4d4d4;color:#000;font-weight:600}
+.lab{color:var(--mut);font-size:12px;margin:0 0 6px 4px}
+.gcard .bar{background:#2e2e2e}
 </style></head><body>
 <header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
@@ -108,7 +114,7 @@ header{flex:none}
 <button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button>
 
 <section class="page" id="insights"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button></div></div><div id="insBody"></div></section>
+<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div></section>
 
 <section class="page" id="settings"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="ttl">Settings</span></div>
 <div class="av">👤</div><button class="nm" id="nm"></button><div class="em">Data is stored on this device</div>
