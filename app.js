@@ -9,13 +9,13 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const mname = (k, o) => new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-IN", o || { month: "long" });
 const sum = a => r2(a.reduce((s, t) => s + t.amount, 0));
 const DC = {
-  expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Other", "📦", "#9ca3af"]],
+  expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Investment", "📈", "#22d3ee"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [] });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], inv: [] });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || [];
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.inv = S.inv || []; ensureInvCat();
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -112,6 +112,7 @@ function calendar() {
   return h + "</div></div>";
 }
 function drawAdd() {
+  ensureInvCat();
   const c = catInfo(D.type, D.cat);
   let body;
   if (D.panel === "cats") {
@@ -190,6 +191,7 @@ function renderIns() {
   const el = $("#insBody"), ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), tot = sum(ex);
   if (tab === "savings") return renderGoals(el);
   if (tab === "loans") return renderLoans(el);
+  if (tab === "invest") return renderInv(el);
   if (!ex.length) { el.innerHTML = '<div class="empty" style="text-align:center">No expenses in ' + mname(vm) + "</div>"; return; }
   if (tab === "spending") {
     const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
@@ -229,7 +231,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S.inv.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -254,7 +256,7 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), inv: mix(a.inv, b.inv), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -395,17 +397,18 @@ function finishForm() { save(); hideSheet(); F = null; renderIns(); render(); }
 sheet.addEventListener("click", e => {
   const id = e.target.id;
   if (!F || !["fsave", "fdel", "psave"].includes(id)) return;
-  const G = F.kind === "goal", key = G ? "goals" : "loans", list = S[key];
+  const G = F.kind === "goal", key = { goal: "goals", loan: "loans", inv: "inv" }[F.kind], list = S[key];
   const v = k => { const el = sheet.querySelector('[data-f="' + k + '"]'); return el ? el.value : ""; };
-  if (id === "fdel") { if (confirm("Delete this " + F.kind + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); finishForm(); } return; }
+  if (id === "fdel") { if (confirm("Delete this " + (F.kind === "inv" ? "investment" : F.kind) + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); finishForm(); } return; }
   if (id === "psave") {
     const a = num(v("amt")); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
     const g = S.goals.find(x => x.id === F.id); g.saved = r2(g.saved + a); g.u = Date.now(); finishForm(); return;
   }
   const name = v("name").trim();
-  const o = G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
-  if (!G) o.paid = Math.min(o.paid, o.total);
-  const need = G ? o.target : o.total;
+  const o = F.kind === "inv" ? { name, kind: F.ik, invested: num(v("invested")), value: num(v("value")) } : G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
+  if (F.kind === "loan") o.paid = Math.min(o.paid, o.total);
+  if (F.kind === "inv" && !(o.value > 0)) o.value = o.invested;
+  const need = F.kind === "inv" ? o.invested : G ? o.target : o.total;
   if (!name || !(need > 0)) { alert("Enter a name and an amount greater than zero."); return; }
   const ex = list.find(x => x.id === F.id);
   if (ex) Object.assign(ex, o, { u: Date.now() }); else list.push({ id: crypto.randomUUID(), ...o, u: Date.now() });
@@ -415,7 +418,55 @@ $("#insBody").onclick = e => {
   const d = (e.target.closest("button") || {}).dataset; if (!d) return;
   if (d.gnew) openForm("goal"); else if (d.gedit) openForm("goal", d.gedit); else if (d.gadd) openAddMoney(d.gadd);
   else if (d.lnew) openForm("loan"); else if (d.ledit) openForm("loan", d.ledit); else if (d.lpay) payEmi(d.lpay);
+  else if (d.inew) openInv(); else if (d.iedit) openInv(d.iedit); else if (d.ibuy) openBuy(d.ibuy);
 };
+
+/* ---------- Investments (stocks, mutual funds, gold) ---------- */
+const IK = { stock: ["Stocks", "📈"], mf: ["Mutual Fund", "📊"], gold: ["Gold", "🪙"], other: ["Other", "💼"] };
+function ensureInvCat() {
+  const l = S.cats.expense;
+  if (!l.some(c => c[0] === "Investment")) l.splice(Math.max(0, l.length - 1), 0, ["Investment", "📈", "#22d3ee"]);
+}
+function renderInv(el) {
+  const inv = S.inv.reduce((a, h) => a + h.invested, 0), val = S.inv.reduce((a, h) => a + h.value, 0), d = r2(val - inv);
+  const sg = x => x >= 0 ? "+" : "−", pc = (g, i) => Math.abs(Math.round(g / i * 1000) / 10) + "%";
+  let h = S.inv.length ? `<div class="icard"><small>Current value</small><b>${fmt(r2(val))}</b><div class="${d >= 0 ? "ok" : "bad"}">${sg(d)}${fmt(Math.abs(d))}${inv > 0 ? " · " + sg(d) + pc(d, inv) : ""} on ${fmt(r2(inv))} invested</div></div>` : "";
+  h += [...S.inv].sort((a, b) => Object.keys(IK).indexOf(a.kind) - Object.keys(IK).indexOf(b.kind) || b.value - a.value).map(x => {
+    const k = IK[x.kind] || IK.other, g = r2(x.value - x.invested);
+    return `<div class="gcard"><div class="gh"><b>${k[1]} ${esc(x.name)}</b><span>${fmt(x.value)}</span></div><div class="gf"><small>${k[0]} · invested ${fmt(x.invested)} · <span class="${g >= 0 ? "ok" : "bad"}">${sg(g)}${x.invested > 0 ? pc(g, x.invested) : fmt(Math.abs(g))}</span></small><button data-iedit="${esc(x.id)}">Edit</button><button class="pri" data-ibuy="${esc(x.id)}">+ Buy</button></div></div>`;
+  }).join("") || '<div class="empty" style="text-align:center">No investments yet</div>';
+  el.innerHTML = h + '<button class="save wide" data-inew="1">New investment</button>';
+}
+function openInv(id) {
+  const it = S.inv.find(x => x.id === id) || {};
+  F = { kind: "inv", id: it.id || "", ik: it.kind || "stock" };
+  const f = (lab, k, val, mode, extra) => `<div class="lab">${lab}</div><input class="fi" data-f="${k}" type="text" inputmode="${mode}" value="${esc(val)}" ${extra}>`;
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div>${it.id ? '<button class="del" id="fdel">Delete</button>' : ""}<h3>${it.id ? "Edit" : "New"} investment</h3><p class="sub"></p><div class="seg mid" style="width:100%;margin-bottom:14px">${Object.entries(IK).map(([k, v]) => `<button data-ik="${k}" class="${k === F.ik ? "on" : ""}" style="flex:1;padding:6px 2px">${v[0]}</button>`).join("")}</div>`
+    + f("Name", "name", it.name || "", "text", 'maxlength="30"') + f("Amount invested (₹)", "invested", it.invested || "", "decimal", 'placeholder="0"') + f("Current value (₹)", "value", it.value || "", "decimal", 'placeholder="Same as invested"')
+    + '<button class="save wide" id="fsave">Save</button>';
+  showSheet();
+}
+function openBuy(id) {
+  const x = S.inv.find(h => h.id === id); if (!x) return;
+  F = { kind: "inv", id, log: true };
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>Buy more ${esc(x.name)}</h3><p class="sub">Currently worth ${fmt(x.value)}</p><input class="fi" data-f="amt" type="text" inputmode="decimal" placeholder="Amount invested (₹)"><button class="ghost" id="logBtn" style="color:var(--grn)">Log as expense: On</button><button class="save wide" id="bsave">Add</button>`;
+  showSheet();
+}
+sheet.addEventListener("click", e => {
+  if (!F || F.kind !== "inv") return;
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.ik) { F.ik = b.dataset.ik; sheet.querySelectorAll("[data-ik]").forEach(x => x.classList.toggle("on", x === b)); }
+  else if (b.id === "logBtn") { F.log = !F.log; b.textContent = "Log as expense: " + (F.log ? "On" : "Off"); b.style.color = F.log ? "var(--grn)" : "var(--mut)"; }
+  else if (b.id === "bsave") {
+    const a = num(sheet.querySelector('[data-f="amt"]').value); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
+    const x = S.inv.find(h => h.id === F.id); if (!x) return;
+    x.invested = r2(x.invested + a); x.value = r2(x.value + a); x.u = Date.now();
+    if (F.log) { ensureInvCat(); S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: x.name, cat: "Investment", u: Date.now() }); }
+    finishForm();
+  }
+});
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
