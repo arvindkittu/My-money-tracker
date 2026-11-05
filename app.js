@@ -310,9 +310,10 @@ if (sb) sb.auth.onAuthStateChange((ev, s) => {
   if (user && (ev === "SIGNED_IN" || ev === "INITIAL_SESSION")) setTimeout(() => { if (claimDevice()) syncNow(); }, 0);
 });
 addEventListener("online", syncNow);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); syncNow(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); syncNow(); } });
 $("#acct").onclick = () => user ? syncNow() : openAuth();
 $("#lo").onclick = async () => { if (confirm("Log out? Your data stays on this device.")) { await sb.auth.signOut(); setMsg(""); } };
+
 /* ---------- Recurring ---------- */
 function runRecurring() {
   const now = new Date(), cur = now.getFullYear() + "-" + pad(now.getMonth() + 1), t = today();
