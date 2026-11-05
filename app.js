@@ -12,10 +12,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [] });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [] });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || [];
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || [];
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -188,6 +188,8 @@ function openBudget() {
 function renderIns() {
   $$("#insTabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   const el = $("#insBody"), ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), tot = sum(ex);
+  if (tab === "savings") return renderGoals(el);
+  if (tab === "loans") return renderLoans(el);
   if (!ex.length) { el.innerHTML = '<div class="empty" style="text-align:center">No expenses in ' + mname(vm) + "</div>"; return; }
   if (tab === "spending") {
     const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
@@ -227,7 +229,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -252,7 +254,7 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -345,6 +347,75 @@ sheet.addEventListener("click", e => {
     S.del[b.dataset.rdel] = Date.now(); S.rec = S.rec.filter(r => r.id !== b.dataset.rdel); save(); openRec();
   }
 });
+
+/* ---------- Savings goals & Loans ---------- */
+const num = v => Math.max(0, r2(parseFloat(String(v).replace(/,/g, "")) || 0));
+const pct = (a, b) => b > 0 ? Math.min(100, Math.round(a / b * 100)) : 0;
+let F = null;
+function renderGoals(el) {
+  el.innerHTML = (S.goals.map(g => {
+    const p = pct(g.saved, g.target), left = Math.max(0, r2(g.target - g.saved));
+    return `<div class="gcard"><div class="gh"><b>${esc(g.name)}</b><span>${fmt(g.saved)} / ${fmt(g.target)}</span></div><div class="bar"><i style="width:${p}%;background:var(--grn)"></i></div><div class="gf"><small>${p >= 100 ? "Goal reached 🎉" : p + "% · " + fmt(left) + " to go"}</small><button data-gedit="${esc(g.id)}">Edit</button><button class="pri" data-gadd="${esc(g.id)}">+ Add</button></div></div>`;
+  }).join("") || '<div class="empty" style="text-align:center">No savings goals yet</div>') + '<button class="save wide" data-gnew="1">New goal</button>';
+}
+function renderLoans(el) {
+  el.innerHTML = (S.loans.map(l => {
+    const p = pct(l.paid, l.total), left = Math.max(0, r2(l.total - l.paid)), n = l.emi > 0 ? Math.ceil(left / l.emi) : 0;
+    return `<div class="gcard"><div class="gh"><b>${esc(l.name)}</b><span>${fmt(l.paid)} / ${fmt(l.total)}</span></div><div class="bar"><i style="width:${p}%;background:#fb923c"></i></div><div class="gf"><small>${left <= 0 ? "Paid off 🎉" : fmt(left) + " left · " + n + " EMI" + (n === 1 ? "" : "s") + " of " + fmt(l.emi)}</small><button data-ledit="${esc(l.id)}">Edit</button>${left > 0 && l.emi > 0 ? `<button class="pri" data-lpay="${esc(l.id)}">Pay EMI</button>` : ""}</div></div>`;
+  }).join("") || '<div class="empty" style="text-align:center">No loans yet</div>') + '<button class="save wide" data-lnew="1">New loan</button>';
+}
+function openForm(kind, id) {
+  const G = kind === "goal", it = (G ? S.goals : S.loans).find(x => x.id === id) || {};
+  F = { kind, id: it.id || "" };
+  const fields = G
+    ? [["Goal name", "name", it.name || "", "text"], ["Target amount (₹)", "target", it.target || "", "decimal"], ["Saved so far (₹)", "saved", it.saved || "", "decimal"]]
+    : [["Loan name", "name", it.name || "", "text"], ["Total amount (₹)", "total", it.total || "", "decimal"], ["Monthly EMI (₹)", "emi", it.emi || "", "decimal"], ["Paid so far (₹)", "paid", it.paid || "", "decimal"]];
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div>${it.id ? '<button class="del" id="fdel">Delete</button>' : ""}<h3>${it.id ? "Edit" : "New"} ${G ? "goal" : "loan"}</h3><p class="sub"></p>`
+    + fields.map(f => `<div class="lab">${f[0]}</div><input class="fi" data-f="${f[1]}" type="text" inputmode="${f[3]}" value="${esc(f[2])}" ${f[3] === "text" ? 'maxlength="30"' : 'placeholder="0"'}>`).join("")
+    + '<button class="save wide" id="fsave">Save</button>';
+  showSheet();
+}
+function openAddMoney(id) {
+  const g = S.goals.find(x => x.id === id); if (!g) return;
+  F = { kind: "goal", id };
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>Add to ${esc(g.name)}</h3><p class="sub">${fmt(g.saved)} of ${fmt(g.target)} saved</p><input class="fi" data-f="amt" type="text" inputmode="decimal" placeholder="Amount (₹)"><button class="save wide" id="psave">Add</button>`;
+  showSheet();
+}
+function payEmi(id) {
+  const l = S.loans.find(x => x.id === id); if (!l) return;
+  const a = Math.min(l.emi, r2(l.total - l.paid)); if (!(a > 0)) return;
+  if (!confirm("Record " + fmt(a) + " EMI for " + l.name + "? This also adds an EMI expense for today.")) return;
+  l.paid = r2(l.paid + a); l.u = Date.now();
+  S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: l.name + " EMI", cat: "EMI", u: Date.now() });
+  save(); renderIns(); render();
+}
+function finishForm() { save(); hideSheet(); F = null; renderIns(); render(); }
+sheet.addEventListener("click", e => {
+  const id = e.target.id;
+  if (!F || !["fsave", "fdel", "psave"].includes(id)) return;
+  const G = F.kind === "goal", key = G ? "goals" : "loans", list = S[key];
+  const v = k => { const el = sheet.querySelector('[data-f="' + k + '"]'); return el ? el.value : ""; };
+  if (id === "fdel") { if (confirm("Delete this " + F.kind + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); finishForm(); } return; }
+  if (id === "psave") {
+    const a = num(v("amt")); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
+    const g = S.goals.find(x => x.id === F.id); g.saved = r2(g.saved + a); g.u = Date.now(); finishForm(); return;
+  }
+  const name = v("name").trim();
+  const o = G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
+  if (!G) o.paid = Math.min(o.paid, o.total);
+  const need = G ? o.target : o.total;
+  if (!name || !(need > 0)) { alert("Enter a name and an amount greater than zero."); return; }
+  const ex = list.find(x => x.id === F.id);
+  if (ex) Object.assign(ex, o, { u: Date.now() }); else list.push({ id: crypto.randomUUID(), ...o, u: Date.now() });
+  finishForm();
+});
+$("#insBody").onclick = e => {
+  const d = (e.target.closest("button") || {}).dataset; if (!d) return;
+  if (d.gnew) openForm("goal"); else if (d.gedit) openForm("goal", d.gedit); else if (d.gadd) openAddMoney(d.gadd);
+  else if (d.lnew) openForm("loan"); else if (d.ledit) openForm("loan", d.ledit); else if (d.lpay) payEmi(d.lpay);
+};
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
