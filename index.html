@@ -99,6 +99,8 @@ header{flex:none}
 .gf button{font-size:13px;padding:6px 12px;border-radius:16px;background:#2a2a2a}.gf .pri{background:#d4d4d4;color:#000;font-weight:600}
 .lab{color:var(--mut);font-size:12px;margin:0 0 6px 4px}
 .gcard .bar{background:#2e2e2e}
+#menuBtn{position:relative}#menuBtn.dot::after{content:"";position:absolute;top:-1px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--red)}
+.hl{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#bbb;padding:6px 0;border-top:1px solid #262626}
 </style></head><body>
 <header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
@@ -120,6 +122,7 @@ header{flex:none}
 <div class="av">👤</div><button class="nm" id="nm"></button><div class="em">Data is stored on this device</div>
 <button class="menu" id="acct">☁️ Sign in to sync</button>
 <button class="menu" id="rcBtn">🔁 Recurring</button>
+<button class="menu" id="remBtn">📅 Monthly reminder</button>
 <button class="menu" id="bk">⬇️ Backup Data</button>
 <label class="menu">⬆️ Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>🚪 Log Out</button>
