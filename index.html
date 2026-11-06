@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-title" content="My Money">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>My Money</title>
 <style>
 :root{--seg:#1a1a1a;--on:#363636;--sheet:#141414;--chip:#222;--tx:#f5f5f7;--mut:#777;--red:#ff5f5f;--grn:#4ade80}
@@ -101,6 +101,9 @@ header{flex:none}
 .gcard .bar{background:#2e2e2e}
 #menuBtn{position:relative}#menuBtn.dot::after{content:"";position:absolute;top:-1px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--red)}
 .hl{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:#bbb;padding:6px 0;border-top:1px solid #262626}
+.cwrap{position:relative;overflow:hidden;border-bottom:1px solid #2c2c2c}.cwrap .crow{border:0;position:relative;background:#222;transition:transform .2s;touch-action:pan-y}
+.cact{position:absolute;right:0;top:0;bottom:0;display:flex}.cact button{width:70px;color:#fff;font-size:13px}.cact button:first-child{background:#4b5563}.cact button:last-child{background:#ef4444}
+.rv{margin-left:auto;color:var(--mut);font-size:13px}
 </style></head><body>
 <header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
@@ -123,6 +126,7 @@ header{flex:none}
 <button class="menu" id="acct">☁️ Sign in to sync</button>
 <button class="menu" id="rcBtn">🔁 Recurring</button>
 <button class="menu" id="remBtn">📅 Monthly reminder</button>
+<button class="menu" id="dailyBtn">🔔 Daily reminder<span class="rv" id="dailyVal">Off</span></button>
 <button class="menu" id="bk">⬇️ Backup Data</button>
 <label class="menu">⬆️ Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>🚪 Log Out</button>
