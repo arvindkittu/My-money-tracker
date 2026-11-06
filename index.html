@@ -104,6 +104,19 @@ header{flex:none}
 .cwrap{position:relative;overflow:hidden;border-bottom:1px solid #2c2c2c}.cwrap .crow{border:0;position:relative;background:#222;transition:transform .2s;touch-action:pan-y}
 .cact{position:absolute;right:0;top:0;bottom:0;display:flex}.cact button{width:70px;color:#fff;font-size:13px}.cact button:first-child{background:#4b5563}.cact button:last-child{background:#ef4444}
 .rv{margin-left:auto;color:var(--mut);font-size:13px}
+/* swipe actions, sheet swipe-down, save flow, full-height list */
+.rw{position:relative;overflow:hidden}.rw .row{position:relative;background:#000;touch-action:pan-y;transition:transform .2s}
+.ra{position:absolute;top:0;bottom:0;display:flex;align-items:center;padding:0 16px}.ra.l{left:0}.ra.r{right:0}
+.ra button{width:44px;height:44px;border-radius:50%;display:grid;place-items:center}.ra .dl{background:#ef4444}.ra .ed{background:#4b5563}
+.ra svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.hd{touch-action:none;position:relative}.hd::before{content:"";position:absolute;left:-140px;right:-140px;top:-14px;bottom:-26px}
+.savebar{display:none}.sheet.typing .keys{display:none}.sheet.typing .savebar{display:block}
+.save:disabled{opacity:.4}
+canvas{height:209px;margin-top:27px}
+.total{line-height:1.05;margin:0 0 14px}
+#rangeSeg{margin:10px 0 26px}
+#list{padding-bottom:calc(min(env(safe-area-inset-bottom), 34px) + 16px)}
+#fab{bottom:calc(min(env(safe-area-inset-bottom), 18px) + 24px)}
 </style></head><body>
 <header>
 <button id="walletBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
