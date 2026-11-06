@@ -22,6 +22,7 @@ let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, t
 const budgetFor = m => { const k = Object.keys(S.budgets).filter(x => x <= m).sort().pop(); return k ? S.budgets[k] : 0; };
 const catInfo = (t, n) => S.cats[t].find(c => c[0] === n) || ["Other", "📦", "#9ca3af"];
 const sheet = $("#sheet"), scrim = $("#scrim");
+const ICO_ED = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>', ICO_DEL = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg>', CHECK = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#000;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const showSheet = () => { scrim.classList.add("on"); sheet.classList.add("open"); };
 const hideSheet = () => { scrim.classList.remove("on"); sheet.classList.remove("open"); if (document.activeElement) document.activeElement.blur(); };
 scrim.onclick = hideSheet;
@@ -43,7 +44,7 @@ function render() {
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
   if (range === "1M") {
     L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
-      `<button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${type}">${fmt(t.amount)}</span></button>`).join("");
+      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${type}">${fmt(t.amount)}</span></button></div>`).join("");
   } else {
     const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + t.amount; });
     L.innerHTML = Object.keys(by).sort().reverse().map(k =>
@@ -74,7 +75,7 @@ function chart(list) {
     }
   }
   const vals = keys.map(k => list.filter(t => t.date.startsWith(k)).reduce((a, t) => a + t.amount, 0));
-  const L = 26, R = 26, top = 10, base = H - 46, slot = (W - L - R) / keys.length;
+  const L = 26, R = 26, top = 10, base = H - 30, slot = (W - L - R) / keys.length;
   const bw = Math.min(range === "1M" ? 14 : 24, slot * .68), max = Math.max(1, ...vals);
   x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
   x.beginPath(); x.moveTo(L, base); x.lineTo(W - R, base); x.stroke(); x.setLineDash([]);
@@ -89,7 +90,7 @@ function chart(list) {
     }
     const d = lab[i];
     const show = range !== "1M" || d === 1 || (isCur && d === td) || (d >= 9 && (d - 9) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
-    if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, H - 14); }
+    if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, base + 21); }
     if (isCur && d === td) { x.fillStyle = "#4ade80"; x.beginPath(); x.arc(cx, base - 12, 3, 0, 7); x.fill(); }
   });
 }
@@ -119,31 +120,33 @@ function drawAdd() {
     body = '<div class="cats">' + S.cats[D.type].map(k => `<div class="cwrap">${k[0] === "Other" ? "" : `<div class="cact"><button data-cedit="${esc(k[0])}">Edit</button><button data-cdel="${esc(k[0])}">Delete</button></div>`}<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button></div>`).join("")
       + '<button class="crow" id="addCat"><span class="ce">＋</span><span class="cn">Add category</span></button></div>';
   } else if (D.panel === "cal") body = calendar();
-  else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" data-k="save">Save</button></div>';
+  else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" id="nextBtn" data-k="next" aria-label="Next"' + (+D.amt > 0 ? "" : " disabled") + '>' + CHECK + '</button></div>';
   const dl = D.date === today() ? "Today" : new Date(+D.date.slice(0, 4), +D.date.slice(5, 7) - 1, +D.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  sheet.classList.toggle("p", D.panel !== "keys");
+  sheet.classList.remove("typing"); sheet.classList.toggle("p", D.panel !== "keys");
   sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button>' : ""}
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
-  <div class="chips"><button class="chip" id="catBtn"><span class="e">${c[1]}</span> ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}</div>${body}`;
+  <div class="chips"><button class="chip" id="catBtn"><span class="e">${c[1]}</span> ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}</div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
 }
 function key(k) {
   if (k === "save") return saveTx();
+  if (k === "next") { if (+D.amt > 0) $("#note").focus(); return; }
   if (k === "<") D.amt = D.amt.slice(0, -1);
   else if (D.amt.length < 9 && !(D.amt === "" && k === "0")) D.amt += k;
-  const a = $("#amt"); a.innerHTML = "<span>₹</span>" + (D.amt || 0); a.classList.toggle("z", !D.amt);
+  const a = $("#amt"); a.innerHTML = "<span>₹</span>" + (D.amt || 0); a.classList.toggle("z", !D.amt); const nb = $("#nextBtn"); if (nb) nb.disabled = !(+D.amt > 0);
 }
 function saveTx() {
   const a = +D.amt || 0;
   if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
+  if (!D.id && !D.note.trim()) { $("#note").focus(); return; }
   const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
   save(); hideSheet(); type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render();
 }
-sheet.oninput = e => { if (e.target.id === "note") D.note = e.target.value; };
+sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); } };
 sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
 sheet.onclick = e => {
   const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
@@ -664,6 +667,57 @@ async function dailyReminder() {
   localStorage.setItem("mm3daily", pad(h) + ":" + pad(m)); refreshDaily();
   await shareIcs("Log expenses in My Money", "Add today's expenses to My Money.", "FREQ=DAILY", d, h, m);
 }
+
+/* ---------- Typing mode, sheet swipe-down, transaction swipe ---------- */
+sheet.addEventListener("focusin", e => { if (e.target.id === "note") sheet.classList.add("typing"); });
+sheet.addEventListener("focusout", e => { if (e.target.id === "note") setTimeout(() => { if (document.activeElement !== e.target) sheet.classList.remove("typing"); }, 150); });
+sheet.addEventListener("mousedown", e => { if (e.target.closest(".savebar")) e.preventDefault(); }); // keep the keyboard up while tapping Save
+sheet.addEventListener("click", e => { if (e.target.closest("#amt") && document.activeElement && document.activeElement.id === "note") document.activeElement.blur(); });
+if (window.visualViewport) { // lift the sheet above the on-screen keyboard
+  const vv = window.visualViewport, fit = () => {
+    const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    sheet.style.bottom = kb ? kb + "px" : ""; sheet.style.maxHeight = kb ? Math.round(vv.height * .96) + "px" : "";
+  };
+  vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit);
+}
+(function () { // drag the handle down to close any sheet
+  let on = false, y0 = 0, dy = 0;
+  sheet.addEventListener("pointerdown", e => { if (!e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
+  sheet.addEventListener("pointermove", e => { if (!on) return; dy = Math.max(0, e.clientY - y0); sheet.style.transform = "translateY(" + dy + "px)"; });
+  const end = () => { if (!on) return; on = false; sheet.style.transition = ""; sheet.style.transform = ""; if (dy > 100) hideSheet(); };
+  sheet.addEventListener("pointerup", end); sheet.addEventListener("pointercancel", end);
+})();
+(function () { // swipe a transaction: right = Edit, left = Delete
+  const L = $("#list"), W = 76; let r = null, x0 = 0, y0 = 0, base = 0, dx = 0, mv = false;
+  const st = el => el.classList.contains("oL") ? W : el.classList.contains("oR") ? -W : 0;
+  const shut = el => { el.style.transform = ""; el.classList.remove("oL", "oR"); };
+  L.addEventListener("pointerdown", e => {
+    const t = e.target.closest(".rw .row"); if (!t) return;
+    L.querySelectorAll(".row.oL,.row.oR").forEach(o => { if (o !== t) shut(o); });
+    r = t; x0 = e.clientX; y0 = e.clientY; base = st(t); dx = 0; mv = false;
+  });
+  L.addEventListener("pointermove", e => {
+    if (!r) return; dx = e.clientX - x0;
+    if (!mv && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - y0)) { mv = true; r.style.transition = "none"; }
+    if (mv) r.style.transform = "translateX(" + Math.max(-W, Math.min(W, base + dx)) + "px)";
+  });
+  const end = () => {
+    if (!r) return; r.style.transition = "";
+    if (mv) { const p = base + dx; shut(r); if (p > W / 2) { r.classList.add("oL"); r.style.transform = "translateX(" + W + "px)"; } else if (p < -W / 2) { r.classList.add("oR"); r.style.transform = "translateX(-" + W + "px)"; } }
+    r = null; setTimeout(() => { mv = false; }, 120);
+  };
+  L.addEventListener("pointerup", end); L.addEventListener("pointercancel", end);
+  L.addEventListener("click", e => { // a swipe, or a tap on an opened row, must not open the editor
+    const t = e.target.closest(".row"), open = t && (t.classList.contains("oL") || t.classList.contains("oR"));
+    if (mv || open) { e.stopImmediatePropagation(); e.preventDefault(); if (open && !mv) shut(t); }
+  }, true);
+  L.addEventListener("click", e => {
+    const b = e.target.closest("[data-redit],[data-rdel]"); if (!b) return;
+    const id = b.dataset.redit || b.dataset.rdel, tx = S.tx.find(t => t.id === id); if (!tx) return;
+    if (b.dataset.redit) openAdd(tx);
+    else if (confirm("Delete this transaction?")) { S.del[id] = Date.now(); S.tx = S.tx.filter(t => t.id !== id); save(); render(); }
+  });
+})();
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
