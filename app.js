@@ -127,7 +127,8 @@ function drawAdd() {
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
-  <div class="chips"><button class="chip" id="catBtn"><span class="e">${c[1]}</span> ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}</div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
+  ${pillHTML()}
+  <div class="chips"><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
 }
 function key(k) {
   if (k === "save") return saveTx();
@@ -682,10 +683,29 @@ if (window.visualViewport) { // lift the sheet above the on-screen keyboard
 }
 (function () { // drag the handle down to close any sheet
   let on = false, y0 = 0, dy = 0;
-  sheet.addEventListener("pointerdown", e => { if (!e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
+  sheet.addEventListener("pointerdown", e => { if (e.pointerType === "touch" || !e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
   sheet.addEventListener("pointermove", e => { if (!on) return; dy = Math.max(0, e.clientY - y0); sheet.style.transform = "translateY(" + dy + "px)"; });
   const end = () => { if (!on) return; on = false; sheet.style.transition = ""; sheet.style.transform = ""; if (dy > 100) hideSheet(); };
   sheet.addEventListener("pointerup", end); sheet.addEventListener("pointercancel", end);
+})();
+(function () { // swipe down anywhere on a sheet to close it (touch)
+  let t0 = false, y0 = 0, x0 = 0, dy = 0, drag = false, scroller = null;
+  sheet.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1 || e.target.closest("input,.ruler")) { t0 = false; return; }
+    scroller = e.target.closest(".cats"); // a scrolling list only starts a drag when it is at the top
+    y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; drag = false; t0 = true;
+  }, { passive: true });
+  sheet.addEventListener("touchmove", e => {
+    if (!t0) return;
+    const t = e.touches[0], mx = t.clientX - x0, my = t.clientY - y0;
+    if (!drag) {
+      if (my > 8 && my > Math.abs(mx) * 1.2 && sheet.scrollTop <= 0 && (!scroller || scroller.scrollTop <= 0)) { drag = true; sheet.style.transition = "none"; y0 = t.clientY; }
+      else { if (Math.abs(mx) > 8 || my < -8) t0 = false; return; }
+    }
+    e.preventDefault(); dy = Math.max(0, t.clientY - y0); sheet.style.transform = "translateY(" + dy + "px)";
+  }, { passive: false });
+  const end = () => { const was = drag; drag = false; t0 = false; if (!was) return; sheet.style.transition = ""; sheet.style.transform = ""; if (dy > 100) hideSheet(); };
+  sheet.addEventListener("touchend", end); sheet.addEventListener("touchcancel", end);
 })();
 (function () { // swipe a transaction: right = Edit, left = Delete
   const L = $("#list"), W = 76; let r = null, x0 = 0, y0 = 0, base = 0, dx = 0, mv = false;
@@ -718,6 +738,19 @@ if (window.visualViewport) { // lift the sheet above the on-screen keyboard
     else if (confirm("Delete this transaction?")) { S.del[id] = Date.now(); S.tx = S.tx.filter(t => t.id !== id); save(); render(); }
   });
 })();
+
+/* ---------- Category pills (5 most used, one line) ---------- */
+function pillHTML() {
+  const list = S.cats[D.type], cnt = {};
+  S.tx.forEach(t => { if (t.type === D.type) cnt[t.cat] = (cnt[t.cat] || 0) + 1; });
+  const top = [...list].sort((a, b) => (cnt[b[0]] || 0) - (cnt[a[0]] || 0) || list.indexOf(a) - list.indexOf(b)).slice(0, 5);
+  if (!top.some(c => c[0] === D.cat)) { const sel = list.find(c => c[0] === D.cat); if (sel) top[4] = sel; }
+  return '<div class="pills">' + list.filter(c => top.includes(c)).map(c => `<button class="pill${c[0] === D.cat ? " on" : ""}" data-pill="${esc(c[0])}"><span class="e">${c[1]}</span><span class="pn">${esc(c[0])}</span></button>`).join("") + "</div>";
+}
+sheet.addEventListener("click", e => {
+  const b = e.target.closest("[data-pill]"); if (!b || !D) return;
+  D.cat = b.dataset.pill; sheet.querySelectorAll(".pill").forEach(x => x.classList.toggle("on", x === b));
+});
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
