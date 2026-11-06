@@ -116,7 +116,7 @@ function drawAdd() {
   const c = catInfo(D.type, D.cat);
   let body;
   if (D.panel === "cats") {
-    body = '<div class="cats">' + S.cats[D.type].map(k => `<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button>`).join("")
+    body = '<div class="cats">' + S.cats[D.type].map(k => `<div class="cwrap">${k[0] === "Other" ? "" : `<div class="cact"><button data-cedit="${esc(k[0])}">Edit</button><button data-cdel="${esc(k[0])}">Delete</button></div>`}<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button></div>`).join("")
       + '<button class="crow" id="addCat"><span class="ce">＋</span><span class="cn">Add category</span></button></div>';
   } else if (D.panel === "cal") body = calendar();
   else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" data-k="save">Save</button></div>';
@@ -209,7 +209,7 @@ function renderIns() {
   }
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
-const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); } $("#" + id).classList.add("open"); };
+const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } $("#" + id).classList.add("open"); };
 $$("[data-close]").forEach(b => b.onclick = () => b.closest(".page").classList.remove("open"));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
 $("#bk").onclick = async () => {
@@ -592,13 +592,77 @@ $("#insBody").addEventListener("click", e => {
   const d = (e.target.closest("button") || {}).dataset; if (!d) return;
   if (d.iref) refreshPrices({}); else if (d.iset) openPK();
 });
-async function calReminder() {
-  const d = new Date(); d.setMonth(d.getMonth() + 1, 1);
-  const ds = d.getFullYear() + pad(d.getMonth() + 1) + "01";
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//My Money//EN", "BEGIN:VEVENT", "UID:my-money-refresh@mymoney", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", "DTSTART:" + ds + "T090000", "DTEND:" + ds + "T091500", "RRULE:FREQ=MONTHLY", "SUMMARY:Update My Money portfolio", "DESCRIPTION:Open My Money > Insights > Invest > Refresh.", "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Update My Money portfolio", "TRIGGER:PT0S", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
-  const f = new File([ics], "my-money-reminder.ics", { type: "text/calendar" });
-  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
+/* ---------- Category swipe: edit / delete ---------- */
+let swipeMoved = false;
+(function () {
+  const W = 140; let row = null, x0 = 0, base = 0, dx = 0;
+  const shut = o => { o.style.transform = ""; o.classList.remove("open"); };
+  sheet.addEventListener("pointerdown", e => {
+    const r = e.target.closest(".cwrap .crow"); if (!r) return;
+    sheet.querySelectorAll(".crow.open").forEach(o => { if (o !== r) shut(o); });
+    row = r; x0 = e.clientX; base = r.classList.contains("open") ? -W : 0; dx = 0; r.style.transition = "none";
+  });
+  sheet.addEventListener("pointermove", e => {
+    if (!row) return; dx = e.clientX - x0;
+    if (Math.abs(dx) > 8) swipeMoved = true;
+    if (swipeMoved) row.style.transform = "translateX(" + Math.max(-W, Math.min(0, base + dx)) + "px)";
+  });
+  const end = () => {
+    if (!row) return; row.style.transition = "";
+    const open = swipeMoved ? base + dx < -W / 2 : row.classList.contains("open");
+    row.classList.toggle("open", open); row.style.transform = open ? "translateX(-" + W + "px)" : "";
+    row = null; setTimeout(() => { swipeMoved = false; }, 120);
+  };
+  sheet.addEventListener("pointerup", end); sheet.addEventListener("pointercancel", end);
+  // a swipe, or a tap on an opened row, must not select the category
+  sheet.addEventListener("click", e => {
+    const open = e.target.closest(".crow.open");
+    if (swipeMoved || open) { e.stopPropagation(); e.preventDefault(); if (open && !swipeMoved) shut(open); }
+  }, true);
+})();
+function recat(type, from, to) {
+  const now = Date.now();
+  S.tx.forEach(t => { if (t.type === type && t.cat === from) { t.cat = to; t.u = now; } });
+  S.rec.forEach(r => { if (r.type === type && r.cat === from) { r.cat = to; r.u = now; } });
+}
+sheet.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b || !D || !(b.dataset.cedit || b.dataset.cdel)) return;
+  const list = S.cats[D.type];
+  if (b.dataset.cedit) {
+    const old = b.dataset.cedit, c = list.find(x => x[0] === old); if (!c) return;
+    const n = (prompt("Category name", c[0]) || "").trim().slice(0, 20); if (!n) return;
+    const em = (prompt("Emoji", c[1]) || "").trim() || c[1];
+    if (n.toLowerCase() !== old.toLowerCase() && list.some(x => x[0].toLowerCase() === n.toLowerCase())) { alert("That category already exists."); return; }
+    c[0] = n; c[1] = em; recat(D.type, old, n); if (D.cat === old) D.cat = n;
+  } else {
+    const old = b.dataset.cdel; if (!confirm("Delete \"" + old + "\"? Its transactions move to Other.")) return;
+    S.cats[D.type] = list.filter(x => x[0] !== old); recat(D.type, old, "Other"); if (D.cat === old) D.cat = "Other";
+  }
+  S.su = Date.now(); save(); drawAdd(); render();
+});
+
+/* ---------- Reminders (calendar events) ---------- */
+async function shareIcs(summary, desc, rrule, d, h, m) {
+  const f2 = x => x.getFullYear() + pad(x.getMonth() + 1) + pad(x.getDate()) + "T" + pad(x.getHours()) + pad(x.getMinutes()) + "00";
+  const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m), e = new Date(+s + 15 * 6e4);
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//My Money//EN", "BEGIN:VEVENT", "UID:my-money-" + summary.replace(/\W+/g, "-").toLowerCase() + "@mymoney", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", "DTSTART:" + f2(s), "DTEND:" + f2(e), "RRULE:" + rrule, "SUMMARY:" + summary, "DESCRIPTION:" + desc, "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + summary, "TRIGGER:PT0S", "END:VALARM", "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const f = new File([ics], "my-money-" + summary.split(" ")[0].toLowerCase() + ".ics", { type: "text/calendar" });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (err) { if (err.name === "AbortError") return; } }
   const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+}
+function calReminder() { const d = new Date(); d.setMonth(d.getMonth() + 1, 1); return shareIcs("Update My Money portfolio", "Open My Money > Insights > Invest > Refresh.", "FREQ=MONTHLY", d, 9, 0); }
+function refreshDaily() {
+  const v = localStorage.getItem("mm3daily");
+  $("#dailyVal").textContent = v ? new Date(2000, 0, 1, +v.slice(0, 2), +v.slice(3)).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : "Off";
+}
+async function dailyReminder() {
+  const a = (prompt("Daily reminder time, 24-hour (for example 21:00). Type off to clear.", localStorage.getItem("mm3daily") || "21:00") || "").trim().toLowerCase();
+  if (!a) return;
+  if (a === "off") { localStorage.removeItem("mm3daily"); refreshDaily(); alert("To stop the reminders, delete the \"Log expenses\" event in the Calendar app."); return; }
+  const mt = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(a); if (!mt) { alert("Use a time like 21:00."); return; }
+  const h = +mt[1], m = +mt[2], d = new Date(); if (d.getHours() * 60 + d.getMinutes() >= h * 60 + m) d.setDate(d.getDate() + 1);
+  localStorage.setItem("mm3daily", pad(h) + ":" + pad(m)); refreshDaily();
+  await shareIcs("Log expenses in My Money", "Add today's expenses to My Money.", "FREQ=DAILY", d, h, m);
 }
 
 /* ---------- Wiring ---------- */
@@ -613,6 +677,7 @@ $("#bl").onclick = () => { if (type === "expense" && range === "1M") openBudget(
 $("#fab").onclick = () => openAdd();
 $("#rcBtn").onclick = openRec;
 $("#remBtn").onclick = calReminder;
+$("#dailyBtn").onclick = dailyReminder;
 $("#menuBtn").onclick = () => openPage("insights");
 $("#walletBtn").onclick = () => openPage("settings");
 addEventListener("resize", render);
