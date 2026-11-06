@@ -58,7 +58,7 @@ canvas{width:100%;height:225px;display:block;margin-top:26px}
 .del{position:absolute;right:26px;top:26px;color:#f87171;font-size:13px}
 .mid{display:flex;width:max-content;margin:0 auto;background:#222}.mid .on{background:var(--on)}
 .amt{text-align:center;font-size:48px;font-weight:300;margin:26px 0 4px}.amt span{font-size:26px;color:#999;margin-right:6px}.amt.z{color:#888}
-.note{display:block;width:100%;background:none;border:0;color:var(--tx);text-align:center;font-size:14px;outline:0;margin:22px 0 44px}
+.note{display:block;width:100%;background:none;border:0;color:var(--tx);text-align:center;font-size:14px;outline:0;margin:22px 0 16px}
 .note::placeholder{color:#555}
 .sheet.p .amt{font-size:36px;margin:8px 0}.sheet.p .note{margin:4px 0 14px}
 .chips{display:flex;justify-content:space-around;margin-bottom:6px}.chip{padding:10px;font-size:14px}.chip .e{font-size:19px;margin-right:4px}
@@ -117,6 +117,8 @@ canvas{height:209px;margin-top:27px}
 #rangeSeg{margin:10px 0 26px}
 #list{padding-bottom:calc(min(env(safe-area-inset-bottom), 34px) + 16px)}
 #fab{bottom:calc(min(env(safe-area-inset-bottom), 18px) + 24px)}
+.pills{display:flex;gap:6px;margin:0 0 10px}.pill{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 3px;border-radius:999px;background:#222;color:#aaa;font-size:12px;white-space:nowrap}
+.pill .e{font-size:15px}.pill .pn{overflow:hidden;text-overflow:ellipsis}.pill.on{background:#e5e5e5;color:#000;font-weight:600}
 </style></head><body>
 <header>
 <button id="walletBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
