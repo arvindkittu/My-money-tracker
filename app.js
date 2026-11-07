@@ -13,10 +13,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Investment", "📈", "#22d3ee"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], inv: [], snaps: [], cb: {} });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], cb: {} });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.inv = S.inv || []; S.snaps = S.snaps || []; S.cb = S.cb || {}; ensureInvCat();
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {};
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -32,27 +32,28 @@ scrim.onclick = hideSheet;
 function render() {
   $$("#typeSeg button").forEach(b => b.classList.toggle("on", b.dataset.t === type));
   $$("#rangeSeg button").forEach(b => b.classList.toggle("on", b.dataset.r === range));
-  const yr = String(new Date().getFullYear()), all = S.tx.filter(t => t.type === type);
+  const yr = String(new Date().getFullYear()), all = type === "net" ? S.tx : S.tx.filter(t => t.type === type), isN = type === "net";
   const list = range === "1M" ? all.filter(t => t.date.startsWith(vm)) : range === "1Y" ? all.filter(t => t.date.startsWith(yr)) : all;
   $("#period").textContent = range === "1M" ? mname(vm) + (vm.slice(0, 4) !== yr ? " " + vm.slice(0, 4) : "") : range === "1Y" ? yr : "All time";
   $("#mPrev").classList.toggle("hide", range !== "1M"); $("#mNext").classList.toggle("hide", range !== "1M"); $("#mNext").disabled = vm >= today().slice(0, 7);
   const tot = sum(list), bud = budgetFor(vm), isB = type === "expense" && range === "1M";
-  $("#total").textContent = fmt(tot);
+  const iS = sum(list.filter(t => t.type === "income")), eS = sum(list.filter(t => t.type === "expense")), nv = r2(iS - eS);
+  $("#total").textContent = isN ? sgn(nv) : fmt(tot); $("#total").className = "total" + (isN ? (nv >= 0 ? " pos" : " neg") : "");
   const bl = $("#bl");
   const inScope = t => range === "1M" ? t.date.startsWith(vm) : range === "1Y" ? t.date.startsWith(yr) : true, any = S.tx.some(inScope);
   const net = r2(sum(S.tx.filter(t => t.type === "income" && inScope(t))) - sum(S.tx.filter(t => t.type === "expense" && inScope(t))));
-  bl.textContent = isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : (any ? "Net saved " + sgn(net) : "");
-  bl.className = "bl" + (isB && bud && tot > bud ? " over" : "") + (!isB && any ? (net >= 0 ? " pos" : " over") : "");
+  bl.textContent = isN ? (list.length ? "Income " + fmt(iS) + " · Spent " + fmt(eS) : "") : isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : (any ? "Net saved " + sgn(net) : "");
+  bl.className = "bl" + (isB && bud && tot > bud ? " over" : "") + (!isB && !isN && any ? (net >= 0 ? " pos" : " over") : "");
   chart(list);
   const L = $("#list");
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
   if (range === "1M") {
     L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
-      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${type}">${fmt(t.amount)}</span></button></div>`).join("");
+      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${t.type}">${isN ? (t.type === "income" ? "+" : "−") : ""}${fmt(t.amount)}</span></button></div>`).join("");
   } else {
-    const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + t.amount; });
+    const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + (isN && t.type === "expense" ? -t.amount : t.amount); });
     L.innerHTML = Object.keys(by).sort().reverse().map(k =>
-      `<button class="row mr" data-m="${k}"><span class="n">${mname(k)}${range === "All" ? " " + k.slice(0, 4) : ""}</span><span class="a ${type}">${fmt(r2(by[k]))}</span><span class="chev">›</span></button>`).join("");
+      `<button class="row mr" data-m="${k}"><span class="n">${mname(k)}${range === "All" ? " " + k.slice(0, 4) : ""}</span><span class="a ${isN ? (by[k] >= 0 ? "income" : "neg") : type}">${isN ? sgn(r2(by[k])) : fmt(r2(by[k]))}</span><span class="chev">›</span></button>`).join("");
   }
 }
 
@@ -78,7 +79,9 @@ function chart(list) {
       lab.push(d.toLocaleDateString("en", { month: "narrow" }));
     }
   }
-  const vals = keys.map(k => list.filter(t => t.date.startsWith(k)).reduce((a, t) => a + t.amount, 0));
+  const isN = type === "net", sumK = (k, ty) => list.filter(t => t.date.startsWith(k) && (!ty || t.type === ty)).reduce((a, t) => a + t.amount, 0);
+  const valsI = isN ? keys.map(k => sumK(k, "income")) : [], valsE = isN ? keys.map(k => sumK(k, "expense")) : [];
+  const vals = isN ? keys.map((_, i) => Math.max(valsI[i], valsE[i])) : keys.map(k => sumK(k));
   const L = 26, R = 26, top = 10, base = H - 30, slot = (W - L - R) / keys.length;
   const bw = Math.min(range === "1M" ? 14 : 24, slot * .68), max = Math.max(1, ...vals);
   x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
@@ -87,11 +90,8 @@ function chart(list) {
   x.font = "13px -apple-system,sans-serif"; x.textAlign = "center";
   vals.forEach((v, i) => {
     const cx = L + slot * (i + .5);
-    if (v > 0) {
-      const h = Math.max(4, (base - top) * v / max);
-      x.fillStyle = type === "expense" ? "#ff5f5f" : "#4ade80";
-      x.beginPath(); (x.roundRect || x.rect).call(x, cx - bw / 2, base - h, bw, h, 4); x.fill();
-    }
+    const bar = (c2, val, col, w) => { if (val > 0) { const hh = Math.max(4, (base - top) * val / max); x.fillStyle = col; x.beginPath(); (x.roundRect || x.rect).call(x, c2 - w / 2, base - hh, w, hh, 4); x.fill(); } };
+    if (isN) { bar(cx - bw / 4 - .5, valsI[i], "#4ade80", bw / 2 - 1); bar(cx + bw / 4 + .5, valsE[i], "#ff5f5f", bw / 2 - 1); } else bar(cx, v, type === "expense" ? "#ff5f5f" : "#4ade80", bw);
     const d = lab[i];
     const show = range !== "1M" || d === 1 || (isCur && d === td) || (d >= 9 && (d - 9) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
     if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, base + 21); }
@@ -102,7 +102,7 @@ function chart(list) {
 /* ---------- Add / edit sheet ---------- */
 function openAdd(t) {
   D = t ? { id: t.id, type: t.type, amt: String(t.amount), note: t.note || "", cat: t.cat, date: t.date, panel: "keys" }
-        : { type, amt: "", note: "", cat: type === "expense" ? "Other" : "Salary", date: today(), panel: "keys" };
+        : { type: type === "net" ? "expense" : type, amt: "", note: "", cat: type === "income" ? "Salary" : "Other", date: today(), panel: "keys" };
   D.cm = D.date.slice(0, 7); sheet.className = "sheet"; drawAdd(); showSheet();
 }
 function calendar() {
@@ -117,7 +117,6 @@ function calendar() {
   return h + "</div></div>";
 }
 function drawAdd() {
-  ensureInvCat();
   const c = catInfo(D.type, D.cat);
   let body;
   if (D.panel === "cats") {
@@ -149,7 +148,7 @@ function saveTx() {
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
-  save(); hideSheet(); type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
+  save(); hideSheet(); if (type !== "net") type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
 }
 sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); } };
 sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
@@ -199,7 +198,6 @@ function renderIns() {
   const el = $("#insBody"), ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), tot = sum(ex);
   if (tab === "savings") return renderGoals(el);
   if (tab === "loans") return renderLoans(el);
-  if (tab === "invest") return renderInv(el);
   const inc = sum(S.tx.filter(t => t.type === "income" && t.date.startsWith(vm)));
   if (tab === "spending") {
     const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
@@ -224,7 +222,7 @@ function renderIns() {
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
 const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } $("#" + id).classList.add("open"); };
-$$("[data-close]").forEach(b => b.onclick = () => b.closest(".page").classList.remove("open"));
+$$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
 $("#bk").onclick = async () => {
   const f = new File([JSON.stringify(S, null, 1)], "my-money-backup-" + today() + ".json", { type: "application/json" });
@@ -245,7 +243,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S.inv.forEach(r => del[r.id] = Date.now()); S.snaps.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -255,7 +253,7 @@ let user = null, syncMsg = "", syncing = false, st = null;
 const schedSync = () => { if (user) { clearTimeout(st); st = setTimeout(syncNow, 1500); } };
 function setMsg(m) { syncMsg = m; refreshAcct(); }
 function refreshAcct() {
-  $("#acct").textContent = user ? "☁️ " + user.email + (syncMsg ? " · " + syncMsg : "") : "☁️ Sign in to sync";
+  $("#acct").textContent = user ? user.email + (syncMsg ? " · " + syncMsg : "") : "Sign in to sync";
   $("#lo").hidden = !user;
 }
 // Merge two states: transactions by id (newest edit wins, deletes tracked), settings newest-wins
@@ -270,7 +268,7 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), inv: mix(a.inv, b.inv), snaps: mix(a.snaps, b.snaps), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -328,7 +326,7 @@ if (sb) sb.auth.onAuthStateChange((ev, s) => {
   if (user && (ev === "SIGNED_IN" || ev === "INITIAL_SESSION")) setTimeout(() => { if (claimDevice()) syncNow(); }, 0);
 });
 addEventListener("online", syncNow);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); snapNow(); refreshPrices({ auto: true, quiet: true }); syncNow(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { runRecurring(); syncNow(); } });
 $("#acct").onclick = () => user ? syncNow() : openAuth();
 $("#lo").onclick = async () => { if (confirm("Log out? Your data stays on this device.")) { await sb.auth.signOut(); setMsg(""); } };
 
@@ -407,22 +405,21 @@ function payEmi(id) {
   S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: l.name + " EMI", cat: "EMI", u: Date.now() });
   save(); renderIns(); render();
 }
-function finishForm() { snapNow(); save(); hideSheet(); const rid = F && F.kind === "inv" && F.ik ? F.id : ""; F = null; renderIns(); render(); if (rid) refreshPrices({ id: rid, quiet: true }); }
+function finishForm() { save(); hideSheet(); F = null; renderIns(); render(); }
 sheet.addEventListener("click", e => {
   const id = e.target.id;
   if (!F || !["fsave", "fdel", "psave"].includes(id)) return;
-  const G = F.kind === "goal", key = { goal: "goals", loan: "loans", inv: "inv" }[F.kind], list = S[key];
+  const G = F.kind === "goal", key = { goal: "goals", loan: "loans" }[F.kind], list = S[key];
   const v = k => { const el = sheet.querySelector('[data-f="' + k + '"]'); return el ? el.value : ""; };
-  if (id === "fdel") { if (confirm("Delete this " + (F.kind === "inv" ? "investment" : F.kind) + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); finishForm(); } return; }
+  if (id === "fdel") { if (confirm("Delete this " + F.kind + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); finishForm(); } return; }
   if (id === "psave") {
     const a = num(v("amt")); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
     const g = S.goals.find(x => x.id === F.id); g.saved = r2(g.saved + a); g.u = Date.now(); finishForm(); return;
   }
   const name = v("name").trim();
-  const o = F.kind === "inv" ? { name, kind: F.ik, invested: num(v("invested")), value: num(v("value")), units: num(v("units")), sym: v("sym").trim() } : G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
+  const o = G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
   if (F.kind === "loan") o.paid = Math.min(o.paid, o.total);
-  if (F.kind === "inv" && !(o.value > 0)) o.value = o.invested;
-  const need = F.kind === "inv" ? o.invested : G ? o.target : o.total;
+  const need = G ? o.target : o.total;
   if (!name || !(need > 0)) { alert("Enter a name and an amount greater than zero."); return; }
   const ex = list.find(x => x.id === F.id);
   if (ex) Object.assign(ex, o, { u: Date.now() }); else { const nid = crypto.randomUUID(); F.id = nid; list.push({ id: nid, ...o, u: Date.now() }); }
@@ -432,180 +429,8 @@ $("#insBody").onclick = e => {
   const d = (e.target.closest("button") || {}).dataset; if (!d) return;
   if (d.gnew) openForm("goal"); else if (d.gedit) openForm("goal", d.gedit); else if (d.gadd) openAddMoney(d.gadd);
   else if (d.lnew) openForm("loan"); else if (d.ledit) openForm("loan", d.ledit); else if (d.lpay) payEmi(d.lpay);
-  else if (d.inew) openInv(); else if (d.iedit) openInv(d.iedit); else if (d.ibuy) openBuy(d.ibuy);
 };
 
-/* ---------- Investments (stocks, mutual funds, gold) ---------- */
-const IK = { stock: ["Stocks", "📈"], mf: ["Mutual Fund", "📊"], gold: ["Gold", "🪙"], other: ["Other", "💼"] };
-function ensureInvCat() {
-  const l = S.cats.expense;
-  if (!l.some(c => c[0] === "Investment")) l.splice(Math.max(0, l.length - 1), 0, ["Investment", "📈", "#22d3ee"]);
-}
-function renderInv(el) {
-  const inv = S.inv.reduce((a, h) => a + h.invested, 0), val = S.inv.reduce((a, h) => a + h.value, 0), d = r2(val - inv);
-  const sg = x => x >= 0 ? "+" : "−", pc = (g, i) => Math.abs(Math.round(g / i * 1000) / 10) + "%";
-  let h = S.inv.length ? `<div class="icard"><small>Current value</small><b>${fmt(r2(val))}</b><div class="${d >= 0 ? "ok" : "bad"}">${sg(d)}${fmt(Math.abs(d))}${inv > 0 ? " · " + sg(d) + pc(d, inv) : ""} on ${fmt(r2(inv))} invested</div></div>` : "";
-  h += [...S.inv].sort((a, b) => Object.keys(IK).indexOf(a.kind) - Object.keys(IK).indexOf(b.kind) || b.value - a.value).map(x => {
-    const k = IK[x.kind] || IK.other, g = r2(x.value - x.invested);
-    return `<div class="gcard"><div class="gh"><b>${k[1]} ${esc(x.name)}</b><span>${fmt(x.value)}</span></div><div class="gf"><small>${k[0]} · invested ${fmt(x.invested)} · <span class="${g >= 0 ? "ok" : "bad"}">${sg(g)}${x.invested > 0 ? pc(g, x.invested) : fmt(Math.abs(g))}</span></small><button data-iedit="${esc(x.id)}">Edit</button><button class="pri" data-ibuy="${esc(x.id)}">+ Buy</button></div></div>`;
-  }).join("") || '<div class="empty" style="text-align:center">No investments yet</div>';
-  el.innerHTML = h + '<button class="save wide" data-inew="1">New investment</button>';
-}
-function openInv(id) {
-  const it = S.inv.find(x => x.id === id) || {};
-  F = { kind: "inv", id: it.id || "", ik: it.kind || "stock" };
-  const f = (lab, k, val, mode, extra) => `<div class="lab">${lab}</div><input class="fi" data-f="${k}" type="text" inputmode="${mode}" value="${esc(val)}" ${extra}>`;
-  sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div>${it.id ? '<button class="del" id="fdel">Delete</button>' : ""}<h3>${it.id ? "Edit" : "New"} investment</h3><p class="sub"></p><div class="seg mid" style="width:100%;margin-bottom:14px">${Object.entries(IK).map(([k, v]) => `<button data-ik="${k}" class="${k === F.ik ? "on" : ""}" style="flex:1;padding:6px 2px">${v[0]}</button>`).join("")}</div>`
-    + f("Name", "name", it.name || "", "text", 'maxlength="30"') + f("Amount invested (₹)", "invested", it.invested || "", "decimal", 'placeholder="0"') + f("Current value (₹)", "value", it.value || "", "decimal", 'placeholder="Same as invested"') + f("Units / grams held (for live price)", "units", it.units || "", "decimal", 'placeholder="optional"') + f("Ticker or scheme code (live price)", "sym", it.sym || "", "text", 'placeholder="Stocks: RELIANCE.BSE · Funds: use Find · Gold: leave empty" autocapitalize="characters"') + '<button class="ghost" id="mfFind">🔎 Find mutual fund code from Name</button><div id="mfRes"></div>'
-    + '<button class="save wide" id="fsave">Save</button>';
-  showSheet();
-}
-function openBuy(id) {
-  const x = S.inv.find(h => h.id === id); if (!x) return;
-  F = { kind: "inv", id, log: true };
-  sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div><h3>Buy more ${esc(x.name)}</h3><p class="sub">Currently worth ${fmt(x.value)}</p><input class="fi" data-f="amt" type="text" inputmode="decimal" placeholder="Amount invested (₹)"><button class="ghost" id="logBtn" style="color:var(--grn)">Log as expense: On</button><button class="save wide" id="bsave">Add</button>`;
-  showSheet();
-}
-sheet.addEventListener("click", e => {
-  if (!F || F.kind !== "inv") return;
-  const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.ik) { F.ik = b.dataset.ik; sheet.querySelectorAll("[data-ik]").forEach(x => x.classList.toggle("on", x === b)); }
-  else if (b.id === "logBtn") { F.log = !F.log; b.textContent = "Log as expense: " + (F.log ? "On" : "Off"); b.style.color = F.log ? "var(--grn)" : "var(--mut)"; }
-  else if (b.id === "bsave") {
-    const a = num(sheet.querySelector('[data-f="amt"]').value); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
-    const x = S.inv.find(h => h.id === F.id); if (!x) return;
-    x.invested = r2(x.invested + a); x.value = r2(x.value + a); x.u = Date.now();
-    if (x.units > 0 && x.px > 0) x.units = Math.round((x.units + a / x.px) * 1e4) / 1e4;
-    if (F.log) { ensureInvCat(); S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: x.name, cat: "Investment", u: Date.now() }); }
-    finishForm();
-  }
-});
-
-/* ---------- Live prices, refresh, monthly snapshots, reminder ---------- */
-const PK = () => { try { return JSON.parse(localStorage.getItem("mm3pk")) || {}; } catch (e) { return {}; } };
-const getJSON = async (url, ms = 9000) => {
-  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
-  try { const r = await fetch(url, { signal: c.signal }); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); } finally { clearTimeout(t); }
-};
-async function goldPerGram() {
-  const g = await getJSON("https://api.gold-api.com/price/XAU"); let fx;
-  try { fx = (await getJSON("https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR")).rates.INR; }
-  catch (e) { fx = (await getJSON("https://open.er-api.com/v6/latest/USD")).rates.INR; }
-  if (!(g.price > 0) || !(fx > 0)) throw new Error("bad gold data");
-  return g.price / 31.1035 * fx * (1 + (parseFloat(PK().adj) || 0) / 100); // 24K, per gram, INR
-}
-async function priceFor(h, cache) {
-  if (h.kind === "gold") return cache.gold || (cache.gold = await goldPerGram());
-  if (h.kind === "mf") {
-    const j = await getJSON("https://api.mfapi.in/mf/" + encodeURIComponent(h.sym) + "/latest");
-    const p = parseFloat(j.data && j.data[0] && j.data[0].nav); if (!(p > 0)) throw new Error("no NAV"); return p;
-  }
-  const pk = PK(); if (!pk.key) throw new Error("add a stock API key in ⚙️");
-  if (pk.prov === "td") {
-    const j = await getJSON("https://api.twelvedata.com/price?symbol=" + encodeURIComponent(h.sym) + "&apikey=" + encodeURIComponent(pk.key));
-    const p = parseFloat(j.price); if (!(p > 0)) throw new Error(j.message || "no price"); return p;
-  }
-  const j = await getJSON("https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=" + encodeURIComponent(h.sym) + "&apikey=" + encodeURIComponent(pk.key));
-  const p = parseFloat(j["Global Quote"] && j["Global Quote"]["05. price"]); if (!(p > 0)) throw new Error(j.Note || j.Information || "no price"); return p;
-}
-let refreshing = false, invNote = "";
-function setNote(m) { invNote = m; const el = $("#invNote"); if (el) { el.textContent = m; el.className = ""; } }
-async function refreshPrices(o = {}) {
-  if (refreshing) return;
-  const hs = S.inv.filter(h => h.units > 0 && (h.kind === "gold" || h.sym) && (!o.id || h.id === o.id) && (!o.auto || Date.now() - (h.pu || 0) > 432e5));
-  if (!hs.length) { if (!o.quiet) alert("Nothing to refresh yet. Add units (grams for gold) and a ticker or scheme code to a holding."); return; }
-  if (!navigator.onLine) { if (!o.quiet) alert("You're offline."); return; }
-  refreshing = true; setNote("Refreshing prices…");
-  const cache = {}, bad = []; let ok = 0;
-  for (const h of hs) {
-    try { const p = await priceFor(h, cache); h.px = p; h.value = r2(h.units * p); h.pu = Date.now(); h.u = Date.now(); ok++; }
-    catch (e) { bad.push(h.name + ": " + (e.name === "AbortError" ? "timed out" : e.message || "failed")); }
-  }
-  refreshing = false;
-  if (ok) { snapNow(); save(); }
-  setNote(ok + " updated" + (bad.length ? " · " + bad.length + " failed (" + bad[0] + ")" : ""));
-  if (tab === "invest" && $("#insights").classList.contains("open")) renderIns();
-  setTimeout(() => { invNote = ""; if (tab === "invest" && $("#insights").classList.contains("open")) renderIns(); }, 8000);
-}
-function updateDot() {
-  const last = Math.max(0, ...S.inv.map(h => Math.max(h.pu || 0, h.u || 0)));
-  $("#menuBtn").classList.toggle("dot", S.inv.length > 0 && Date.now() - last > 7 * 864e5);
-}
-function snapNow() {
-  updateDot();
-  if (!S.inv.length) return;
-  const ym = today().slice(0, 7), id = "s_" + ym, inv = r2(S.inv.reduce((a, h) => a + h.invested, 0)), val = r2(S.inv.reduce((a, h) => a + h.value, 0));
-  const s = S.snaps.find(x => x.id === id);
-  if (s && s.invested === inv && s.value === val) return;
-  if (s) Object.assign(s, { invested: inv, value: val, u: Date.now() }); else S.snaps.push({ id, ym, invested: inv, value: val, u: Date.now() });
-  save();
-}
-function invStatus() {
-  if (invNote) return { t: invNote, old: false };
-  if (!S.inv.length) return { t: "", old: false };
-  const last = Math.max(...S.inv.map(h => Math.max(h.pu || 0, h.u || 0))), days = Math.floor((Date.now() - last) / 864e5), pu = Math.max(...S.inv.map(h => h.pu || 0));
-  if (days >= 7) return { t: "Not updated for " + days + " days. Tap Refresh or update values.", old: true };
-  return { t: pu ? "Prices updated " + new Date(pu).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Values entered manually", old: false };
-}
-function drawHist(c) {
-  if (!c) return;
-  const ss = [...S.snaps].sort((a, b) => a.ym.localeCompare(b.ym)).slice(-12);
-  const dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight; c.width = W * dpr; c.height = H * dpr;
-  const x = c.getContext("2d"); x.scale(dpr, dpr);
-  const mx = Math.max(1, ...ss.map(s => Math.max(s.value, s.invested))), base = H - 22, slot = W / Math.max(ss.length, 4), bw = Math.min(26, slot * .6);
-  x.font = "11px -apple-system,sans-serif"; x.textAlign = "center";
-  ss.forEach((s, i) => {
-    const cx = slot * (i + .5), h = Math.max(3, (base - 8) * s.value / mx), ih = (base - 8) * s.invested / mx;
-    x.fillStyle = s.value >= s.invested ? "#4ade80" : "#ff5f5f"; x.beginPath(); (x.roundRect || x.rect).call(x, cx - bw / 2, base - h, bw, h, 4); x.fill();
-    x.fillStyle = "#fff"; x.fillRect(cx - bw / 2 - 2, base - ih - 1, bw + 4, 2);
-    x.fillStyle = "#9a9a9a"; x.fillText(mname(s.ym, { month: "narrow" }), cx, H - 6);
-  });
-}
-const baseRenderInv = renderInv;
-renderInv = el => {
-  baseRenderInv(el);
-  const st = invStatus();
-  el.insertAdjacentHTML("afterbegin", `<div class="gf" style="margin:0 0 12px"><small id="invNote" class="${st.old ? "bad" : ""}">${esc(st.t)}</small><button data-iset="1">⚙️</button><button class="pri" data-iref="1">↻ Refresh</button></div>`);
-  const ic = el.querySelector(".icard");
-  if (ic && S.snaps.length) {
-    const rows = [...S.snaps].sort((a, b) => b.ym.localeCompare(a.ym)).slice(0, 6).map(s => { const g = r2(s.value - s.invested); return `<div class="hl"><span>${mname(s.ym)} ${s.ym.slice(0, 4)}</span><span>${fmt(s.value)} <span class="${g >= 0 ? "ok" : "bad"}">${g >= 0 ? "+" : "−"}${fmt(Math.abs(g))}</span></span></div>`; }).join("");
-    ic.insertAdjacentHTML("afterend", `<div class="icard"><small>Portfolio by month · bar = value, line = invested</small><canvas id="hist" style="width:100%;height:130px;margin:10px 0 6px"></canvas>${rows}</div>`);
-    drawHist(el.querySelector("#hist"));
-  }
-};
-function openPK() {
-  const p = PK(); F = { kind: "pk", prov: p.prov || "av" };
-  sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div><h3>Price settings</h3><p class="sub">Mutual funds and gold need no key. Stocks need a free API key, saved on this device only.</p>
-  <div class="seg mid" style="width:100%;margin-bottom:14px">${[["av", "Alpha Vantage"], ["td", "Twelve Data"]].map(([k, n]) => `<button data-pv="${k}" class="${k === F.prov ? "on" : ""}" style="flex:1;padding:6px 2px">${n}</button>`).join("")}</div>
-  <div class="lab">Stock API key</div><input class="fi" data-f="key" value="${esc(p.key || "")}" autocapitalize="off" autocomplete="off" placeholder="Paste key">
-  <div class="lab">Gold adjustment % (Indian retail is usually above spot)</div><input class="fi" data-f="adj" inputmode="decimal" value="${esc(p.adj || "")}" placeholder="0">
-  <button class="save wide" id="pksave">Save</button>`;
-  showSheet();
-}
-sheet.addEventListener("click", async e => {
-  if (!F) return;
-  const b = e.target.closest("button"); if (!b) return;
-  if (F.kind === "pk") {
-    if (b.dataset.pv) { F.prov = b.dataset.pv; sheet.querySelectorAll("[data-pv]").forEach(x => x.classList.toggle("on", x === b)); }
-    else if (b.id === "pksave") { const g = k => sheet.querySelector('[data-f="' + k + '"]').value.trim(); localStorage.setItem("mm3pk", JSON.stringify({ prov: F.prov, key: g("key"), adj: g("adj") })); F = null; hideSheet(); }
-  } else if (F.kind === "inv" && b.id === "mfFind") {
-    const q = sheet.querySelector('[data-f="name"]').value.trim(); if (q.length < 3) { alert("Type part of the fund name in Name first."); return; }
-    const box = $("#mfRes"); box.innerHTML = '<div class="lab">Searching…</div>';
-    try {
-      const r = await getJSON("https://api.mfapi.in/mf/search?q=" + encodeURIComponent(q));
-      box.innerHTML = r.slice(0, 6).map(m => `<button class="ghost" style="height:auto;padding:8px 4px;text-align:left;font-size:13px" data-code="${m.schemeCode}">${esc(m.schemeName)}</button>`).join("") || '<div class="lab">No match. Try fewer words.</div>';
-    } catch (err) { box.innerHTML = '<div class="lab">Search failed: ' + esc(err.message) + "</div>"; }
-  } else if (F.kind === "inv" && b.dataset.code) {
-    sheet.querySelector('[data-f="sym"]').value = b.dataset.code; $("#mfRes").innerHTML = '<div class="lab">Selected scheme code ' + esc(b.dataset.code) + "</div>";
-  }
-});
-$("#insBody").addEventListener("click", e => {
-  const d = (e.target.closest("button") || {}).dataset; if (!d) return;
-  if (d.iref) refreshPrices({}); else if (d.iset) openPK();
-});
 /* ---------- Category swipe: edit / delete ---------- */
 let swipeMoved = false;
 (function () {
@@ -664,7 +489,6 @@ async function shareIcs(summary, desc, rrule, d, h, m) {
   if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (err) { if (err.name === "AbortError") return; } }
   const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
 }
-function calReminder() { const d = new Date(); d.setMonth(d.getMonth() + 1, 1); return shareIcs("Update My Money portfolio", "Open My Money > Insights > Invest > Refresh.", "FREQ=MONTHLY", d, 9, 0); }
 function refreshDaily() {
   const v = localStorage.getItem("mm3daily");
   $("#dailyVal").textContent = v ? new Date(2000, 0, 1, +v.slice(0, 2), +v.slice(3)).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : "Off";
@@ -799,6 +623,55 @@ sheet.addEventListener("click", e => {
 });
 $("#insBody").addEventListener("click", e => { const b = e.target.closest("[data-cb]"); if (b) openCB(b.dataset.cb); });
 
+/* ---------- Swipe a page sideways to go back, search & filter ---------- */
+function closePage(p, dir) {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  if (!dir) { p.classList.remove("open"); return; }
+  p.style.transition = "transform .22s"; p.style.transform = "translateX(" + (dir > 0 ? "100%" : "-100%") + ")";
+  setTimeout(() => { p.classList.remove("open"); p.style.transition = "none"; p.style.transform = ""; void p.offsetWidth; p.style.transition = ""; }, 230);
+}
+$$(".page").forEach(p => {
+  let x0 = 0, y0 = 0, dx = 0, on = false, drag = false;
+  p.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1 || e.target.closest("input,textarea,.fl")) { on = false; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = true; drag = false;
+  }, { passive: true });
+  p.addEventListener("touchmove", e => {
+    if (!on) return; const t = e.touches[0]; dx = t.clientX - x0; const dy = t.clientY - y0;
+    if (!drag) { if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5) { drag = true; p.style.transition = "none"; } else { if (Math.abs(dy) > 12) on = false; return; } }
+    e.preventDefault(); p.style.transform = "translateX(" + dx + "px)";
+  }, { passive: false });
+  const end = () => { const was = drag; drag = false; on = false; if (!was) return; if (Math.abs(dx) > 90) closePage(p, dx > 0 ? 1 : -1); else { p.style.transition = ""; p.style.transform = ""; } };
+  p.addEventListener("touchend", end); p.addEventListener("touchcancel", end);
+});
+const SQ = { q: "", t: "all", per: "All", cat: "" };
+function renderSearch() {
+  const now = new Date(), d3 = iso(new Date(now.getFullYear(), now.getMonth() - 2, 1)), yr = String(now.getFullYear());
+  const q = SQ.q.trim().toLowerCase(), qn = q.replace(/[₹,\s]/g, ""), isNum = /^\d+(\.\d+)?$/.test(qn);
+  const inPer = t => SQ.per === "All" || (SQ.per === "vm" && t.date.startsWith(vm)) || (SQ.per === "3M" && t.date >= d3) || (SQ.per === "1Y" && t.date.startsWith(yr));
+  const base = S.tx.filter(t => (SQ.t === "all" || t.type === SQ.t) && inPer(t) && (!q || (t.note || "").toLowerCase().includes(q) || t.cat.toLowerCase().includes(q) || (isNum && String(t.amount).includes(qn))));
+  const cats = [...new Set(base.map(t => t.cat))].sort(); if (SQ.cat && !cats.includes(SQ.cat)) SQ.cat = "";
+  const res = base.filter(t => !SQ.cat || t.cat === SQ.cat).sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0));
+  $$("#sType button").forEach(x => x.classList.toggle("on", x.dataset.s === SQ.t));
+  $("#sPer").innerHTML = [["All", "All time"], ["vm", mname(vm)], ["3M", "3 months"], ["1Y", "This year"]].map(([k, n]) => `<button data-sp="${k}" class="${k === SQ.per ? "on" : ""}">${esc(n)}</button>`).join("");
+  const em = c => (S.cats.expense.concat(S.cats.income).find(x => x[0] === c) || ["", "🏷️"])[1];
+  $("#sCat").innerHTML = cats.map(c => `<button data-sc="${esc(c)}" class="${c === SQ.cat ? "on" : ""}">${em(c)} ${esc(c)}</button>`).join("");
+  const I = sum(res.filter(t => t.type === "income")), E = sum(res.filter(t => t.type === "expense")), N = r2(I - E);
+  $("#sSum").innerHTML = res.length ? `<div class="icard" style="margin-top:14px"><small>${res.length} result${res.length === 1 ? "" : "s"}</small><b class="${N >= 0 ? "up" : "dn"}">${sgn(N)}</b><div class="gl">Income ${fmt(I)} · Spent ${fmt(E)}</div></div>` : "";
+  $("#sList").innerHTML = res.length ? res.slice(0, 200).map(t => `<button class="row" data-sid="${esc(t.id)}" style="padding:10px 4px"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}<small>${esc(t.cat)} · ${t.date.slice(0, 4)}</small></span><span class="a ${t.type}">${t.type === "income" ? "+" : "−"}${fmt(t.amount)}</span></button>`).join("") + (res.length > 200 ? '<div class="empty" style="text-align:center">Showing the latest 200</div>' : "") : '<div class="empty" style="text-align:center">No matches</div>';
+}
+$("#sq").addEventListener("input", e => { SQ.q = e.target.value; renderSearch(); });
+$("#sq").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
+$("#search").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
+  if (d.s) { SQ.t = d.s; renderSearch(); } else if (d.sp) { SQ.per = d.sp; renderSearch(); }
+  else if (d.sc !== undefined) { SQ.cat = SQ.cat === d.sc ? "" : d.sc; renderSearch(); }
+  else if (d.sid) { const tx = S.tx.find(t => t.id === d.sid); if (tx) openAdd(tx); }
+});
+$("#srchBtn").onclick = () => { renderSearch(); $("#search").classList.add("open"); $("#sq").focus(); };
+const baseRender = render;
+render = function () { baseRender.apply(this, arguments); if ($("#search").classList.contains("open")) renderSearch(); };
+
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
 $("#rangeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { range = b.dataset.r; render(); } };
@@ -810,13 +683,11 @@ $("#list").onclick = e => {
 $("#bl").onclick = () => { if (type === "expense" && range === "1M") openBudget(); };
 $("#fab").onclick = () => openAdd();
 $("#rcBtn").onclick = openRec;
-$("#remBtn").onclick = calReminder;
 $("#dailyBtn").onclick = dailyReminder;
 $("#menuBtn").onclick = () => openPage("insights");
 $("#walletBtn").onclick = () => openPage("settings");
 addEventListener("resize", render);
 render();
 runRecurring();
-snapNow(); setTimeout(() => refreshPrices({ auto: true, quiet: true }), 1500);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
