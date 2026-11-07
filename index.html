@@ -119,14 +119,20 @@ canvas{height:209px;margin-top:27px}
 #fab{bottom:calc(min(env(safe-area-inset-bottom), 18px) + 24px)}
 .pills{display:flex;gap:6px;margin:0 0 10px}.pill{flex:1 1 auto;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 3px;border-radius:999px;background:#222;color:#aaa;font-size:12px;white-space:nowrap}
 .pill .e{font-size:15px}.pill .pn{overflow:hidden;text-overflow:ellipsis}.pill.on{background:#e5e5e5;color:#000;font-weight:600}
+/* month navigation, net balance, category limits */
+.period{display:flex;align-items:center;justify-content:center;height:14px}.period button{padding:12px 14px;margin:-12px 0;font-size:18px;line-height:14px;color:var(--mut)}
+.period button:disabled{opacity:.2}.period button.hide{visibility:hidden}.bl.pos{color:var(--grn)}
+canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
+#toast{position:fixed;left:50%;bottom:calc(min(env(safe-area-inset-bottom), 18px) + 110px);transform:translate(-50%,20px);background:#2a2a2a;color:#fff;padding:12px 18px;border-radius:24px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:88%;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
 </style></head><body>
 <header>
-<button id="walletBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
+<button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
 <div class="seg" id="typeSeg"><button data-t="expense" class="on">Expense</button><button data-t="income">Income</button></div>
-<button id="menuBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
+<button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
 </header>
 <main id="home">
-<div class="period" id="period"></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
+<div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
 <canvas id="chart"></canvas>
 <div class="seg" id="rangeSeg"><button data-r="1M" class="on">1M</button><button data-r="1Y">1Y</button><button data-r="All">All</button></div>
 <div id="list"></div>
