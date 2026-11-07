@@ -5,6 +5,7 @@ const iso = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.get
 const today = () => iso(new Date());
 const r2 = n => Math.round(n * 100) / 100;
 const fmt = n => "₹" + (+n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const sgn = n => (n >= 0 ? "+" : "−") + fmt(r2(Math.abs(n)));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const mname = (k, o) => new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-IN", o || { month: "long" });
 const sum = a => r2(a.reduce((s, t) => s + t.amount, 0));
@@ -12,10 +13,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Investment", "📈", "#22d3ee"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], inv: [], snaps: [] });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], inv: [], snaps: [], cb: {} });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.inv = S.inv || []; S.snaps = S.snaps || []; ensureInvCat();
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.inv = S.inv || []; S.snaps = S.snaps || []; S.cb = S.cb || {}; ensureInvCat();
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -33,12 +34,15 @@ function render() {
   $$("#rangeSeg button").forEach(b => b.classList.toggle("on", b.dataset.r === range));
   const yr = String(new Date().getFullYear()), all = S.tx.filter(t => t.type === type);
   const list = range === "1M" ? all.filter(t => t.date.startsWith(vm)) : range === "1Y" ? all.filter(t => t.date.startsWith(yr)) : all;
-  $("#period").textContent = range === "1M" ? mname(vm) : range === "1Y" ? yr : "All time";
+  $("#period").textContent = range === "1M" ? mname(vm) + (vm.slice(0, 4) !== yr ? " " + vm.slice(0, 4) : "") : range === "1Y" ? yr : "All time";
+  $("#mPrev").classList.toggle("hide", range !== "1M"); $("#mNext").classList.toggle("hide", range !== "1M"); $("#mNext").disabled = vm >= today().slice(0, 7);
   const tot = sum(list), bud = budgetFor(vm), isB = type === "expense" && range === "1M";
   $("#total").textContent = fmt(tot);
   const bl = $("#bl");
-  bl.textContent = isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : "";
-  bl.className = "bl" + (isB && bud && tot > bud ? " over" : "");
+  const inScope = t => range === "1M" ? t.date.startsWith(vm) : range === "1Y" ? t.date.startsWith(yr) : true, any = S.tx.some(inScope);
+  const net = r2(sum(S.tx.filter(t => t.type === "income" && inScope(t))) - sum(S.tx.filter(t => t.type === "expense" && inScope(t))));
+  bl.textContent = isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : (any ? "Net saved " + sgn(net) : "");
+  bl.className = "bl" + (isB && bud && tot > bud ? " over" : "") + (!isB && any ? (net >= 0 ? " pos" : " over") : "");
   chart(list);
   const L = $("#list");
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
@@ -145,7 +149,7 @@ function saveTx() {
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
-  save(); hideSheet(); type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render();
+  save(); hideSheet(); type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
 }
 sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); } };
 sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
@@ -196,21 +200,27 @@ function renderIns() {
   if (tab === "savings") return renderGoals(el);
   if (tab === "loans") return renderLoans(el);
   if (tab === "invest") return renderInv(el);
-  if (!ex.length) { el.innerHTML = '<div class="empty" style="text-align:center">No expenses in ' + mname(vm) + "</div>"; return; }
+  const inc = sum(S.tx.filter(t => t.type === "income" && t.date.startsWith(vm)));
   if (tab === "spending") {
     const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
-    el.innerHTML = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([n, v]) => { const c = catInfo("expense", n);
-      return `<div class="srow"><span class="ce">${c[1]}</span><div><div class="sl"><b>${esc(n)}</b><em>${fmt(r2(v))}</em></div><div class="bar"><i style="width:${v / tot * 100}%;background:${c[2]}"></i></div></div></div>`; }).join("");
-  } else {
-    const y = +vm.slice(0, 4), m = +vm.slice(5, 7), dim = new Date(y, m, 0).getDate(), cur = vm === today().slice(0, 7);
-    const days = cur ? new Date().getDate() : dim, avg = tot / days, bud = budgetFor(vm);
-    const pk = iso(new Date(y, m - 2, 1)).slice(0, 7), prev = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk)));
-    const cards = [["Spent in " + mname(vm), fmt(tot)], ["Daily average", fmt(r2(avg))]];
-    if (cur) cards.push(["Projected month-end", fmt(Math.round(avg * dim))]);
-    if (bud) cards.push([tot > bud ? "Over budget by" : "Left in budget", fmt(r2(Math.abs(bud - tot)))]);
-    if (prev) cards.push(["Vs last month", (tot >= prev ? "+" : "−") + Math.round(Math.abs(tot - prev) / prev * 100) + "%"]);
-    el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("");
+    const names = [...new Set([...S.cats.expense.map(c => c[0]), ...Object.keys(by)])].sort((a, b) => (by[b] || 0) - (by[a] || 0));
+    el.innerHTML = '<div class="lab" style="text-align:center;margin-bottom:6px">' + mname(vm) + " · tap a category to set a monthly limit</div>" + names.map(n => {
+      const c = catInfo("expense", n), v = r2(by[n] || 0), lim = S.cb[n] || 0, p = lim ? v / lim : (tot ? v / tot : 0);
+      const col = lim ? (p > 1 ? "#ff5f5f" : p >= .8 ? "#f59e0b" : c[2]) : c[2];
+      return `<button class="srow" data-cb="${esc(n)}"><span class="ce">${c[1]}</span><div><div class="sl"><b>${esc(n)}</b><em>${fmt(v)}${lim ? " / " + fmt(lim) : ""}</em></div><div class="bar"><i style="width:${Math.min(100, p * 100)}%;background:${col}"></i></div></div></button>`;
+    }).join("");
+    return;
   }
+  if (!ex.length && !inc) { el.innerHTML = '<div class="empty" style="text-align:center">No transactions in ' + mname(vm) + "</div>"; return; }
+  const y = +vm.slice(0, 4), m = +vm.slice(5, 7), dim = new Date(y, m, 0).getDate(), cur = vm === today().slice(0, 7);
+  const days = cur ? new Date().getDate() : dim, avg = tot / days, bud = budgetFor(vm);
+  const pk = iso(new Date(y, m - 2, 1)).slice(0, 7), prev = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk)));
+  const cards = [["Spent in " + mname(vm), fmt(tot)], ["Income", fmt(inc)], ["Net saved", sgn(r2(inc - tot))], ["Daily average", fmt(r2(avg))]];
+  if (cur) cards.push(["Projected month-end", fmt(Math.round(avg * dim))]);
+  if (bud) cards.push([tot > bud ? "Over budget by" : "Left in budget", fmt(r2(Math.abs(bud - tot)))]);
+  if (prev) cards.push(["Vs last month", (tot >= prev ? "+" : "−") + Math.round(Math.abs(tot - prev) / prev * 100) + "%"]);
+  Object.entries(S.cb).forEach(([n, lim]) => { const v = sum(ex.filter(t => t.cat === n)); if (lim && v >= lim * .8) cards.push([n + (v > lim ? " is over its limit" : " is near its limit"), Math.round(v / lim * 100) + "% of " + fmt(lim)]); });
+  el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("");
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
 const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } $("#" + id).classList.add("open"); };
@@ -260,7 +270,7 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), inv: mix(a.inv, b.inv), snaps: mix(a.snaps, b.snaps), del, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), inv: mix(a.inv, b.inv), snaps: mix(a.snaps, b.snaps), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -751,6 +761,43 @@ sheet.addEventListener("click", e => {
   const b = e.target.closest("[data-pill]"); if (!b || !D) return;
   D.cat = b.dataset.pill; sheet.querySelectorAll(".pill").forEach(x => x.classList.toggle("on", x === b));
 });
+
+/* ---------- Month navigation, category limits, toast ---------- */
+function shiftMonth(d) {
+  const t = new Date(+vm.slice(0, 4), +vm.slice(5, 7) - 1 + d, 1), ym = t.getFullYear() + "-" + pad(t.getMonth() + 1);
+  const now = new Date(), lo = iso(new Date(now.getFullYear(), now.getMonth() - 36, 1)).slice(0, 7);
+  if (ym > today().slice(0, 7) || ym < lo) return; vm = ym; render();
+}
+$("#mPrev").onclick = () => shiftMonth(-1); $("#mNext").onclick = () => shiftMonth(1);
+(function () { // swipe the chart sideways to change month
+  const c = $("#chart"); let x0 = 0, y0 = 0, on = false;
+  c.addEventListener("pointerdown", e => { on = true; x0 = e.clientX; y0 = e.clientY; });
+  c.addEventListener("pointerup", e => { if (!on) return; on = false; const dx = e.clientX - x0, dy = e.clientY - y0; if (range === "1M" && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftMonth(dx < 0 ? 1 : -1); });
+  c.addEventListener("pointercancel", () => { on = false; });
+})();
+function toast(m) {
+  let t = $("#toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
+  t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 3400);
+}
+function catWarn(tx, isNew) {
+  const lim = S.cb[tx.cat]; if (!isNew || tx.type !== "expense" || !lim) return;
+  const v = sum(S.tx.filter(t => t.type === "expense" && t.cat === tx.cat && t.date.startsWith(tx.date.slice(0, 7)))), before = r2(v - tx.amount);
+  if (v > lim && before <= lim) toast("Over your " + tx.cat + " limit: " + fmt(v) + " of " + fmt(lim));
+  else if (v >= lim * .8 && before < lim * .8) toast(tx.cat + ": " + Math.round(v / lim * 100) + "% of " + fmt(lim) + " used");
+}
+function openCB(name) {
+  F = { kind: "cb", name }; sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>${esc(name)} limit</h3><p class="sub">Monthly spending limit for this category. You get a warning at 80%.</p><input class="fi" data-f="lim" inputmode="decimal" placeholder="Amount (₹)" value="${S.cb[name] || ""}"><button class="save wide" id="cbsave">Save</button>${S.cb[name] ? '<button class="ghost" id="cbrm">Remove limit</button>' : ""}`;
+  showSheet();
+}
+sheet.addEventListener("click", e => {
+  if (!F || F.kind !== "cb") return;
+  const id = e.target.id; if (id !== "cbsave" && id !== "cbrm") return;
+  if (id === "cbrm") delete S.cb[F.name];
+  else { const v = num(sheet.querySelector('[data-f="lim"]').value); if (!(v > 0)) { alert("Enter a limit greater than zero."); return; } S.cb[F.name] = v; }
+  S.su = Date.now(); save(); hideSheet(); F = null; renderIns();
+});
+$("#insBody").addEventListener("click", e => { const b = e.target.closest("[data-cb]"); if (b) openCB(b.dataset.cb); });
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
