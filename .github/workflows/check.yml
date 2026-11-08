@@ -1,0 +1,87 @@
+name: Check app
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax and file checks
+        run: |
+          node - <<'EOF'
+          const fs = require("fs"), cp = require("child_process");
+          const bad = [];
+          const need = f => { if (!fs.existsSync(f)) { bad.push("Missing file: " + f); return false; } return true; };
+          for (const f of ["index.html", "app.js", "sw.js", "manifest.webmanifest"]) need(f);
+          for (const f of ["app.js", "sw.js"]) {
+            if (!fs.existsSync(f)) continue;
+            const r = cp.spawnSync(process.execPath, ["--check", f], { encoding: "utf8" });
+            if (r.status) bad.push("Syntax error in " + f + ":\n" + r.stderr);
+          }
+          let man = {};
+          try { man = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8")); }
+          catch (e) { bad.push("manifest.webmanifest is not valid JSON: " + e.message); }
+          (man.icons || []).forEach(i => need(i.src));
+          if (fs.existsSync("index.html")) {
+            const html = fs.readFileSync("index.html", "utf8");
+            [...html.matchAll(/(?:src|href)="([^"#?]+)"/g)].map(m => m[1])
+              .filter(u => !/^(https?:|data:|mailto:|\/\/)/.test(u)).forEach(need);
+          }
+          if (fs.existsSync("sw.js")) {
+            const m = fs.readFileSync("sw.js", "utf8").match(/const F = \[([^\]]*)\]/);
+            if (m) [...m[1].matchAll(/"([^"]+)"/g)].map(x => x[1]).filter(u => u !== "./").forEach(need);
+            else bad.push("Could not find the offline file list (const F = [...]) in sw.js");
+          }
+          if (bad.length) { console.error("PROBLEMS FOUND:\n- " + bad.join("\n- ")); process.exit(1); }
+          console.log("Syntax and file checks passed");
+          EOF
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Browser smoke test
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+          python - <<'EOF'
+          import sys
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+          url = Path("index.html").resolve().as_uri()
+          errors = []
+          with sync_playwright() as p:
+              b = p.chromium.launch()
+              pg = b.new_context(viewport={"width": 393, "height": 852}, has_touch=True).new_page()
+              pg.on("pageerror", lambda e: errors.append("Page error: " + str(e)))
+              pg.route("**/*", lambda r: r.abort() if r.request.url.startswith("http") else r.continue_())
+              pg.goto(url)
+              pg.wait_for_timeout(600)
+              def check(ok, msg):
+                  if not ok: errors.append(msg)
+              check(pg.inner_text("#period").strip() != "", "The home screen did not draw (month name is empty)")
+              pg.click("#fab"); pg.wait_for_timeout(400)
+              for k in "125": pg.click('[data-k="' + k + '"]')
+              pg.click("#nextBtn"); pg.keyboard.type("Smoke test"); pg.click("#svBtn"); pg.wait_for_timeout(400)
+              check(pg.inner_text("#total").strip() == "₹125", "Adding a transaction did not update the total (got " + pg.inner_text("#total") + ")")
+              pg.click("#srchBtn"); pg.wait_for_timeout(400); pg.keyboard.type("smoke"); pg.wait_for_timeout(200)
+              check(pg.locator("#sList .row").count() == 1, "Search did not find the new transaction")
+              pg.click("#search [data-close]"); pg.wait_for_timeout(400)
+              pg.click("#menuBtn"); pg.wait_for_timeout(400)
+              check(pg.locator("#insBody .icard").count() > 0, "Insights page is empty")
+              pg.click("#insights [data-close]"); pg.wait_for_timeout(400)
+              pg.click("#walletBtn"); pg.wait_for_timeout(400)
+              check(pg.locator("#settings .menu").count() > 3, "Settings page is missing its rows")
+              b.close()
+          if errors:
+              print("SMOKE TEST FAILED:\n- " + "\n- ".join(errors)); sys.exit(1)
+          print("Browser smoke test passed")
+          EOF
