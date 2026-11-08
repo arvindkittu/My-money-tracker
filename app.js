@@ -126,11 +126,11 @@ function drawAdd() {
   else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" id="nextBtn" data-k="next" aria-label="Next"' + (+D.amt > 0 ? "" : " disabled") + '>' + CHECK + '</button></div>';
   const dl = D.date === today() ? "Today" : new Date(+D.date.slice(0, 4), +D.date.slice(5, 7) - 1, +D.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   sheet.classList.remove("typing"); sheet.classList.toggle("p", D.panel !== "keys");
-  sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button>' : ""}
+  sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button><button class="dup" id="dupTx">Copy</button>' : ""}
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
-  ${pillHTML()}
+  ${quickHTML()}${pillHTML()}
   <div class="chips"><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
 }
 function key(k) {
@@ -507,7 +507,7 @@ async function dailyReminder() {
 sheet.addEventListener("focusin", e => { if (e.target.id === "note") sheet.classList.add("typing"); });
 sheet.addEventListener("focusout", e => { if (e.target.id === "note") setTimeout(() => { if (document.activeElement !== e.target) sheet.classList.remove("typing"); }, 150); });
 sheet.addEventListener("mousedown", e => { if (e.target.closest(".savebar")) e.preventDefault(); }); // keep the keyboard up while tapping Save
-sheet.addEventListener("click", e => { if (e.target.closest("#amt") && document.activeElement && document.activeElement.id === "note") document.activeElement.blur(); });
+sheet.addEventListener("click", e => { if (e.target.closest("#amt")) { sheet.classList.remove("typing"); if (document.activeElement && document.activeElement.id === "note") document.activeElement.blur(); } });
 if (window.visualViewport) { // lift the sheet above the on-screen keyboard
   const vv = window.visualViewport, fit = () => {
     const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
@@ -696,6 +696,33 @@ $("#csvBtn").onclick = async () => {
   if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
   const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
 };
+
+/* ---------- Frequent shortcuts & copy ---------- */
+function quickHTML() { // your most repeated description + amount + category, one tap to fill
+  if (D.id) return "";
+  const m = new Map();
+  S.tx.forEach(t => {
+    if (t.type !== D.type || !(t.note || "").trim() || !S.cats[D.type].some(c => c[0] === t.cat)) return;
+    const k = t.note.trim().toLowerCase() + "|" + t.amount + "|" + t.cat, e = m.get(k) || { n: 0, last: "", t };
+    e.n++; if (t.date > e.last) { e.last = t.date; e.t = t; } m.set(k, e);
+  });
+  const top = [...m.values()].filter(e => e.n >= 2).sort((a, b) => b.n - a.n || b.last.localeCompare(a.last)).slice(0, 4);
+  if (!top.length) return "";
+  return '<div class="qk">' + top.map(e => `<button class="qchip" data-q="${esc(e.t.id)}"><span>⚡</span>${esc(e.t.note.trim().slice(0, 14))} · ${fmt(e.t.amount)}</button>`).join("") + "</div>";
+}
+sheet.addEventListener("click", e => {
+  const b = e.target.closest("[data-q]"); if (!b || !D) return;
+  const t = S.tx.find(x => x.id === b.dataset.q); if (!t) return;
+  D.amt = String(t.amount); D.note = t.note.trim(); D.cat = t.cat; D.manual = true;
+  $("#amt").innerHTML = "<span>₹</span>" + D.amt; $("#amt").classList.remove("z"); $("#note").value = D.note;
+  const nb = $("#nextBtn"); if (nb) nb.disabled = false; const sv = $("#svBtn"); if (sv) sv.disabled = false;
+  const p = sheet.querySelector(".pills"); if (p) p.outerHTML = pillHTML();
+  sheet.classList.add("typing"); // Save is ready; tap the amount to change it first
+});
+sheet.addEventListener("click", e => {
+  if (!D || e.target.id !== "dupTx") return;
+  D.id = ""; D.date = today(); D.cm = D.date.slice(0, 7); D.manual = true; drawAdd(); toast("Copied. Change anything, then save");
+});
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
