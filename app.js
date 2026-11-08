@@ -103,7 +103,7 @@ function chart(list) {
 function openAdd(t) {
   D = t ? { id: t.id, type: t.type, amt: String(t.amount), note: t.note || "", cat: t.cat, date: t.date, panel: "keys" }
         : { type: type === "net" ? "expense" : type, amt: "", note: "", cat: type === "income" ? "Salary" : "Other", date: today(), panel: "keys" };
-  D.cm = D.date.slice(0, 7); sheet.className = "sheet"; drawAdd(); showSheet();
+  D.cm = D.date.slice(0, 7); D.manual = !!t; sheet.className = "sheet"; drawAdd(); showSheet();
 }
 function calendar() {
   const y = +D.cm.slice(0, 4), m = +D.cm.slice(5, 7), first = new Date(y, m - 1, 1), off = (first.getDay() + 6) % 7;
@@ -150,13 +150,13 @@ function saveTx() {
   if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
   save(); hideSheet(); if (type !== "net") type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
 }
-sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); } };
+sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); suggestCat(); } };
 sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
 sheet.onclick = e => {
   const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
   if (d.st) { D.type = d.st; if (!S.cats[D.type].some(c => c[0] === D.cat)) D.cat = D.type === "expense" ? "Other" : "Salary"; D.panel = "keys"; drawAdd(); }
   else if (d.k !== undefined) key(d.k);
-  else if (d.cat !== undefined) { D.cat = d.cat; D.panel = "keys"; drawAdd(); }
+  else if (d.cat !== undefined) { D.cat = d.cat; D.manual = true; D.panel = "keys"; drawAdd(); }
   else if (b.id === "catBtn") { D.panel = D.panel === "cats" ? "keys" : "cats"; drawAdd(); }
   else if (b.id === "dateBtn") { D.panel = D.panel === "cal" ? "keys" : "cal"; drawAdd(); }
   else if (b.id === "addCat") {
@@ -170,7 +170,7 @@ sheet.onclick = e => {
   else if (d.cm) { const dt = new Date(+D.cm.slice(0, 4), +D.cm.slice(5, 7) - 1 + +d.cm, 1); D.cm = dt.getFullYear() + "-" + pad(dt.getMonth() + 1); drawAdd(); }
   else if (d.d) { D.date = d.d; D.panel = "keys"; drawAdd(); }
   else if (b.id === "repBtn") { D.rep = !D.rep; drawAdd(); }
-  else if (b.id === "delTx") { if (confirm("Delete this transaction?")) { S.del[D.id] = Date.now(); S.tx = S.tx.filter(t => t.id !== D.id); save(); hideSheet(); render(); } }
+  else if (b.id === "delTx") { const id = D.id; hideSheet(); delTx(id); }
   else if (b.id === "setBudget") { if (B > 0) S.budgets[vm] = B; else delete S.budgets[vm]; S.su = Date.now(); save(); hideSheet(); render(); }
 };
 
@@ -569,7 +569,7 @@ if (window.visualViewport) { // lift the sheet above the on-screen keyboard
     const b = e.target.closest("[data-redit],[data-rdel]"); if (!b) return;
     const id = b.dataset.redit || b.dataset.rdel, tx = S.tx.find(t => t.id === id); if (!tx) return;
     if (b.dataset.redit) openAdd(tx);
-    else if (confirm("Delete this transaction?")) { S.del[id] = Date.now(); S.tx = S.tx.filter(t => t.id !== id); save(); render(); }
+    else delTx(id);
   });
 })();
 
@@ -583,7 +583,7 @@ function pillHTML() {
 }
 sheet.addEventListener("click", e => {
   const b = e.target.closest("[data-pill]"); if (!b || !D) return;
-  D.cat = b.dataset.pill; sheet.querySelectorAll(".pill").forEach(x => x.classList.toggle("on", x === b));
+  D.cat = b.dataset.pill; D.manual = true; sheet.querySelectorAll(".pill").forEach(x => x.classList.toggle("on", x === b));
 });
 
 /* ---------- Month navigation, category limits, toast ---------- */
@@ -599,9 +599,11 @@ $("#mPrev").onclick = () => shiftMonth(-1); $("#mNext").onclick = () => shiftMon
   c.addEventListener("pointerup", e => { if (!on) return; on = false; const dx = e.clientX - x0, dy = e.clientY - y0; if (range === "1M" && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftMonth(dx < 0 ? 1 : -1); });
   c.addEventListener("pointercancel", () => { on = false; });
 })();
-function toast(m) {
+function toast(m, undo) {
   let t = $("#toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); }
-  t.textContent = m; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 3400);
+  t.textContent = m;
+  if (undo) { const b = document.createElement("button"); b.className = "undo"; b.textContent = "Undo"; b.onclick = () => { undo(); t.classList.remove("on"); }; t.appendChild(b); }
+  t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), undo ? 6000 : 3400);
 }
 function catWarn(tx, isNew) {
   const lim = S.cb[tx.cat]; if (!isNew || tx.type !== "expense" || !lim) return;
@@ -671,6 +673,29 @@ $("#search").addEventListener("click", e => {
 $("#srchBtn").onclick = () => { renderSearch(); $("#search").classList.add("open"); $("#sq").focus(); };
 const baseRender = render;
 render = function () { baseRender.apply(this, arguments); if ($("#search").classList.contains("open")) renderSearch(); };
+
+/* ---------- Undo delete, smart category, CSV export ---------- */
+function delTx(id) {
+  const tx = S.tx.find(t => t.id === id); if (!tx) return;
+  S.del[id] = Date.now(); S.tx = S.tx.filter(t => t.id !== id); save(); render();
+  toast("Transaction deleted", () => { delete S.del[id]; S.tx.push({ ...tx, u: Date.now() }); save(); render(); });
+}
+function suggestCat() { // pick the category you usually use for this description, unless you already chose one
+  if (!D || D.manual) return;
+  const n = D.note.trim().toLowerCase(); if (n.length < 2) return;
+  const cnt = {};
+  S.tx.forEach(t => { if (t.type === D.type && t.note && t.note.toLowerCase().startsWith(n) && S.cats[D.type].some(c => c[0] === t.cat)) cnt[t.cat] = (cnt[t.cat] || 0) + 1; });
+  const best = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+  if (best && best !== D.cat) { D.cat = best; const p = sheet.querySelector(".pills"); if (p) p.outerHTML = pillHTML(); }
+}
+$("#csvBtn").onclick = async () => {
+  if (!S.tx.length) { alert("Nothing to export yet."); return; }
+  const q = v => { v = String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; }; // quotes, and no formulas in Excel
+  const rows = [...S.tx].sort((a, b) => a.date.localeCompare(b.date) || (a.u || 0) - (b.u || 0)).map(t => [t.date, t.type === "income" ? "Income" : "Expense", q(t.cat), q(t.note || ""), t.amount].join(","));
+  const f = new File(["\uFEFF" + ["Date,Type,Category,Description,Amount"].concat(rows).join("\r\n")], "my-money-" + today() + ".csv", { type: "text/csv" });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+};
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
