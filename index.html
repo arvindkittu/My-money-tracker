@@ -142,11 +142,13 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 #impL{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21V9M7 13l5-5 5 5M5 3h14'/%3E%3C/svg%3E")}
 #lo{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'/%3E%3C/svg%3E")}
 #er{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6'/%3E%3C/svg%3E")}
+#csvBtn{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4h16v16H4zM4 10h16M4 15h16M10 4v16'/%3E%3C/svg%3E")}
+#toast.on{pointer-events:auto}#toast .undo{margin-left:14px;color:var(--grn);font-weight:600}
 </style></head><body>
 <header>
-<button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
+<button id="walletBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
 <div class="seg" id="typeSeg"><button data-t="expense" class="on">Expense</button><button data-t="income">Income</button><button data-t="net">Net</button></div>
-<button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
+<button id="menuBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
 </header>
 <main id="home">
 <div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
@@ -166,10 +168,11 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <button class="menu" id="rcBtn">Recurring</button>
 <button class="menu" id="dailyBtn">Daily reminder<span class="rv" id="dailyVal">Off</span></button>
 <button class="menu" id="bk">Backup Data</button>
+<button class="menu" id="csvBtn">Export CSV</button>
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.0.0</div></section>
+</div><div class="ver">v2.1.0</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
