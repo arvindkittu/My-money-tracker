@@ -1,9 +1,9 @@
 name: Check app
 
 on:
-workflow_dispatch:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -41,7 +41,10 @@ jobs:
             if (m) [...m[1].matchAll(/"([^"]+)"/g)].map(x => x[1]).filter(u => u !== "./").forEach(need);
             else bad.push("Could not find the offline file list (const F = [...]) in sw.js");
           }
-          if (bad.length) { console.error("PROBLEMS FOUND:\n- " + bad.join("\n- ")); process.exit(1); }
+          if (bad.length) {
+            bad.forEach(b => console.log("::error title=Check failed::" + b.split("\n")[0]));
+            console.error("PROBLEMS FOUND:\n- " + bad.join("\n- ")); process.exit(1);
+          }
           console.log("Syntax and file checks passed");
           EOF
 
@@ -83,6 +86,7 @@ jobs:
               check(pg.locator("#settings .menu").count() > 3, "Settings page is missing its rows")
               b.close()
           if errors:
+              for e in errors: print("::error title=Smoke test failed::" + e.replace("\n", " "))
               print("SMOKE TEST FAILED:\n- " + "\n- ".join(errors)); sys.exit(1)
           print("Browser smoke test passed")
           EOF
