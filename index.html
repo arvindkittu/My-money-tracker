@@ -146,11 +146,13 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 #toast.on{pointer-events:auto}#toast .undo{margin-left:14px;color:var(--grn);font-weight:600}
 .qk{display:flex;gap:6px;overflow-x:auto;margin:0 0 8px;scrollbar-width:none}.qk::-webkit-scrollbar{display:none}.qchip{flex:none;padding:6px 11px;border-radius:999px;border:1px dashed #3a3a3a;color:#bbb;font-size:12px;white-space:nowrap}.qchip span{margin-right:4px;color:#f59e0b}
 .dup{position:absolute;left:26px;top:26px;color:#9ca3af;font-size:13px}
+.rpv{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:16px;margin:6px 0 4px;background:#000}
+.rimg{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:18px;margin:0 auto 14px;background:#000}
 </style></head><body>
 <header>
-<button id="walletBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
+<button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
 <div class="seg" id="typeSeg"><button data-t="expense" class="on">Expense</button><button data-t="income">Income</button><button data-t="net">Net</button></div>
-<button id="menuBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
+<button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
 </header>
 <main id="home">
 <div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
@@ -174,7 +176,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.1.0</div></section>
+</div><div class="ver">v2.2.0</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
