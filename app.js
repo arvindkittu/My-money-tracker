@@ -343,7 +343,8 @@ function runRecurring() {
       const date = ym + "-" + pad(Math.min(r.day, new Date(y, m, 0).getDate()));
       if (date > t) break;
       const id = "r_" + r.id + "_" + ym;
-      if (!S.del[id] && !S.tx.some(x => x.id === id)) S.tx.push({ id, type: r.type, amount: r.amount, date, note: r.note, cat: r.cat, u: new Date(date + "T00:00:00").getTime() });
+      const sk = (r.skip || []).indexOf(ym); if (sk >= 0) r.skip.splice(sk, 1);
+      if (!r.paused && sk < 0 && !S.del[id] && !S.tx.some(x => x.id === id)) S.tx.push({ id, type: r.type, amount: r.amount, date, note: r.note, cat: r.cat, u: new Date(date + "T00:00:00").getTime() });
       r.last = ym; r.u = Date.now(); changed = true;
     }
   });
@@ -351,7 +352,10 @@ function runRecurring() {
 }
 function openRec() {
   sheet.className = "sheet";
-  const L = S.rec.map(r => { const c = catInfo(r.type, r.cat); return `<div class="rrow"><span class="ce">${c[1]}</span><span class="n">${esc(r.note || r.cat)}<small>Monthly on day ${r.day}</small></span><span class="a ${r.type}">${fmt(r.amount)}</span><button data-rdel="${esc(r.id)}" style="color:#f87171">✕</button></div>`; }).join("");
+  const L = S.rec.map(r => {
+    const c = catInfo(r.type, r.cat), nd = nextDue(r), sk = (r.skip || []).includes(nd.ym);
+    return `<button class="rrow${r.paused ? " off" : ""}" data-rec="${esc(r.id)}"><span class="ce">${c[1]}</span><span class="n">${esc(r.note || r.cat)}<small>${r.paused ? "Paused · day " + r.day : (sk ? "Skipping " : "Next ") + dLabel(nd.date)}</small></span><span class="a ${r.type}">${fmt(r.amount)}</span><span class="chev">›</span></button>`;
+  }).join("");
   sheet.innerHTML = `<div class="hd"></div><h3>Recurring</h3><p class="sub">Added automatically every month</p>${L || '<div class="empty" style="text-align:center">None yet. Turn on 🔁 when adding a transaction.</div>'}`;
   showSheet();
 }
@@ -877,6 +881,40 @@ sheet.addEventListener("click", async e => {
     const text = reportText(REP.R);
     if (navigator.share) { try { await navigator.share({ text }); return; } catch (err) { if (err.name === "AbortError") return; } }
     try { await navigator.clipboard.writeText(text); toast("Report text copied"); } catch (err) { prompt("Copy this text", text); }
+  }
+});
+
+/* ---------- Edit, pause and skip recurring entries ---------- */
+function nextDue(r) { // the first month after the last one created
+  let y = +r.last.slice(0, 4), m = +r.last.slice(5, 7) + 1; if (m > 12) { m = 1; y++; }
+  const ym = y + "-" + pad(m); return { ym, date: ym + "-" + pad(Math.min(r.day, new Date(y, m, 0).getDate())) };
+}
+const dLabel = d => new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+function openRecEdit(id) {
+  const r = S.rec.find(x => x.id === id); if (!r) return;
+  const nd = nextDue(r), sk = (r.skip || []).includes(nd.ym);
+  F = { kind: "recE", id }; sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><button class="del" id="rdel2">Delete</button><h3>Edit recurring</h3><p class="sub">Changes apply to future entries. Past ones stay as they are.</p>
+  <div class="lab">Description</div><input class="fi" id="rn" maxlength="60" value="${esc(r.note || "")}" placeholder="${esc(r.cat)}">
+  <div class="lab">Amount (₹)</div><input class="fi" id="ra" inputmode="decimal" value="${r.amount}">
+  <div class="lab">Day of month (1 to 31)</div><input class="fi" id="rdy" inputmode="numeric" value="${r.day}">
+  <div class="lab">Category</div><select class="fi" id="rcat">${S.cats[r.type].map(c => `<option${c[0] === r.cat ? " selected" : ""}>${esc(c[0])}</option>`).join("")}</select>
+  <button class="ghost" id="rskip">${sk ? "Undo skip of " : "Skip "}${dLabel(nd.date)}</button>
+  <button class="ghost" id="rpause">${r.paused ? "Resume this rule" : "Pause this rule"}</button>
+  <button class="save wide" id="rsave2" style="margin-top:8px">Save</button>`;
+  showSheet();
+}
+sheet.addEventListener("click", e => {
+  const row = e.target.closest("[data-rec]"); if (row) { openRecEdit(row.dataset.rec); return; }
+  if (!F || F.kind !== "recE") return;
+  const r = S.rec.find(x => x.id === F.id); if (!r) return; const id = e.target.id;
+  if (id === "rdel2") { if (confirm("Delete this recurring entry? Past entries stay.")) { S.del[r.id] = Date.now(); S.rec = S.rec.filter(x => x.id !== r.id); save(); openRec(); } }
+  else if (id === "rskip") { const nd = nextDue(r); r.skip = r.skip || []; const i = r.skip.indexOf(nd.ym); if (i >= 0) r.skip.splice(i, 1); else r.skip.push(nd.ym); r.u = Date.now(); save(); openRecEdit(r.id); }
+  else if (id === "rpause") { r.paused = !r.paused; r.u = Date.now(); save(); openRec(); toast(r.paused ? "Paused. Skipped months are not added later" : "Resumed"); }
+  else if (id === "rsave2") {
+    const a = num($("#ra").value), dy = Math.round(+$("#rdy").value);
+    if (!(a > 0) || !(dy >= 1 && dy <= 31)) { alert("Enter an amount above zero and a day from 1 to 31."); return; }
+    r.amount = a; r.day = dy; r.note = $("#rn").value.trim(); r.cat = $("#rcat").value; r.u = Date.now(); save(); runRecurring(); openRec();
   }
 });
 
