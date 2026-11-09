@@ -126,7 +126,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 
 /* net tab, search, settings polish */
 .total.pos{color:var(--grn)}.total.neg{color:var(--red)}.a.neg{color:var(--red)}
-.rrow{position:relative;display:flex;justify-content:center;width:100%;margin:10px 0 26px}#rangeSeg{margin:0}
+.rgrow{position:relative;display:flex;justify-content:center;width:100%;margin:10px 0 26px}#rangeSeg{margin:0}
 #srchBtn{position:absolute;right:24px;top:50%;transform:translateY(-50%);padding:10px;line-height:0}#srchBtn svg{width:22px;height:22px;stroke:#bdbdbd;fill:none;stroke-width:1.8;stroke-linecap:round}
 .sin{flex:1;margin:0;-webkit-appearance:none;appearance:none}#sType{display:flex;width:100%;margin-top:14px}#sType button{flex:1}
 .fl{display:flex;gap:6px;overflow-x:auto;margin:12px 0 0;padding-bottom:2px;scrollbar-width:none}.fl::-webkit-scrollbar{display:none}.fl button{flex:none;padding:7px 12px;border-radius:999px;background:#1d1d1d;color:#aaa;font-size:12px}.fl button.on{background:#e5e5e5;color:#000;font-weight:600}
@@ -148,6 +148,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 .dup{position:absolute;left:26px;top:26px;color:#9ca3af;font-size:13px}
 .rpv{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:16px;margin:6px 0 4px;background:#000}
 .rimg{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:18px;margin:0 auto 14px;background:#000}
+.rrow{width:100%;text-align:left}.rrow.off{opacity:.5}select.fi{-webkit-appearance:none;appearance:none}
 </style></head><body>
 <header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
@@ -157,7 +158,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <main id="home">
 <div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
 <canvas id="chart"></canvas>
-<div class="rrow"><div class="seg" id="rangeSeg"><button data-r="1M" class="on">1M</button><button data-r="1Y">1Y</button><button data-r="All">All</button></div><button id="srchBtn" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button></div>
+<div class="rgrow"><div class="seg" id="rangeSeg"><button data-r="1M" class="on">1M</button><button data-r="1Y">1Y</button><button data-r="All">All</button></div><button id="srchBtn" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button></div>
 <div id="list"></div>
 </main>
 <button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button>
@@ -176,7 +177,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.2.0</div></section>
+</div><div class="ver">v2.3.0</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
