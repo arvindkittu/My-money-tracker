@@ -218,7 +218,7 @@ function renderIns() {
   if (bud) cards.push([tot > bud ? "Over budget by" : "Left in budget", fmt(r2(Math.abs(bud - tot)))]);
   if (prev) cards.push(["Vs last month", (tot >= prev ? "+" : "−") + Math.round(Math.abs(tot - prev) / prev * 100) + "%"]);
   Object.entries(S.cb).forEach(([n, lim]) => { const v = sum(ex.filter(t => t.cat === n)); if (lim && v >= lim * .8) cards.push([n + (v > lim ? " is over its limit" : " is near its limit"), Math.round(v / lim * 100) + "% of " + fmt(lim)]); });
-  el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("");
+  el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
 const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } $("#" + id).classList.add("open"); };
@@ -722,6 +722,162 @@ sheet.addEventListener("click", e => {
 sheet.addEventListener("click", e => {
   if (!D || e.target.id !== "dupTx") return;
   D.id = ""; D.date = today(); D.cm = D.date.slice(0, 7); D.manual = true; drawAdd(); toast("Copied. Change anything, then save");
+});
+
+/* ---------- Monthly report (image + text) ---------- */
+let RP = null;
+function reportData() {
+  const ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), inc = S.tx.filter(t => t.type === "income" && t.date.startsWith(vm));
+  const spent = sum(ex), income = sum(inc), net = r2(income - spent), by = {};
+  ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
+  const cats = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([n, v]) => ({ n, v: r2(v), pct: spent ? Math.round(v / spent * 100) : 0, ci: catInfo("expense", n) }));
+  const y = +vm.slice(0, 4), m = +vm.slice(5, 7), dim = new Date(y, m, 0).getDate(), cur = vm === today().slice(0, 7), days = cur ? new Date().getDate() : dim;
+  const pk = iso(new Date(y, m - 2, 1)).slice(0, 7), prev = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk)));
+  return { label: mname(vm) + " " + vm.slice(0, 4), spent, income, net, cats, budget: budgetFor(vm), avg: Math.round(spent / days), prevLabel: mname(pk), prev, big: ex.slice().sort((a, b) => b.amount - a.amount)[0], count: ex.length + inc.length, rate: income > 0 ? Math.round(net / income * 100) : null };
+}
+function reportText(d) {
+  const L = ["My Money · " + d.label, "Net saved " + sgn(d.net) + (d.rate !== null ? " (" + d.rate + "% of income)" : ""), "Income " + fmt(d.income) + " · Spent " + fmt(d.spent)];
+  if (d.budget) L.push("Budget: " + fmt(d.spent) + " of " + fmt(d.budget) + " (" + Math.round(d.spent / d.budget * 100) + "%)");
+  if (d.cats.length) { L.push("", "Spending by category"); d.cats.slice(0, 8).forEach(c => L.push(c.ci[1] + " " + c.n + " " + fmt(c.v) + " (" + c.pct + "%)")); }
+  L.push("", "Daily average " + fmt(d.avg) + " · " + d.count + " transaction" + (d.count === 1 ? "" : "s"));
+  if (d.prev > 0) { const ch = Math.round((d.spent - d.prev) / d.prev * 100); L.push("vs " + d.prevLabel + ": spending " + (ch === 0 ? "unchanged" : Math.abs(ch) + "% " + (ch > 0 ? "higher" : "lower"))); }
+  return L.join("\n");
+}
+function drawReport(d) {
+  const W = 1080, pad = 72, FN = "-apple-system, 'SF Pro Text', Helvetica, Arial, sans-serif";
+  let rows = d.cats.slice(0, 6);
+  if (d.cats.length > 6) { const rest = d.cats.slice(5); rows = d.cats.slice(0, 5).concat([{ n: "Other categories", v: r2(rest.reduce((a, c) => a + c.v, 0)), pct: rest.reduce((a, c) => a + c.pct, 0), ci: ["", "🏷️", "#6b7280"] }]); }
+  const y0 = 730 + (d.budget ? 130 : 0), H = y0 + 70 + rows.length * 104 + 270;
+  const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
+  const T = (s, px, y, col, w, al, ox) => { x.font = (w || 400) + " " + px + "px " + FN; x.fillStyle = col; x.textAlign = al || "left"; x.fillText(s, al === "right" ? W - pad : al === "center" ? W / 2 : (ox === undefined ? pad : ox), y); };
+  const B = (x1, y1, w, h, r, col) => { x.fillStyle = col; x.beginPath(); (x.roundRect || x.rect).call(x, x1, y1, w, h, r); x.fill(); };
+  B(0, 0, W, H, 0, "#000");
+  T("My Money", 34, 110, "#8a8a8a", 600); T(d.label, 64, 192, "#fff", 700);
+  T("Net saved", 36, 300, "#8a8a8a"); T(sgn(d.net), 124, 420, d.net >= 0 ? "#4ade80" : "#ff5f5f", 700);
+  T(d.rate === null ? "" : d.net >= 0 ? d.rate + "% of income saved" : "Spent more than earned", 34, 478, "#8a8a8a");
+  const cw = (W - pad * 3) / 2;
+  [["Income", d.income, "#4ade80", pad], ["Spent", d.spent, "#fff", pad * 2 + cw]].forEach(([l, v, col, cx]) => { B(cx, 530, cw, 150, 28, "#141414"); T(l, 30, 580, "#8a8a8a", 400, "left", cx + 32); T(fmt(v), 56, 646, col, 700, "left", cx + 32); });
+  if (d.budget) {
+    const pct = Math.round(d.spent / d.budget * 100), col = pct > 100 ? "#ff5f5f" : pct >= 80 ? "#f59e0b" : "#4ade80";
+    T("Budget " + fmt(d.budget) + " · " + pct + "% used" + (pct > 100 ? " · over by " + fmt(r2(d.spent - d.budget)) : ""), 34, 748, "#bdbdbd");
+    B(pad, 774, W - pad * 2, 24, 12, "#1d1d1d"); B(pad, 774, Math.max(24, (W - pad * 2) * Math.min(pct, 100) / 100), 24, 12, col);
+  }
+  T("Spending by category", 40, y0, "#fff", 600);
+  rows.forEach((r, i) => {
+    const y = y0 + 70 + i * 104;
+    T(r.ci[1], 44, y + 40, "#fff"); T(r.n.slice(0, 20), 38, y + 38, "#fff", 400, "left", pad + 70); T(fmt(r.v) + "   " + r.pct + "%", 38, y + 38, "#fff", 400, "right");
+    B(pad, y + 58, W - pad * 2, 14, 7, "#1d1d1d"); B(pad, y + 58, Math.max(14, (W - pad * 2) * r.pct / 100), 14, 7, r.ci[2]);
+  });
+  const fy = y0 + 70 + rows.length * 104 + 60;
+  T("Daily average " + fmt(d.avg) + " · " + d.count + " transaction" + (d.count === 1 ? "" : "s"), 32, fy, "#8a8a8a");
+  if (d.big) T("Biggest expense: " + (d.big.note || d.big.cat).slice(0, 22) + " " + fmt(d.big.amount), 32, fy + 56, "#8a8a8a");
+  if (d.prev > 0) { const ch = Math.round((d.spent - d.prev) / d.prev * 100); T("vs " + d.prevLabel + ": spending " + (ch === 0 ? "unchanged" : Math.abs(ch) + "% " + (ch > 0 ? "higher" : "lower")), 32, fy + 112, "#8a8a8a"); }
+  T("Made with My Money", 28, H - 40, "#4a4a4a", 400, "center");
+  return c;
+}
+function openReport() {
+  const d = reportData();
+  if (!d.count) { toast("No transactions in " + mname(vm)); return; }
+  const c = drawReport(d); RP = { d, c, text: reportText(d), vm };
+  sheet.className = "sheet"; F = { kind: "rep" };
+  sheet.innerHTML = `<div class="hd"></div><h3>${esc(d.label)} report</h3><img class="rpv" alt="Monthly report preview" src="${c.toDataURL("image/png")}"><button class="save wide" id="repShare">Share image</button><button class="ghost" id="repText">Share as text</button>`;
+  showSheet();
+}
+sheet.addEventListener("click", async e => {
+  if (!F || F.kind !== "rep" || !RP) return;
+  const id = e.target.id;
+  if (id === "repShare") {
+    const blob = await new Promise(r => RP.c.toBlob(r, "image/png")), f = new File([blob], "my-money-" + RP.vm + ".png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (err) { if (err.name === "AbortError") return; } }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+  } else if (id === "repText") {
+    if (navigator.share) { try { await navigator.share({ text: RP.text }); return; } catch (err) { if (err.name === "AbortError") return; } }
+    try { await navigator.clipboard.writeText(RP.text); toast("Report copied"); } catch (err) { alert(RP.text); }
+  }
+});
+const baseRenderIns = renderIns;
+renderIns = function () {
+  baseRenderIns.apply(this, arguments);
+  if (tab === "insights" || tab === "spending") $("#insBody").insertAdjacentHTML("beforeend", '<button class="save wide" data-rep="1">Share ' + esc(mname(vm)) + " report</button>");
+};
+$("#insBody").addEventListener("click", e => { if (e.target.closest("[data-rep]")) openReport(); });
+
+/* ---------- Monthly report (picture + text) ---------- */
+let REP = null;
+function reportData(m) {
+  const tx = S.tx.filter(t => t.date.startsWith(m)); if (!tx.length) return null;
+  const ex = tx.filter(t => t.type === "expense"), inc = sum(tx.filter(t => t.type === "income")), spent = sum(ex), by = {};
+  ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
+  const cats = Object.entries(by).sort((a, b) => b[1] - a[1]).map(([n, v]) => { const c = catInfo("expense", n); return { n, v: r2(v), e: c[1], col: c[2], lim: S.cb[n] || 0 }; });
+  const y = +m.slice(0, 4), mo = +m.slice(5, 7), dim = new Date(y, mo, 0).getDate(), days = m === today().slice(0, 7) ? new Date().getDate() : dim;
+  const pk = iso(new Date(y, mo - 2, 1)).slice(0, 7), prev = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk)));
+  return { m, label: mname(m) + " " + y, inc, spent, net: r2(inc - spent), bud: budgetFor(m), cats, avg: Math.round(spent / days), prev, big: [...ex].sort((a, b) => b.amount - a.amount)[0] };
+}
+function reportText(R) {
+  const L = ["My Money · " + R.label, "", "Net saved: " + sgn(R.net), "Income: " + fmt(R.inc) + "  ·  Spent: " + fmt(R.spent)];
+  if (R.bud) L.push("Budget: " + fmt(R.spent) + " of " + fmt(R.bud) + " (" + Math.round(R.spent / R.bud * 100) + "%)");
+  if (R.cats.length) { L.push("", "Where it went:"); R.cats.slice(0, 6).forEach(c => L.push(c.e + " " + c.n + "  " + fmt(c.v) + " (" + Math.round(c.v / R.spent * 100) + "%)")); }
+  L.push("", "Daily average: " + fmt(R.avg)); if (R.prev) L.push("Vs last month: " + (R.spent >= R.prev ? "+" : "−") + Math.round(Math.abs(R.spent - R.prev) / R.prev * 100) + "%");
+  return L.join("\n");
+}
+function drawReport(R) {
+  const W = 1080, P = 64, IW = W - 2 * P, FN = '-apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif';
+  const top = R.cats.slice(0, 6), rest = R.cats.slice(6), rows = top.concat(rest.length ? [{ n: "Others", v: r2(rest.reduce((a, c) => a + c.v, 0)), e: "•••", col: "#6b7280", lim: 0 }] : []);
+  const H = Math.max(1080, 620 + (R.bud ? 210 : 0) + (rows.length ? 90 + rows.length * 104 : 0) + 280);
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const x = cv.getContext("2d");
+  const rr = (a, b, w, h, r) => { x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); };
+  const t = (s, px, py, size, col, wt = 400, al = "left") => { x.font = wt + " " + size + "px " + FN; x.fillStyle = col; x.textAlign = al; x.fillText(s, px, py); };
+  const fit = (s, maxW, size) => { x.font = "400 " + size + "px " + FN; while (s.length > 1 && x.measureText(s).width > maxW) s = s.slice(0, -2) + "…"; return s; };
+  const bar = (py, h, frac, col) => { x.fillStyle = "#1f1f1f"; rr(P, py, IW, h, h / 2); x.fill(); if (frac > 0) { x.fillStyle = col; rr(P, py, Math.max(h, IW * Math.min(1, frac)), h, h / 2); x.fill(); } };
+  x.fillStyle = "#000"; x.fillRect(0, 0, W, H);
+  t("MY MONEY", P, 110, 30, "#8a8a8a", 600); t(R.label, P, 190, 72, "#f5f5f7", 700);
+  t("Net saved", P, 290, 34, "#8a8a8a"); t(sgn(R.net), P, 410, 140, R.net >= 0 ? "#4ade80" : "#ff5f5f", 700);
+  [["Income", R.inc, "#4ade80"], ["Spent", R.spent, "#ff5f5f"]].forEach(([l, v, c], i) => {
+    const cx = P + i * (IW / 2 + 12); x.fillStyle = "#141414"; rr(cx, 470, IW / 2 - 12, 150, 28); x.fill();
+    t(l, cx + 32, 524, 30, "#8a8a8a"); t(fmt(v), cx + 32, 584, 54, c, 700);
+  });
+  let y = 620;
+  if (R.bud) {
+    const p = R.spent / R.bud, col = p >= 1 ? "#ff5f5f" : p >= .8 ? "#fb923c" : "#4ade80"; y += 60;
+    t("Budget", P, y, 34, "#8a8a8a"); t(Math.round(p * 100) + "% used", W - P, y, 34, col, 700, "right");
+    bar(y + 24, 26, p, col); t(fmt(R.spent) + " of " + fmt(R.bud), P, y + 110, 34, "#f5f5f7"); y += 150;
+  }
+  if (rows.length) {
+    y += 50; t("Where it went", P, y, 40, "#f5f5f7", 700); y += 40;
+    rows.forEach(c => {
+      const nm = c.e + " " + c.n, pc = Math.round(c.v / R.spent * 100) + "%";
+      t(nm, P, y + 44, 38, "#f5f5f7"); x.font = "400 38px " + FN; let nx = P + x.measureText(nm).width + 18;
+      t(pc, nx, y + 44, 30, "#8a8a8a"); x.font = "400 30px " + FN; nx += x.measureText(pc).width + 16;
+      if (c.lim && c.v > c.lim) t("over limit", nx, y + 44, 30, "#ff5f5f", 600);
+      t(fmt(c.v), W - P, y + 44, 38, "#f5f5f7", 700, "right"); bar(y + 64, 14, c.v / R.spent, c.lim && c.v > c.lim ? "#ff5f5f" : c.col); y += 104;
+    });
+  }
+  y += 40; const bits = ["Daily average " + fmt(R.avg)];
+  if (R.prev) bits.push("vs last month " + (R.spent >= R.prev ? "+" : "−") + Math.round(Math.abs(R.spent - R.prev) / R.prev * 100) + "%");
+  t(bits.join("  ·  "), P, y + 30, 32, "#bdbdbd");
+  if (R.big) t("Biggest: " + fit(R.big.note || R.big.cat, 560, 32) + " " + fmt(R.big.amount), P, y + 84, 32, "#bdbdbd");
+  t("Made with My Money", W / 2, H - 50, 26, "#555", 400, "center");
+  return cv;
+}
+function openReport() {
+  const R = reportData(vm); if (!R) { alert("No transactions in " + mname(vm) + " yet."); return; }
+  const cv = drawReport(R); REP = { R, cv }; F = { kind: "rep" };
+  sheet.className = "sheet";
+  sheet.innerHTML = `<div class="hd"></div><h3>${esc(mname(vm))} report</h3><p class="sub">Share it as a picture or as text.</p><img class="rimg" src="${cv.toDataURL("image/png")}" alt="Monthly report"><button class="save wide" id="repImg" style="margin-top:0">Share picture</button><button class="ghost" id="repTxt">Share as text</button>`;
+  showSheet();
+}
+$("#insBody").addEventListener("click", e => { if (e.target.closest("[data-report]")) openReport(); });
+sheet.addEventListener("click", async e => {
+  if (!REP || !F || F.kind !== "rep") return;
+  if (e.target.id === "repImg") {
+    const blob = await new Promise(r => REP.cv.toBlob(r, "image/png")), f = new File([blob], "my-money-" + REP.R.m + ".png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f], title: "My Money " + REP.R.label }); return; } catch (err) { if (err.name === "AbortError") return; } }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+  } else if (e.target.id === "repTxt") {
+    const text = reportText(REP.R);
+    if (navigator.share) { try { await navigator.share({ text }); return; } catch (err) { if (err.name === "AbortError") return; } }
+    try { await navigator.clipboard.writeText(text); toast("Report text copied"); } catch (err) { prompt("Copy this text", text); }
+  }
 });
 
 /* ---------- Wiring ---------- */
