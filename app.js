@@ -13,11 +13,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Investment", "📈", "#22d3ee"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], cb: {}, wallets: [], tr: [] });
-let WF = null; // wallet shown on the home screen (null = all wallets)
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], cb: {} });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {}; S.wallets = S.wallets || []; S.tr = S.tr || [];
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {};
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -33,17 +32,16 @@ scrim.onclick = hideSheet;
 function render() {
   $$("#typeSeg button").forEach(b => b.classList.toggle("on", b.dataset.t === type));
   $$("#rangeSeg button").forEach(b => b.classList.toggle("on", b.dataset.r === range));
-  wChipUpdate();
-  const yr = String(new Date().getFullYear()), all = (type === "net" ? S.tx : S.tx.filter(t => t.type === type)).filter(t => !WF || t.w === WF), isN = type === "net";
+  const yr = String(new Date().getFullYear()), all = type === "net" ? S.tx : S.tx.filter(t => t.type === type), isN = type === "net";
   const list = range === "1M" ? all.filter(t => t.date.startsWith(vm)) : range === "1Y" ? all.filter(t => t.date.startsWith(yr)) : all;
   $("#period").textContent = range === "1M" ? mname(vm) + (vm.slice(0, 4) !== yr ? " " + vm.slice(0, 4) : "") : range === "1Y" ? yr : "All time";
   $("#mPrev").classList.toggle("hide", range !== "1M"); $("#mNext").classList.toggle("hide", range !== "1M"); $("#mNext").disabled = vm >= today().slice(0, 7);
-  const tot = sum(list), bud = budgetFor(vm), isB = type === "expense" && range === "1M" && !WF;
+  const tot = sum(list), bud = budgetFor(vm), isB = type === "expense" && range === "1M";
   const iS = sum(list.filter(t => t.type === "income")), eS = sum(list.filter(t => t.type === "expense")), nv = r2(iS - eS);
   $("#total").textContent = isN ? sgn(nv) : fmt(tot); $("#total").className = "total" + (isN ? (nv >= 0 ? " pos" : " neg") : "");
   const bl = $("#bl");
-  const inScope = t => range === "1M" ? t.date.startsWith(vm) : range === "1Y" ? t.date.startsWith(yr) : true, any = S.tx.some(t => inScope(t) && (!WF || t.w === WF));
-  const net = r2(sum(S.tx.filter(t => t.type === "income" && inScope(t) && (!WF || t.w === WF))) - sum(S.tx.filter(t => t.type === "expense" && inScope(t) && (!WF || t.w === WF))));
+  const inScope = t => range === "1M" ? t.date.startsWith(vm) : range === "1Y" ? t.date.startsWith(yr) : true, any = S.tx.some(inScope);
+  const net = r2(sum(S.tx.filter(t => t.type === "income" && inScope(t))) - sum(S.tx.filter(t => t.type === "expense" && inScope(t))));
   bl.textContent = isN ? (list.length ? "Income " + fmt(iS) + " · Spent " + fmt(eS) : "") : isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : (any ? "Net saved " + sgn(net) : "");
   bl.className = "bl" + (isB && bud && tot > bud ? " over" : "") + (!isB && !isN && any ? (net >= 0 ? " pos" : " over") : "");
   chart(list);
@@ -51,7 +49,7 @@ function render() {
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
   if (range === "1M") {
     L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
-      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}${S.wallets.length > 1 && !WF ? `<small>${esc(walName(t.w) || "No wallet")}</small>` : ""}</span><span class="a ${t.type}">${isN ? (t.type === "income" ? "+" : "−") : ""}${fmt(t.amount)}</span></button></div>`).join("");
+      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${t.type}">${isN ? (t.type === "income" ? "+" : "−") : ""}${fmt(t.amount)}</span></button></div>`).join("");
   } else {
     const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + (isN && t.type === "expense" ? -t.amount : t.amount); });
     L.innerHTML = Object.keys(by).sort().reverse().map(k =>
@@ -105,7 +103,7 @@ function chart(list) {
 function openAdd(t) {
   D = t ? { id: t.id, type: t.type, amt: String(t.amount), note: t.note || "", cat: t.cat, date: t.date, panel: "keys" }
         : { type: type === "net" ? "expense" : type, amt: "", note: "", cat: type === "income" ? "Salary" : "Other", date: today(), panel: "keys" };
-  D.cm = D.date.slice(0, 7); D.manual = !!t; D.w = t ? (t.w || "") : (WF && S.wallets.some(w => w.id === WF) ? WF : defW()); sheet.className = "sheet"; drawAdd(); showSheet();
+  D.cm = D.date.slice(0, 7); D.manual = !!t; sheet.className = "sheet"; drawAdd(); showSheet();
 }
 function calendar() {
   const y = +D.cm.slice(0, 4), m = +D.cm.slice(5, 7), first = new Date(y, m - 1, 1), off = (first.getDay() + 6) % 7;
@@ -133,7 +131,7 @@ function drawAdd() {
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
   ${quickHTML()}${pillHTML()}
-  <div class="chips"><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}${walletChip()}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
+  <div class="chips"><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
 }
 function key(k) {
   if (k === "save") return saveTx();
@@ -146,10 +144,10 @@ function saveTx() {
   const a = +D.amt || 0;
   if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
   if (!D.id && !D.note.trim()) { $("#note").focus(); return; }
-  const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, w: D.w || "", u: Date.now() }; if (D.w) localStorage.setItem(LASTW, D.w);
+  const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
-  if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, w: tx.w, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
+  if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
   save(); hideSheet(); if (type !== "net") type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
 }
 sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); suggestCat(); } };
@@ -200,7 +198,6 @@ function renderIns() {
   const el = $("#insBody"), ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), tot = sum(ex);
   if (tab === "savings") return renderGoals(el);
   if (tab === "loans") return renderLoans(el);
-  if (tab === "wallets") return renderWallets(el);
   const inc = sum(S.tx.filter(t => t.type === "income" && t.date.startsWith(vm)));
   if (tab === "spending") {
     const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
@@ -243,11 +240,10 @@ $("#imp").onchange = async e => {
       if (+o.budget > 0) n.budgets[today().slice(0, 7)] = +o.budget;
     } else throw 0;
     if (!confirm("Replace current data with " + n.tx.length + " transactions from this file?")) return;
-    const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); S.wallets.forEach(w => { if (!(n.wallets || []).some(x => x.id === w.id)) del[w.id] = Date.now(); }); S.tr.forEach(x => { if (!(n.tr || []).some(y => y.id === x.id)) del[x.id] = Date.now(); }); (n.wallets || []).forEach(w => w.u = Date.now()); (n.tr || []).forEach(x => x.u = Date.now());
-    n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
+    const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S.wallets.forEach(r => del[r.id] = Date.now()); S.tr.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -272,7 +268,7 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), wallets: mix(a.wallets, b.wallets), tr: mix(a.tr, b.tr), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
@@ -348,7 +344,7 @@ function runRecurring() {
       if (date > t) break;
       const id = "r_" + r.id + "_" + ym;
       const sk = (r.skip || []).indexOf(ym); if (sk >= 0) r.skip.splice(sk, 1);
-      if (!r.paused && sk < 0 && !S.del[id] && !S.tx.some(x => x.id === id)) S.tx.push({ id, type: r.type, amount: r.amount, date, note: r.note, cat: r.cat, w: r.w || "", u: new Date(date + "T00:00:00").getTime() });
+      if (!r.paused && sk < 0 && !S.del[id] && !S.tx.some(x => x.id === id)) S.tx.push({ id, type: r.type, amount: r.amount, date, note: r.note, cat: r.cat, u: new Date(date + "T00:00:00").getTime() });
       r.last = ym; r.u = Date.now(); changed = true;
     }
   });
@@ -410,7 +406,7 @@ function payEmi(id) {
   const a = Math.min(l.emi, r2(l.total - l.paid)); if (!(a > 0)) return;
   if (!confirm("Record " + fmt(a) + " EMI for " + l.name + "? This also adds an EMI expense for today.")) return;
   l.paid = r2(l.paid + a); l.u = Date.now();
-  S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: l.name + " EMI", cat: "EMI", w: defW(), u: Date.now() });
+  S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: l.name + " EMI", cat: "EMI", u: Date.now() });
   save(); renderIns(); render();
 }
 function finishForm() { save(); hideSheet(); F = null; renderIns(); render(); }
@@ -654,29 +650,27 @@ $$(".page").forEach(p => {
   const end = () => { const was = drag; drag = false; on = false; if (!was) return; if (Math.abs(dx) > 90) closePage(p, dx > 0 ? 1 : -1); else { p.style.transition = ""; p.style.transform = ""; } };
   p.addEventListener("touchend", end); p.addEventListener("touchcancel", end);
 });
-const SQ = { q: "", t: "all", per: "All", cat: "", w: "" };
+const SQ = { q: "", t: "all", per: "All", cat: "" };
 function renderSearch() {
   const now = new Date(), d3 = iso(new Date(now.getFullYear(), now.getMonth() - 2, 1)), yr = String(now.getFullYear());
   const q = SQ.q.trim().toLowerCase(), qn = q.replace(/[₹,\s]/g, ""), isNum = /^\d+(\.\d+)?$/.test(qn);
   const inPer = t => SQ.per === "All" || (SQ.per === "vm" && t.date.startsWith(vm)) || (SQ.per === "3M" && t.date >= d3) || (SQ.per === "1Y" && t.date.startsWith(yr));
-  const base = S.tx.filter(t => (SQ.t === "all" || t.type === SQ.t) && inPer(t) && (!SQ.w || t.w === SQ.w) && (!q || (t.note || "").toLowerCase().includes(q) || t.cat.toLowerCase().includes(q) || (isNum && String(t.amount).includes(qn))));
+  const base = S.tx.filter(t => (SQ.t === "all" || t.type === SQ.t) && inPer(t) && (!q || (t.note || "").toLowerCase().includes(q) || t.cat.toLowerCase().includes(q) || (isNum && String(t.amount).includes(qn))));
   const cats = [...new Set(base.map(t => t.cat))].sort(); if (SQ.cat && !cats.includes(SQ.cat)) SQ.cat = "";
   const res = base.filter(t => !SQ.cat || t.cat === SQ.cat).sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0));
   $$("#sType button").forEach(x => x.classList.toggle("on", x.dataset.s === SQ.t));
   $("#sPer").innerHTML = [["All", "All time"], ["vm", mname(vm)], ["3M", "3 months"], ["1Y", "This year"]].map(([k, n]) => `<button data-sp="${k}" class="${k === SQ.per ? "on" : ""}">${esc(n)}</button>`).join("");
   const em = c => (S.cats.expense.concat(S.cats.income).find(x => x[0] === c) || ["", "🏷️"])[1];
-  $("#sWal").innerHTML = S.wallets.map(w => `<button data-sw="${esc(w.id)}" class="${w.id === SQ.w ? "on" : ""}">${w.icon} ${esc(w.name)}</button>`).join("");
   $("#sCat").innerHTML = cats.map(c => `<button data-sc="${esc(c)}" class="${c === SQ.cat ? "on" : ""}">${em(c)} ${esc(c)}</button>`).join("");
   const I = sum(res.filter(t => t.type === "income")), E = sum(res.filter(t => t.type === "expense")), N = r2(I - E);
   $("#sSum").innerHTML = res.length ? `<div class="icard" style="margin-top:14px"><small>${res.length} result${res.length === 1 ? "" : "s"}</small><b class="${N >= 0 ? "up" : "dn"}">${sgn(N)}</b><div class="gl">Income ${fmt(I)} · Spent ${fmt(E)}</div></div>` : "";
-  $("#sList").innerHTML = res.length ? res.slice(0, 200).map(t => `<button class="row" data-sid="${esc(t.id)}" style="padding:10px 4px"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}<small>${esc(t.cat)}${t.w ? " · " + esc(walName(t.w)) : ""} · ${t.date.slice(0, 4)}</small></span><span class="a ${t.type}">${t.type === "income" ? "+" : "−"}${fmt(t.amount)}</span></button>`).join("") + (res.length > 200 ? '<div class="empty" style="text-align:center">Showing the latest 200</div>' : "") : '<div class="empty" style="text-align:center">No matches</div>';
+  $("#sList").innerHTML = res.length ? res.slice(0, 200).map(t => `<button class="row" data-sid="${esc(t.id)}" style="padding:10px 4px"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}<small>${esc(t.cat)} · ${t.date.slice(0, 4)}</small></span><span class="a ${t.type}">${t.type === "income" ? "+" : "−"}${fmt(t.amount)}</span></button>`).join("") + (res.length > 200 ? '<div class="empty" style="text-align:center">Showing the latest 200</div>' : "") : '<div class="empty" style="text-align:center">No matches</div>';
 }
 $("#sq").addEventListener("input", e => { SQ.q = e.target.value; renderSearch(); });
 $("#sq").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
 $("#search").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
   if (d.s) { SQ.t = d.s; renderSearch(); } else if (d.sp) { SQ.per = d.sp; renderSearch(); }
-  else if (d.sw !== undefined) { SQ.w = SQ.w === d.sw ? "" : d.sw; renderSearch(); }
   else if (d.sc !== undefined) { SQ.cat = SQ.cat === d.sc ? "" : d.sc; renderSearch(); }
   else if (d.sid) { const tx = S.tx.find(t => t.id === d.sid); if (tx) openAdd(tx); }
 });
@@ -701,10 +695,8 @@ function suggestCat() { // pick the category you usually use for this descriptio
 $("#csvBtn").onclick = async () => {
   if (!S.tx.length) { alert("Nothing to export yet."); return; }
   const q = v => { v = String(v); if (/^[=+\-@]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; }; // quotes, and no formulas in Excel
-  const all = S.tx.map(t => ({ d: t.date, u: t.u || 0, r: [t.date, t.type === "income" ? "Income" : "Expense", q(t.cat), q(t.note || ""), t.amount, q(walName(t.w))].join(",") }))
-    .concat(S.tr.map(t => ({ d: t.date, u: t.u || 0, r: [t.date, "Transfer", q(walName(t.from) + " → " + walName(t.to)), q(t.note || ""), t.amount, ""].join(",") })));
-  const rows = all.sort((a, b) => a.d.localeCompare(b.d) || a.u - b.u).map(x => x.r);
-  const f = new File(["\uFEFF" + ["Date,Type,Category,Description,Amount,Wallet"].concat(rows).join("\r\n")], "my-money-" + today() + ".csv", { type: "text/csv" });
+  const rows = [...S.tx].sort((a, b) => a.date.localeCompare(b.date) || (a.u || 0) - (b.u || 0)).map(t => [t.date, t.type === "income" ? "Income" : "Expense", q(t.cat), q(t.note || ""), t.amount].join(","));
+  const f = new File(["\uFEFF" + ["Date,Type,Category,Description,Amount"].concat(rows).join("\r\n")], "my-money-" + today() + ".csv", { type: "text/csv" });
   if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
   const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
 };
@@ -725,7 +717,7 @@ function quickHTML() { // your most repeated description + amount + category, on
 sheet.addEventListener("click", e => {
   const b = e.target.closest("[data-q]"); if (!b || !D) return;
   const t = S.tx.find(x => x.id === b.dataset.q); if (!t) return;
-  D.amt = String(t.amount); D.note = t.note.trim(); D.cat = t.cat; D.manual = true; if (t.w && S.wallets.some(x => x.id === t.w)) setWallet(t.w);
+  D.amt = String(t.amount); D.note = t.note.trim(); D.cat = t.cat; D.manual = true;
   $("#amt").innerHTML = "<span>₹</span>" + D.amt; $("#amt").classList.remove("z"); $("#note").value = D.note;
   const nb = $("#nextBtn"); if (nb) nb.disabled = false; const sv = $("#svBtn"); if (sv) sv.disabled = false;
   const p = sheet.querySelector(".pills"); if (p) p.outerHTML = pillHTML();
@@ -907,7 +899,6 @@ function openRecEdit(id) {
   <div class="lab">Amount (₹)</div><input class="fi" id="ra" inputmode="decimal" value="${r.amount}">
   <div class="lab">Day of month (1 to 31)</div><input class="fi" id="rdy" inputmode="numeric" value="${r.day}">
   <div class="lab">Category</div><select class="fi" id="rcat">${S.cats[r.type].map(c => `<option${c[0] === r.cat ? " selected" : ""}>${esc(c[0])}</option>`).join("")}</select>
-  ${S.wallets.length ? '<div class="lab">Wallet</div><select class="fi" id="rw"><option value="">None</option>' + S.wallets.map(w => `<option value="${esc(w.id)}"${w.id === r.w ? " selected" : ""}>${w.icon} ${esc(w.name)}</option>`).join("") + "</select>" : ""}
   <button class="ghost" id="rskip">${sk ? "Undo skip of " : "Skip "}${dLabel(nd.date)}</button>
   <button class="ghost" id="rpause">${r.paused ? "Resume this rule" : "Pause this rule"}</button>
   <button class="save wide" id="rsave2" style="margin-top:8px">Save</button>`;
@@ -923,143 +914,8 @@ sheet.addEventListener("click", e => {
   else if (id === "rsave2") {
     const a = num($("#ra").value), dy = Math.round(+$("#rdy").value);
     if (!(a > 0) || !(dy >= 1 && dy <= 31)) { alert("Enter an amount above zero and a day from 1 to 31."); return; }
-    r.amount = a; r.day = dy; r.note = $("#rn").value.trim(); r.cat = $("#rcat").value; if ($("#rw")) r.w = $("#rw").value; r.u = Date.now(); save(); runRecurring(); openRec();
+    r.amount = a; r.day = dy; r.note = $("#rn").value.trim(); r.cat = $("#rcat").value; r.u = Date.now(); save(); runRecurring(); openRec();
   }
-});
-
-/* ---------- Wallets: cash, bank and card, with transfers ---------- */
-const WICON = ["💵", "🏦", "💳", "👛", "📱", "🏧"], LASTW = "mm3lastw", fmtS = n => (n < 0 ? "−" : "") + fmt(Math.abs(n));
-function defW() { const l = localStorage.getItem(LASTW); return S.wallets.some(w => w.id === l) ? l : (S.wallets[0] ? S.wallets[0].id : ""); }
-function walBal(w) {
-  let b = w.open || 0;
-  S.tx.forEach(t => { if (t.w === w.id) b += t.type === "income" ? t.amount : -t.amount; });
-  S.tr.forEach(t => { if (t.to === w.id) b += t.amount; if (t.from === w.id) b -= t.amount; });
-  return r2(b);
-}
-function walName(id) { const w = S.wallets.find(x => x.id === id); return w ? w.name : ""; }
-function setBalance(w, now) { w.open = 0; w.open = r2(now - walBal(w)); } // "balance now" = opening + everything since
-function walletChip() {
-  if (!S.wallets.length) return "";
-  const w = S.wallets.find(x => x.id === D.w);
-  return `<label class="chip wchip"><span id="wLab">${w ? w.icon + " " + esc(w.name.slice(0, 8)) : "👛 None"} ⌄</span><select id="wSel"><option value="">None</option>${S.wallets.map(x => `<option value="${esc(x.id)}"${x.id === D.w ? " selected" : ""}>${x.icon} ${esc(x.name)}</option>`).join("")}</select></label>`;
-}
-function setWallet(id) {
-  D.w = id; const w = S.wallets.find(x => x.id === id), l = $("#wLab"), s2 = $("#wSel");
-  if (l) l.textContent = (w ? w.icon + " " + w.name.slice(0, 8) : "👛 None") + " ⌄"; if (s2) s2.value = id;
-}
-sheet.addEventListener("change", e => { if (e.target.id === "wSel" && D) setWallet(e.target.value); });
-function renderWallets(el) {
-  let h = "";
-  if (S.wallets.length) {
-    const tot = r2(S.wallets.reduce((a, w) => a + walBal(w), 0));
-    h += `<div class="icard"><small>Total balance</small><b class="${tot < 0 ? "dn" : ""}">${fmtS(tot)}</b></div>`;
-    h += S.wallets.map(w => { const b = walBal(w); return `<button class="gcard wrow" data-wedit="${esc(w.id)}"><span class="ce">${w.icon}</span><span class="n">${esc(w.name)}<small>Tap to edit</small></span><span class="a ${b < 0 ? "neg" : ""}">${fmtS(b)}</span></button>`; }).join("");
-    const trs = [...S.tr].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).slice(0, 5);
-    if (trs.length) h += '<div class="lab" style="margin:16px 0 4px">Recent transfers (tap to delete)</div>' + trs.map(t => `<button class="row" data-wtd="${esc(t.id)}" style="padding:10px 4px"><span class="n">${esc(walName(t.from) || "?")} → ${esc(walName(t.to) || "?")}<small>${dLabel(t.date)}${t.note ? " · " + esc(t.note) : ""}</small></span><span class="a">${fmt(t.amount)}</span></button>`).join("");
-    if (S.wallets.length > 1) h += '<button class="save wide" data-wtr="1">Transfer money</button>';
-  } else h += '<div class="empty" style="text-align:center">Track cash, bank and card balances separately.</div>';
-  const un = S.tx.filter(t => !S.wallets.some(w => w.id === t.w)).length;
-  if (S.wallets.length && un) h += `<p class="sub" style="text-align:left;margin:12px 4px">${un} ${un === 1 ? "entry isn't" : "entries aren't"} in a wallet yet, so balances leave ${un === 1 ? "it" : "them"} out. Open it and pick a wallet.</p>`;
-  el.innerHTML = h + '<button class="ghost" data-wnew="1" style="margin-top:6px">＋ New wallet</button>';
-}
-function openWallet(id) {
-  const w = S.wallets.find(x => x.id === id) || {};
-  F = { kind: "wal", id: w.id || "", icon: w.icon || WICON[0] }; sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div>${w.id && S.wallets.length > 1 ? '<button class="del" id="wdel">Delete</button>' : ""}<h3>${w.id ? "Edit" : "New"} wallet</h3><p class="sub">${w.id ? "Change the balance to correct it." : "For example Cash, Bank or Credit card."}</p>
-  <div class="fl" id="wIcons" style="margin:0 0 12px">${WICON.map(i => `<button data-wi="${i}" class="${i === F.icon ? "on" : ""}" style="font-size:20px;padding:8px 12px">${i}</button>`).join("")}</div>
-  <div class="lab">Name</div><input class="fi" id="wn" maxlength="20" value="${esc(w.name || "")}" placeholder="Cash">
-  <div class="lab">Balance now (₹)</div><input class="fi" id="wo" inputmode="decimal" value="${w.id ? walBal(w) : ""}" placeholder="0">
-  <button class="save wide" id="wsave">Save</button>`;
-  showSheet();
-}
-function openTransfer() {
-  const d1 = defW(), d2 = (S.wallets.find(x => x.id !== d1) || {}).id || "", opts = sel => S.wallets.map(x => `<option value="${esc(x.id)}"${x.id === sel ? " selected" : ""}>${x.icon} ${esc(x.name)}</option>`).join("");
-  F = { kind: "tr" }; sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div><h3>Transfer money</h3><p class="sub">Moves money between wallets. It is not an expense.</p>
-  <div class="lab">From</div><select class="fi" id="tf">${opts(d1)}</select><div class="lab">To</div><select class="fi" id="tt">${opts(d2)}</select>
-  <div class="lab">Amount (₹)</div><input class="fi" id="tam" inputmode="decimal" placeholder="0"><div class="lab">Note (optional)</div><input class="fi" id="tno" maxlength="40" placeholder="e.g. ATM withdrawal">
-  <button class="save wide" id="tsave">Transfer</button>`;
-  showSheet();
-}
-sheet.addEventListener("click", e => {
-  if (!F || (F.kind !== "wal" && F.kind !== "tr")) return;
-  const b = e.target.closest("button"); if (!b) return;
-  if (F.kind === "tr") {
-    if (b.id !== "tsave") return;
-    const from = $("#tf").value, to = $("#tt").value, amount = num($("#tam").value);
-    if (from === to) { alert("Choose two different wallets."); return; }
-    if (!(amount > 0)) { alert("Enter an amount above zero."); return; }
-    S.tr.push({ id: crypto.randomUUID(), from, to, amount, date: today(), note: $("#tno").value.trim(), u: Date.now() });
-    save(); hideSheet(); F = null; renderIns(); toast("Transferred " + fmt(amount)); return;
-  }
-  if (b.dataset.wi) { F.icon = b.dataset.wi; sheet.querySelectorAll("[data-wi]").forEach(x => x.classList.toggle("on", x === b)); return; }
-  const w = S.wallets.find(x => x.id === F.id);
-  if (b.id === "wdel") { F = null; hideSheet(); openWalDelete(w.id); } else if (b.id === "wsave") {
-    const name = $("#wn").value.trim(), now = r2(parseFloat(String($("#wo").value).replace(/,/g, "")) || 0);
-    if (!name) { alert("Give the wallet a name."); return; }
-    if (S.wallets.some(x => x.id !== F.id && x.name.toLowerCase() === name.toLowerCase())) { alert("You already have a wallet with that name."); return; }
-    if (w) { w.name = name; w.icon = F.icon; setBalance(w, now); w.u = Date.now(); }
-    else {
-      const first = !S.wallets.length, nw = { id: crypto.randomUUID(), name, icon: F.icon, open: 0, u: Date.now() }; S.wallets.push(nw);
-      if (first && S.tx.length && confirm("Put your existing " + S.tx.length + " transactions in " + name + "?")) S.tx.forEach(t => { t.w = nw.id; t.u = Date.now(); });
-      setBalance(nw, now);
-    }
-    save(); hideSheet(); F = null; renderIns(); render();
-  }
-});
-$("#insBody").addEventListener("click", e => {
-  const d = (e.target.closest("button") || {}).dataset; if (!d) return;
-  if (d.wnew) openWallet(); else if (d.wedit) openWallet(d.wedit); else if (d.wtr) openTransfer();
-  else if (d.wtd && confirm("Delete this transfer?")) { S.del[d.wtd] = Date.now(); S.tr = S.tr.filter(t => t.id !== d.wtd); save(); renderIns(); }
-});
-
-/* ---------- Home wallet filter and delete with move ---------- */
-function wChipUpdate() {
-  const c = $("#wChip"); if (!c) return;
-  if (WF && !S.wallets.some(w => w.id === WF)) WF = null;
-  c.hidden = S.wallets.length < 2;
-  const w = S.wallets.find(x => x.id === WF);
-  c.textContent = (w ? w.icon + " " + w.name : "All wallets") + "  ⌄";
-}
-function openWalPick() {
-  F = { kind: "wpick" }; sheet.className = "sheet";
-  const rows = [["", "🌐", "All wallets", r2(S.wallets.reduce((a, w) => a + walBal(w), 0))]].concat(S.wallets.map(w => [w.id, w.icon, w.name, walBal(w)]));
-  sheet.innerHTML = `<div class="hd"></div><h3>Show wallet</h3><p class="sub">Home totals, chart and list follow this choice</p>`
-    + rows.map(([id, ic, nm, bal]) => `<button class="wrow gcard${(WF || "") === id ? " on" : ""}" data-wf="${esc(id)}"><span class="ce">${ic}</span><span class="n">${esc(nm)}</span><span class="a${bal < 0 ? " neg" : ""}">${fmtS(bal)}</span></button>`).join("");
-  showSheet();
-}
-function openWalDelete(id) {
-  const w = S.wallets.find(x => x.id === id); if (!w) return;
-  const others = S.wallets.filter(x => x.id !== id);
-  const n = S.tx.filter(t => t.w === id).length, rc = S.rec.filter(r => r.w === id).length, tc = S.tr.filter(t => t.from === id || t.to === id).length;
-  const busy = n + rc + tc > 0, p = (k, one, many) => (k === 1 ? one : many);
-  F = { kind: "wdel", id }; sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div><h3>Delete ${esc(w.name)}?</h3>`
-    + (busy ? `<p class="sub">Its ${n} ${p(n, "entry", "entries")}, ${rc} recurring ${p(rc, "rule", "rules")} and ${tc} ${p(tc, "transfer", "transfers")} move to the wallet you pick, so your total stays the same.</p>` : `<p class="sub">Nothing is linked to it.</p>`)
-    + others.map(x => `<button class="wrow gcard" data-wmove="${esc(x.id)}"><span class="ce">${x.icon}</span><span class="n">${busy ? "Move to " : ""}${esc(x.name)}</span><span class="a${walBal(x) < 0 ? " neg" : ""}">${fmtS(walBal(x))}</span></button>`).join("")
-    + '<button class="ghost" id="wdelno">Cancel</button>';
-  showSheet();
-}
-sheet.addEventListener("click", e => {
-  if (!F || (F.kind !== "wpick" && F.kind !== "wdel")) return;
-  const b = e.target.closest("button"); if (!b) return;
-  if (F.kind === "wpick" && b.dataset.wf !== undefined) { WF = b.dataset.wf || null; F = null; hideSheet(); render(); return; }
-  if (F.kind !== "wdel") return;
-  if (b.id === "wdelno") { F = null; hideSheet(); return; }
-  if (b.dataset.wmove === undefined) return;
-  const id = F.id, to = b.dataset.wmove, src = S.wallets.find(x => x.id === id), dst = S.wallets.find(x => x.id === to);
-  if (!src || !dst || src.id === dst.id) return;
-  const now = Date.now();
-  dst.open = r2((dst.open || 0) + (src.open || 0)); dst.u = now; // the deleted wallet's starting money joins the destination
-  S.tx.forEach(t => { if (t.w === id) { t.w = to; t.u = now; } });
-  S.rec.forEach(r => { if (r.w === id) { r.w = to; r.u = now; } });
-  S.tr.forEach(x => { if (x.from === id || x.to === id) { if (x.from === id) x.from = to; if (x.to === id) x.to = to; x.u = now; } });
-  S.tr = S.tr.filter(x => { if (x.from === x.to) { S.del[x.id] = now; return false; } return true; });
-  S.del[id] = now; S.wallets = S.wallets.filter(x => x.id !== id);
-  if (WF === id) WF = null;
-  if (localStorage.getItem(LASTW) === id) localStorage.setItem(LASTW, to);
-  F = null; save(); hideSheet(); renderIns(); render();
-  toast("Deleted " + src.name + ". Its money is now in " + dst.name);
 });
 
 /* ---------- Wiring ---------- */
@@ -1070,8 +926,7 @@ $("#list").onclick = e => {
   if (b.dataset.id) openAdd(S.tx.find(t => t.id === b.dataset.id));
   else if (b.dataset.m) { vm = b.dataset.m; range = "1M"; render(); }
 };
-$("#bl").onclick = () => { if (type === "expense" && range === "1M" && !WF) openBudget(); };
-$("#wChip").onclick = openWalPick;
+$("#bl").onclick = () => { if (type === "expense" && range === "1M") openBudget(); };
 $("#fab").onclick = () => openAdd();
 $("#rcBtn").onclick = openRec;
 $("#dailyBtn").onclick = dailyReminder;
