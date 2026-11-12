@@ -149,6 +149,59 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 .rpv{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:16px;margin:6px 0 4px;background:#000}
 .rimg{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:18px;margin:0 auto 14px;background:#000}
 .rrow{width:100%;text-align:left}.rrow.off{opacity:.5}select.fi{-webkit-appearance:none;appearance:none}
+/* interface alignment with the reference app */
+#mPrev,#mNext{display:none!important}
+:root{--seg:#141414;--on:#333333;--red:#fe4f4f;--grn:#4ade80}
+.total{font-size:36px;font-weight:500;letter-spacing:-.5px}
+.period{color:#cfcfcf;font-size:12px}
+.bl{color:#cfcfcf;font-size:13px}
+#typeSeg button{font-size:15px;color:#8e8e93}#typeSeg button.on{color:#fff}
+#rangeSeg button{font-size:12px;color:#8e8e93}#rangeSeg button.on{color:#fff}
+.row .n,.row .a{font-size:14px}
+.badge{background:#131313}
+#fab{background:#333234}
+.note{font-size:15px}.chip{font-size:14px}
+.mid button{font-size:15px}
+.menu{font-size:15px;padding:14px 16px}
+.menu::after{content:"›";margin-left:auto;color:#8e8e93;font-size:22px;line-height:1}
+.top .ttl{font-size:15px}
+.hd2{font-size:20px;font-weight:700;text-align:center;margin:18px 0 22px;line-height:1.3}
+.acc.g{color:#4ade80}.acc.r{color:#fe4f4f}
+.ncard{background:#111;border-radius:22px;padding:6px 0;margin-bottom:16px}
+.nrow{padding:14px 18px;border-bottom:1px solid #1c1c1c}.nrow:last-child{border-bottom:0}
+.nt{display:flex;align-items:center;gap:10px;font-size:15px}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}.dot.g{background:#4ade80}.dot.r{background:#fe4f4f}
+.nn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.na{color:#bdbdbd;font-size:13px}
+.nb{height:6px;margin:10px 0 8px;background:#262626;border-radius:6px;overflow:hidden}.nb i{height:100%;border-radius:6px;display:block}
+.nf{display:flex;align-items:center;gap:8px;font-size:12px;color:#8e8e93}.nf small{flex:1}
+.nf button{font-size:12px;padding:4px 8px;border-radius:14px;background:#222;color:#cfcfcf}
+.nf button.acc{background:none;font-weight:600}
+.hint{text-align:center;color:#8e8e93;font-size:12px;margin:14px 0 8px;line-height:1.5}
+.link{display:block;margin:0 auto;font-size:16px;font-weight:600;background:none;padding:8px}
+/* v2.3.2 pass: values measured from the reference recording */
+:root{--sheet:#161616;--seg:#161616;--on:#323232}
+.total{font-size:38px;font-weight:600;letter-spacing:-.6px}
+.period{color:#d6d6d6;font-size:12px}
+.bl{color:#d6d6d6;font-size:13px}
+.ico{stroke:#e3e3e3}
+#typeSeg button{color:#9a9a9a}#typeSeg button.on{color:#fff}
+#rangeSeg button{color:#d6d6d6}#rangeSeg button.on{color:#fff}
+.hd{width:18px;height:5px;background:#686868}
+.amt{font-size:40px;font-weight:400;margin:24px 0 2px}.amt span{font-size:24px;color:#919191;margin-right:6px}
+.keys button{height:68px;font-size:24px;font-weight:600;color:#ececec}
+.keys .save{width:92px!important;height:30px!important;justify-self:end;align-self:center;border-radius:15px;font-size:15px!important;background:#cecece}
+.keys .save svg{width:18px;height:18px}
+.savebar .save.wide{width:92px!important;height:30px!important;margin-left:auto;border-radius:15px;font-size:15px!important;display:block}
+.chips .chip{color:#f0f0f0}
+.ic{width:16px;height:16px;stroke:#d6d6d6;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;margin-right:4px}
+.menu .rv{margin-left:auto;margin-right:10px}
+.menu:has(.rv)::after{margin-left:0}
+.menu.red{color:#ef5b5b}
+.em{color:#909090;font-size:13px}
+.ver{color:#5c5c5c;font-size:11px}
+.hint{color:#8f8f8f;font-size:11px;line-height:1.5}
+.link{font-size:15px}
 </style></head><body>
 <header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
@@ -177,7 +230,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.0</div></section>
+</div><div class="ver">v2.3.2</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
