@@ -83,19 +83,19 @@ function chart(list) {
   const valsI = isN ? keys.map(k => sumK(k, "income")) : [], valsE = isN ? keys.map(k => sumK(k, "expense")) : [];
   const vals = isN ? keys.map((_, i) => Math.max(valsI[i], valsE[i])) : keys.map(k => sumK(k));
   const L = 26, R = 26, top = 10, base = H - 30, slot = (W - L - R) / keys.length;
-  const bw = Math.min(range === "1M" ? 14 : 24, slot * .68), max = Math.max(1, ...vals);
+  const bw = Math.min(range === "1M" ? 8 : 24, slot * .68), max = Math.max(1, ...vals);
   x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
-  x.beginPath(); x.moveTo(L, base); x.lineTo(W - R, base); x.stroke(); x.setLineDash([]);
+  
   const td = +today().slice(8), isCur = range === "1M" && vm === tk.slice(0, 7);
   x.font = "13px -apple-system,sans-serif"; x.textAlign = "center";
   vals.forEach((v, i) => {
     const cx = L + slot * (i + .5);
     const bar = (c2, val, col, w) => { if (val > 0) { const hh = Math.max(4, (base - top) * val / max); x.fillStyle = col; x.beginPath(); (x.roundRect || x.rect).call(x, c2 - w / 2, base - hh, w, hh, 4); x.fill(); } };
-    if (isN) { bar(cx - bw / 4 - .5, valsI[i], "#4ade80", bw / 2 - 1); bar(cx + bw / 4 + .5, valsE[i], "#ff5f5f", bw / 2 - 1); } else bar(cx, v, type === "expense" ? "#ff5f5f" : "#4ade80", bw);
+    if (isN) { bar(cx - bw / 4 - .5, valsI[i], "#4ade80", bw / 2 - 1); bar(cx + bw / 4 + .5, valsE[i], "#ff5f5f", bw / 2 - 1); } else bar(cx, v, type === "expense" ? "#fe4f4f" : "#4ade80", bw);
     const d = lab[i];
-    const show = range !== "1M" || d === 1 || (isCur && d === td) || (d >= 9 && (d - 9) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
+    const show = range !== "1M" || d === 1 || (isCur && d === td) || ((d - 1) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
     if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, base + 21); }
-    if (isCur && d === td) { x.fillStyle = "#4ade80"; x.beginPath(); x.arc(cx, base - 12, 3, 0, 7); x.fill(); }
+    if (v === 0 && range === "1M" && type === "expense" && !(isCur && d > td)) { x.fillStyle = "#4ade80"; x.beginPath(); x.arc(cx, base - 5, 2.4, 0, 7); x.fill(); }
   });
 }
 
@@ -131,7 +131,7 @@ function drawAdd() {
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
   ${quickHTML()}${pillHTML()}
-  <div class="chips"><button class="chip" id="dateBtn"><span class="e">📅</span> ${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
+  <div class="chips"><button class="chip" id="dateBtn"><svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
 }
 function key(k) {
   if (k === "save") return saveTx();
@@ -254,6 +254,7 @@ const schedSync = () => { if (user) { clearTimeout(st); st = setTimeout(syncNow,
 function setMsg(m) { syncMsg = m; refreshAcct(); }
 function refreshAcct() {
   $("#acct").textContent = user ? user.email + (syncMsg ? " · " + syncMsg : "") : "Sign in to sync";
+  document.querySelector(".em").textContent = user ? user.email : "Data is stored on this device";
   $("#lo").hidden = !user;
 }
 // Merge two states: transactions by id (newest edit wins, deletes tracked), settings newest-wins
@@ -371,16 +372,22 @@ const num = v => Math.max(0, r2(parseFloat(String(v).replace(/,/g, "")) || 0));
 const pct = (a, b) => b > 0 ? Math.min(100, Math.round(a / b * 100)) : 0;
 let F = null;
 function renderGoals(el) {
-  el.innerHTML = (S.goals.map(g => {
+  const rows = S.goals.map(g => {
     const p = pct(g.saved, g.target), left = Math.max(0, r2(g.target - g.saved));
-    return `<div class="gcard"><div class="gh"><b>${esc(g.name)}</b><span>${fmt(g.saved)} / ${fmt(g.target)}</span></div><div class="bar"><i style="width:${p}%;background:var(--grn)"></i></div><div class="gf"><small>${p >= 100 ? "Goal reached 🎉" : p + "% · " + fmt(left) + " to go"}</small><button data-gedit="${esc(g.id)}">Edit</button><button class="pri" data-gadd="${esc(g.id)}">+ Add</button></div></div>`;
-  }).join("") || '<div class="empty" style="text-align:center">No savings goals yet</div>') + '<button class="save wide" data-gnew="1">New goal</button>';
+    return `<div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">${esc(g.name)}</span><span class="na">${fmt(g.saved)} / ${fmt(g.target)}</span></div><div class="nb"><i style="width:${p}%;background:var(--grn)"></i></div><div class="nf"><small>${p >= 100 ? "Goal reached 🎉" : p + "% · " + fmt(left) + " to go"}</small><button data-gedit="${esc(g.id)}">Edit</button><button class="acc g" data-gadd="${esc(g.id)}">+ Add</button></div></div>`;
+  }).join("");
+  el.innerHTML = `<h2 class="hd2">Put money aside<br>for what <span class="acc g">matters.</span></h2>`
+    + `<div class="ncard">${rows || '<div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">Set a target for anything</span></div></div><div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">Add money as you save</span></div></div><div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">See how close you are</span></div></div>'}</div>`
+    + `<p class="hint">Save it first, then buy it.<br>No EMIs, no interest.</p><button class="acc g link" data-gnew="1">+ Add a goal</button>`;
 }
 function renderLoans(el) {
-  el.innerHTML = (S.loans.map(l => {
+  const rows = S.loans.map(l => {
     const p = pct(l.paid, l.total), left = Math.max(0, r2(l.total - l.paid)), n = l.emi > 0 ? Math.ceil(left / l.emi) : 0;
-    return `<div class="gcard"><div class="gh"><b>${esc(l.name)}</b><span>${fmt(l.paid)} / ${fmt(l.total)}</span></div><div class="bar"><i style="width:${p}%;background:#fb923c"></i></div><div class="gf"><small>${left <= 0 ? "Paid off 🎉" : fmt(left) + " left · " + n + " EMI" + (n === 1 ? "" : "s") + " of " + fmt(l.emi)}</small><button data-ledit="${esc(l.id)}">Edit</button>${left > 0 && l.emi > 0 ? `<button class="pri" data-lpay="${esc(l.id)}">Pay EMI</button>` : ""}</div></div>`;
-  }).join("") || '<div class="empty" style="text-align:center">No loans yet</div>') + '<button class="save wide" data-lnew="1">New loan</button>';
+    return `<div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">${esc(l.name)}</span><span class="na">${fmt(l.paid)} / ${fmt(l.total)}</span></div><div class="nb"><i style="width:${p}%;background:var(--red)"></i></div><div class="nf"><small>${left <= 0 ? "Paid off 🎉" : fmt(left) + " left · " + n + " EMI" + (n === 1 ? "" : "s") + " of " + fmt(l.emi)}</small><button data-ledit="${esc(l.id)}">Edit</button>${left > 0 && l.emi > 0 ? `<button class="acc r" data-lpay="${esc(l.id)}">Pay EMI</button>` : ""}</div></div>`;
+  }).join("");
+  el.innerHTML = `<h2 class="hd2">All your loans,<br>in <span class="acc r">one place.</span></h2>`
+    + `<div class="ncard">${rows || '<div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">Track every EMI you pay</span></div></div><div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">See your total EMI each month</span></div></div><div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">Know when each loan ends</span></div></div>'}</div>`
+    + `<button class="acc r link" data-lnew="1">+ Add a loan</button>`;
 }
 function openForm(kind, id) {
   const G = kind === "goal", it = (G ? S.goals : S.loans).find(x => x.id === id) || {};
