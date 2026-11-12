@@ -661,12 +661,12 @@ $$(".page").forEach(p => {
     if (!on) return;
     const t = e.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
     if (!drag) {
-      if (ddx > 12 && ddx > Math.abs(ddy) * 1.5) { drag = true; p.style.transition = "none"; stage.style.transition = "none"; }
+      if (ddx > 22 && ddx > Math.abs(ddy) * 2.5) { drag = true; p.style.transition = "none"; stage.style.transition = "none"; }
       else { if (Math.abs(ddy) > 12 || ddx < -12) on = false; return; }
     }
-    dx = Math.max(0, ddx); e.preventDefault();
+    dx = Math.max(0, ddx - 22); e.preventDefault();
     p.style.transform = "translateX(" + dx + "px)";
-    stage.style.transform = "translateX(" + (-0.28 * W() * (1 - Math.min(1, dx / W()))) + "px)";
+    stage.style.transform = "translateX(" + (-0.28 * W() * (1 - Math.min(1, Math.max(0, dx - 0.2 * W()) / (0.8 * W())))) + "px)";
   }, { passive: false });
   const end = () => {
     const was = drag; drag = false; on = false;
@@ -840,7 +840,6 @@ sheet.addEventListener("click", async e => {
 const baseRenderIns = renderIns;
 renderIns = function () {
   baseRenderIns.apply(this, arguments);
-  if (tab === "insights" || tab === "spending") $("#insBody").insertAdjacentHTML("beforeend", '<button class="save wide" data-rep="1">Share ' + esc(mname(vm)) + " report</button>");
 };
 $("#insBody").addEventListener("click", e => { if (e.target.closest("[data-rep]")) openReport(); });
 
@@ -955,6 +954,16 @@ sheet.addEventListener("click", e => {
     r.amount = a; r.day = dy; r.note = $("#rn").value.trim(); r.cat = $("#rcat").value; r.u = Date.now(); save(); runRecurring(); openRec();
   }
 });
+
+/* ---------- Full-height layout on the Home Screen app ---------- */
+function fitViewport() {
+  const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+  const gap = standalone ? Math.max(0, screen.height - innerHeight) : 0;
+  const root = document.documentElement.style;
+  root.setProperty("--gap", gap + "px");
+  root.setProperty("--app-h", (innerHeight + gap) + "px");
+}
+fitViewport(); addEventListener("resize", fitViewport); addEventListener("orientationchange", fitViewport);
 
 /* ---------- Wiring ---------- */
 $("#typeSeg").onclick = e => { const b = e.target.closest("button"); if (b) { type = b.dataset.t; render(); } };
