@@ -149,6 +149,11 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 .rpv{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:16px;margin:6px 0 4px;background:#000}
 .rimg{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:18px;margin:0 auto 14px;background:#000}
 .rrow{width:100%;text-align:left}.rrow.off{opacity:.5}select.fi{-webkit-appearance:none;appearance:none}
+.wchip{position:relative;display:inline-block}.wchip select{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px}
+.wrow{display:flex;align-items:center;gap:14px;width:100%;text-align:left;color:inherit}#sWal:empty{display:none}
+[hidden]{display:none!important}
+.hchip{display:block;margin:0 auto 8px;padding:5px 12px;border-radius:999px;background:#1d1d1d;color:#bdbdbd;font-size:12px}
+.wrow.on{outline:1px solid #e5e5e5}.n small{display:block;color:var(--mut);font-size:11px;margin-top:2px}.a.neg{color:var(--red)}
 </style></head><body>
 <header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
@@ -156,7 +161,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
 </header>
 <main id="home">
-<div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
+<button class="hchip" id="wChip" hidden></button><div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
 <canvas id="chart"></canvas>
 <div class="rgrow"><div class="seg" id="rangeSeg"><button data-r="1M" class="on">1M</button><button data-r="1Y">1Y</button><button data-r="All">All</button></div><button id="srchBtn" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button></div>
 <div id="list"></div>
@@ -164,7 +169,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button>
 
 <section class="page" id="insights"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div></section>
+<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button><button data-tab="wallets">Wallets</button></div></div><div id="insBody"></div></section>
 
 <section class="page" id="settings"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="ttl">Settings</span></div>
 <div class="av"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></div><button class="nm" id="nm"></button><div class="em">Data is stored on this device</div>
@@ -177,11 +182,11 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.0</div></section>
+</div><div class="ver">v2.5.0</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
-<div class="fl" id="sPer"></div><div class="fl" id="sCat"></div><div id="sSum"></div><div id="sList"></div></section>
+<div class="fl" id="sPer"></div><div class="fl" id="sWal"></div><div class="fl" id="sCat"></div><div id="sSum"></div><div id="sList"></div></section>
 <div id="scrim"></div><div class="sheet" id="sheet"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
