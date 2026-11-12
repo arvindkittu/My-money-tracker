@@ -202,8 +202,15 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 .ver{color:#5c5c5c;font-size:11px}
 .hint{color:#8f8f8f;font-size:11px;line-height:1.5}
 .link{font-size:15px}
+/* v2.3.3 pass: animations and swipe rules matched to the reference recording */
+#stage{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;position:relative;transition:transform .26s cubic-bezier(.22,.7,.3,1)}
+#stage.under{transform:translateX(-28%)}
+.page.open{animation:pageIn .32s cubic-bezier(.2,.75,.25,1) backwards}
+@keyframes pageIn{from{transform:scale(1.14)}to{transform:scale(1)}}
+#list.enter{animation:listIn .26s ease-out backwards}
+@keyframes listIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 </style></head><body>
-<header>
+<div id="stage"><header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6h18M3 12h13M3 18h18"/></svg></button>
 <div class="seg" id="typeSeg"><button data-t="expense" class="on">Expense</button><button data-t="income">Income</button><button data-t="net">Net</button></div>
 <button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
@@ -214,7 +221,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <div class="rgrow"><div class="seg" id="rangeSeg"><button data-r="1M" class="on">1M</button><button data-r="1Y">1Y</button><button data-r="All">All</button></div><button id="srchBtn" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button></div>
 <div id="list"></div>
 </main>
-<button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button>
+<button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button></div>
 
 <section class="page" id="insights"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
 <div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div></section>
@@ -230,7 +237,7 @@ canvas{touch-action:pan-y}.srow{width:100%;text-align:left}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.2</div></section>
+</div><div class="ver">v2.3.3</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
