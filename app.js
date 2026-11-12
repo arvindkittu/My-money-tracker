@@ -44,8 +44,9 @@ function render() {
   const net = r2(sum(S.tx.filter(t => t.type === "income" && inScope(t))) - sum(S.tx.filter(t => t.type === "expense" && inScope(t))));
   bl.textContent = isN ? (list.length ? "Income " + fmt(iS) + " · Spent " + fmt(eS) : "") : isB ? (bud ? "of " + fmt(bud) + " budget" : "Set a budget") : (any ? "Net saved " + sgn(net) : "");
   bl.className = "bl" + (isB && bud && tot > bud ? " over" : "") + (!isB && !isN && any ? (net >= 0 ? " pos" : " over") : "");
-  chart(list);
-  const L = $("#list");
+  const vk = type + "|" + range + "|" + vm, viewChanged = vk !== lastVK; lastVK = vk;
+  if (viewChanged) animateChart(list); else chart(list);
+  const L = $("#list"); if (viewChanged) { L.classList.remove("enter"); void L.offsetWidth; L.classList.add("enter"); }
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
   if (range === "1M") {
     L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
@@ -57,7 +58,7 @@ function render() {
   }
 }
 
-function chart(list) {
+function chart(list, pr) {
   const c = $("#chart"), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
   c.width = W * dpr; c.height = H * dpr;
   const x = c.getContext("2d"); x.scale(dpr, dpr);
@@ -90,7 +91,7 @@ function chart(list) {
   x.font = "13px -apple-system,sans-serif"; x.textAlign = "center";
   vals.forEach((v, i) => {
     const cx = L + slot * (i + .5);
-    const bar = (c2, val, col, w) => { if (val > 0) { const hh = Math.max(4, (base - top) * val / max); x.fillStyle = col; x.beginPath(); (x.roundRect || x.rect).call(x, c2 - w / 2, base - hh, w, hh, 4); x.fill(); } };
+    const bar = (c2, val, col, w) => { if (val > 0) { const hh = Math.max(4, (base - top) * val / max * (pr ? pr(i) : 1)); x.fillStyle = col; x.beginPath(); (x.roundRect || x.rect).call(x, c2 - w / 2, base - hh, w, hh, 4); x.fill(); } };
     if (isN) { bar(cx - bw / 4 - .5, valsI[i], "#4ade80", bw / 2 - 1); bar(cx + bw / 4 + .5, valsE[i], "#ff5f5f", bw / 2 - 1); } else bar(cx, v, type === "expense" ? "#fe4f4f" : "#4ade80", bw);
     const d = lab[i];
     const show = range !== "1M" || d === 1 || (isCur && d === td) || ((d - 1) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
@@ -221,7 +222,7 @@ function renderIns() {
   el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
-const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } $("#" + id).classList.add("open"); };
+const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } showPage($("#" + id)); };
 $$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
 $("#bk").onclick = async () => {
@@ -243,7 +244,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); $("#settings").classList.remove("open"); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); closePage($("#settings")); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -637,26 +638,56 @@ sheet.addEventListener("click", e => {
 $("#insBody").addEventListener("click", e => { const b = e.target.closest("[data-cb]"); if (b) openCB(b.dataset.cb); });
 
 /* ---------- Swipe a page sideways to go back, search & filter ---------- */
-function closePage(p, dir) {
+/* ---------- Page transitions: scale-in on open, swipe right to close ---------- */
+var lastVK = "", chartRAF = 0;
+const stage = $("#stage");
+function syncStage() { stage.classList.toggle("under", !!document.querySelector(".page.open")); }
+function showPage(p) { p.style.transform = ""; p.classList.add("open"); syncStage(); }
+function closePage(p) {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  if (!dir) { p.classList.remove("open"); return; }
-  p.style.transition = "transform .22s"; p.style.transform = "translateX(" + (dir > 0 ? "100%" : "-100%") + ")";
-  setTimeout(() => { p.classList.remove("open"); p.style.transition = "none"; p.style.transform = ""; void p.offsetWidth; p.style.transition = ""; }, 230);
+  if (!p.classList.contains("open")) return;
+  p.style.transition = "transform .26s cubic-bezier(.22,.7,.3,1)"; p.style.transform = "translateX(100%)";
+  stage.style.transition = ""; stage.style.transform = ""; stage.classList.remove("under");
+  setTimeout(() => { p.classList.remove("open"); p.style.transition = ""; p.style.transform = ""; syncStage(); }, 270);
 }
 $$(".page").forEach(p => {
-  let x0 = 0, y0 = 0, dx = 0, on = false, drag = false;
+  let x0 = 0, y0 = 0, dx = 0, t0 = 0, on = false, drag = false;
+  const W = () => window.innerWidth;
   p.addEventListener("touchstart", e => {
-    if (e.touches.length !== 1 || e.target.closest("input,textarea,.fl")) { on = false; return; }
-    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; on = true; drag = false;
+    if (e.touches.length !== 1 || e.target.closest("input,textarea,select,.seg,.fl,.cats,.cwrap")) { on = false; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; t0 = Date.now(); on = true; drag = false;
   }, { passive: true });
   p.addEventListener("touchmove", e => {
-    if (!on) return; const t = e.touches[0]; dx = t.clientX - x0; const dy = t.clientY - y0;
-    if (!drag) { if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5) { drag = true; p.style.transition = "none"; } else { if (Math.abs(dy) > 12) on = false; return; } }
-    e.preventDefault(); p.style.transform = "translateX(" + dx + "px)";
+    if (!on) return;
+    const t = e.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (!drag) {
+      if (ddx > 12 && ddx > Math.abs(ddy) * 1.5) { drag = true; p.style.transition = "none"; stage.style.transition = "none"; }
+      else { if (Math.abs(ddy) > 12 || ddx < -12) on = false; return; }
+    }
+    dx = Math.max(0, ddx); e.preventDefault();
+    p.style.transform = "translateX(" + dx + "px)";
+    stage.style.transform = "translateX(" + (-0.28 * W() * (1 - Math.min(1, dx / W()))) + "px)";
   }, { passive: false });
-  const end = () => { const was = drag; drag = false; on = false; if (!was) return; if (Math.abs(dx) > 90) closePage(p, dx > 0 ? 1 : -1); else { p.style.transition = ""; p.style.transform = ""; } };
+  const end = () => {
+    const was = drag; drag = false; on = false;
+    if (!was) return;
+    p.style.transition = ""; stage.style.transition = "";
+    const fast = dx > 40 && dx / Math.max(1, Date.now() - t0) > 0.45;
+    if (dx > W() * 0.35 || fast) closePage(p);
+    else { p.style.transform = ""; stage.style.transform = ""; }
+  };
   p.addEventListener("touchend", end); p.addEventListener("touchcancel", end);
 });
+function animateChart(list) {
+  cancelAnimationFrame(chartRAF);
+  const t0 = performance.now(), dur = 330, ease = t => 1 - Math.pow(1 - t, 3), clamp = v => Math.max(0, Math.min(1, v));
+  const step = now => {
+    const p = clamp((now - t0) / dur);
+    chart(list, i => ease(clamp((p - 0.22 * (i / 31)) / 0.78)));
+    chartRAF = p < 1 ? requestAnimationFrame(step) : 0;
+  };
+  step(t0);
+}
 const SQ = { q: "", t: "all", per: "All", cat: "" };
 function renderSearch() {
   const now = new Date(), d3 = iso(new Date(now.getFullYear(), now.getMonth() - 2, 1)), yr = String(now.getFullYear());
@@ -681,7 +712,7 @@ $("#search").addEventListener("click", e => {
   else if (d.sc !== undefined) { SQ.cat = SQ.cat === d.sc ? "" : d.sc; renderSearch(); }
   else if (d.sid) { const tx = S.tx.find(t => t.id === d.sid); if (tx) openAdd(tx); }
 });
-$("#srchBtn").onclick = () => { renderSearch(); $("#search").classList.add("open"); $("#sq").focus(); };
+$("#srchBtn").onclick = () => { renderSearch(); showPage($("#search")); $("#sq").focus(); };
 const baseRender = render;
 render = function () { baseRender.apply(this, arguments); if ($("#search").classList.contains("open")) renderSearch(); };
 
