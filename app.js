@@ -674,7 +674,7 @@ $$(".page").forEach(p => {
     p.style.transition = ""; stage.style.transition = "";
     const fast = dx > 40 && dx / Math.max(1, Date.now() - t0) > 0.45;
     if (dx > W() * 0.35 || fast) closePage(p);
-    else { p.style.transform = ""; stage.style.transform = ""; }
+    else { p.style.transition = "transform .25s cubic-bezier(.22,.7,.3,1)"; p.style.transform = ""; stage.style.transform = ""; setTimeout(() => { p.style.transition = ""; }, 260); }
   };
   p.addEventListener("touchend", end); p.addEventListener("touchcancel", end);
 });
