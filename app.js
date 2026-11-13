@@ -958,10 +958,7 @@ sheet.addEventListener("click", e => {
 /* ---------- Full-height layout on the Home Screen app ---------- */
 function fitViewport() {
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
-  const gap = standalone ? Math.max(0, screen.height - innerHeight) : 0;
-  const root = document.documentElement.style;
-  root.setProperty("--gap", gap + "px");
-  root.setProperty("--app-h", (innerHeight + gap) + "px");
+  document.documentElement.style.setProperty("--app-h", (standalone ? Math.max(innerHeight, screen.height) : innerHeight) + "px");
 }
 fitViewport(); addEventListener("resize", fitViewport); addEventListener("orientationchange", fitViewport);
 
