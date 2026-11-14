@@ -103,7 +103,7 @@ function chart(list, pr) {
 /* ---------- Add / edit sheet ---------- */
 function openAdd(t) {
   D = t ? { id: t.id, type: t.type, amt: String(t.amount), note: t.note || "", cat: t.cat, date: t.date, panel: "keys" }
-        : { type: type === "net" ? "expense" : type, amt: "", note: "", cat: type === "income" ? "Salary" : "Other", date: today(), panel: "keys" };
+        : { type: type === "net" ? "expense" : type, amt: "", note: "", cat: defaultCat(type === "net" ? "expense" : type), date: today(), panel: "keys" };
   D.cm = D.date.slice(0, 7); D.manual = !!t; sheet.className = "sheet"; drawAdd(); showSheet();
 }
 function calendar() {
@@ -156,7 +156,7 @@ sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; co
 sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
 sheet.onclick = e => {
   const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
-  if (d.st) { D.type = d.st; if (!S.cats[D.type].some(c => c[0] === D.cat)) D.cat = D.type === "expense" ? "Other" : "Salary"; D.panel = "keys"; drawAdd(); }
+  if (d.st) { D.type = d.st; if (!S.cats[D.type].some(c => c[0] === D.cat)) D.cat = defaultCat(D.type); D.panel = "keys"; drawAdd(); }
   else if (d.k !== undefined) key(d.k);
   else if (d.cat !== undefined) { D.cat = d.cat; D.manual = true; D.panel = "keys"; drawAdd(); }
   else if (b.id === "catBtn") { D.panel = D.panel === "cats" ? "keys" : "cats"; D.pop = true; drawAdd(); }
@@ -537,6 +537,14 @@ sheet.addEventListener("click", e => {
   D.panel = "keys"; drawAdd();
   if (e.target.closest("#note")) $("#note").focus({ preventScroll: true });
 });
+/* A new entry starts on the category used most for its type; with no history, the first category (Food for expenses) */
+function defaultCat(t) {
+  const list = S.cats[t] || [], used = new Map();
+  S.tx.forEach(x => { if (x.type === t && list.some(c => c[0] === x.cat)) used.set(x.cat, (used.get(x.cat) || 0) + 1); });
+  let best = (list.find(c => c[0] === "Food") || list[0] || ["Other"])[0], bestN = 0;
+  list.forEach(c => { if (c[0] === "Other") return; const n = used.get(c[0]) || 0; if (n > bestN) { best = c[0]; bestN = n; } });
+  return best;
+}
 (function () { // drag the handle down to close any sheet
   let on = false, y0 = 0, dy = 0;
   sheet.addEventListener("pointerdown", e => { if (e.pointerType === "touch" || !e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
