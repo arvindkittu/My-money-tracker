@@ -1,4 +1,4 @@
-const C = "my-money-v10";
+const C = "my-money-v11";
 const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 const F = ["./", "./index.html", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(C).then(async c => { await c.addAll(F); try { await c.put(CDN, await fetch(CDN, { mode: "no-cors" })); } catch (_) {} })); self.skipWaiting(); });
