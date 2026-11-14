@@ -239,7 +239,7 @@ body{overflow:hidden;overflow:clip}
 .sheet.typing .keys{display:grid}
 .sheet.typing .savebar{display:none}
 @keyframes nudge{0%{transform:translateX(0)}12.5%{transform:translateX(-10px)}37.5%{transform:translateX(10px)}50%{transform:translateX(0)}62.5%{transform:translateX(-10px)}87.5%{transform:translateX(10px)}100%{transform:translateX(0)}}
-.note.nudge{animation:nudge .35s ease-in-out}
+.note.nudge{animation:nudge .55s ease-in-out}
 /* v2.3.12 pass: Save keeps its grey pill with black text; category chip; calendar and category panels open from the bottom without moving the top */
 .keys .save{color:#000!important}
 @keyframes popUp{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
@@ -248,6 +248,8 @@ body{overflow:hidden;overflow:clip}
 .sheet:has(#note)>.cats{flex:1 1 0;min-height:0;max-height:none;overflow-y:auto}
 .sheet:has(#note)>.cal{flex:1 1 0;min-height:0;overflow-y:auto}
 .sheet.nofit{overflow:hidden}
+/* v2.3.13 pass: Save sized to match the number pad; the transaction time shows in grey under the description */
+.keys .save{width:120px!important;height:50px!important;border-radius:25px!important;font-size:17px!important}
 </style></head><body>
 <div id="stage"><header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24" style="stroke-width:1.4;stroke-linecap:butt"><path d="M1.5 5.74h20.9M1.5 12h15.2M1.5 18.26h18.5"/></svg></button>
@@ -276,7 +278,7 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.12</div></section>
+</div><div class="ver">v2.3.13</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
