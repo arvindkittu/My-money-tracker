@@ -124,7 +124,7 @@ function drawAdd() {
     body = '<div class="cats">' + S.cats[D.type].map(k => `<div class="cwrap">${k[0] === "Other" ? "" : `<div class="cact"><button data-cedit="${esc(k[0])}">Edit</button><button data-cdel="${esc(k[0])}">Delete</button></div>`}<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button></div>`).join("")
       + '<button class="crow" id="addCat"><span class="ce">＋</span><span class="cn">Add category</span></button></div>';
   } else if (D.panel === "cal") body = calendar();
-  else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" id="nextBtn" data-k="next" aria-label="Next"' + (+D.amt > 0 ? "" : " disabled") + '>' + CHECK + '</button></div>';
+  else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" id="nextBtn" data-k="save" aria-label="Save"' + (+D.amt > 0 ? "" : " disabled") + '>Save</button></div>';
   const dl = D.date === today() ? "Today" : new Date(+D.date.slice(0, 4), +D.date.slice(5, 7) - 1, +D.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
   sheet.classList.remove("typing"); sheet.classList.toggle("p", D.panel !== "keys");
   sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button><button class="dup" id="dupTx">Copy</button>' : ""}
@@ -144,7 +144,7 @@ function key(k) {
 function saveTx() {
   const a = +D.amt || 0;
   if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
-  if (!D.id && !D.note.trim()) { $("#note").focus({ preventScroll: true }); return; }
+  if (!D.id && !D.note.trim()) { nudgeNote(); return; }
   const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
@@ -521,6 +521,14 @@ sheet.addEventListener("focusout", e => { if (e.target.id === "note") setTimeout
 sheet.addEventListener("mousedown", e => { if (e.target.closest(".savebar")) e.preventDefault(); }); // keep the keyboard up while tapping Save
 sheet.addEventListener("click", e => { if (e.target.closest("#amt")) { sheet.classList.remove("typing"); if (document.activeElement && document.activeElement.id === "note") document.activeElement.blur(); } });
 // The sheet stays where it is; the on-screen keyboard opens over its lower part.
+/* ---------- Add sheet: tapping the description never moves the page; Return closes the keyboard; an empty description shakes ---------- */
+function nudgeNote() {
+  const n = $("#note"); if (!n) return;
+  n.classList.remove("nudge"); void n.offsetWidth; n.classList.add("nudge");
+}
+sheet.addEventListener("touchend", e => { const n = e.target.closest && e.target.closest("#note"); if (n && document.activeElement !== n) n.focus({ preventScroll: true }); }, { passive: true });
+sheet.addEventListener("click", e => { const n = e.target.closest && e.target.closest("#note"); if (n && document.activeElement !== n) n.focus({ preventScroll: true }); });
+sheet.addEventListener("keydown", e => { if (e.target.id === "note" && e.key === "Enter") { e.preventDefault(); e.target.blur(); } });
 (function () { // drag the handle down to close any sheet
   let on = false, y0 = 0, dy = 0;
   sheet.addEventListener("pointerdown", e => { if (e.pointerType === "touch" || !e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
