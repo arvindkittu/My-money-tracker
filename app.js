@@ -127,7 +127,7 @@ function drawAdd() {
   } else if (D.panel === "cal") body = calendar().replace('class="cal"', 'class="cal' + pop + '"');
   else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" id="nextBtn" data-k="save" aria-label="Save"' + (+D.amt > 0 ? "" : " disabled") + '>Save</button></div>';
   const dl = D.date === today() ? "Today" : new Date(+D.date.slice(0, 4), +D.date.slice(5, 7) - 1, +D.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  sheet.classList.remove("typing");
+  sheet.classList.remove("typing"); sheet.classList.toggle("nofit", D.panel !== "keys");
   sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button><button class="dup" id="dupTx">Copy</button>' : ""}
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
@@ -530,6 +530,13 @@ function nudgeNote() {
 sheet.addEventListener("touchend", e => { const n = e.target.closest && e.target.closest("#note"); if (n && document.activeElement !== n) n.focus({ preventScroll: true }); }, { passive: true });
 sheet.addEventListener("click", e => { const n = e.target.closest && e.target.closest("#note"); if (n && document.activeElement !== n) n.focus({ preventScroll: true }); });
 sheet.addEventListener("keydown", e => { if (e.target.id === "note" && e.key === "Enter") { e.preventDefault(); e.target.blur(); } });
+/* Add sheet: a tap anywhere on the page closes the open calendar or category list; taps inside them and on their own chips still work */
+sheet.addEventListener("click", e => {
+  if (!$("#amt") || !D || D.panel === "keys") return;
+  if (e.target.closest(".cats, .cal, #catBtn, #dateBtn, #delTx, #dupTx")) return;
+  D.panel = "keys"; drawAdd();
+  if (e.target.closest("#note")) $("#note").focus({ preventScroll: true });
+});
 (function () { // drag the handle down to close any sheet
   let on = false, y0 = 0, dy = 0;
   sheet.addEventListener("pointerdown", e => { if (e.pointerType === "touch" || !e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
