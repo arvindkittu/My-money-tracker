@@ -50,7 +50,7 @@ function render() {
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
   if (range === "1M") {
     L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
-      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}</span><span class="a ${t.type}">${isN ? (t.type === "income" ? "+" : "−") : ""}${fmt(t.amount)}</span></button></div>`).join("");
+      `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}${txTime(t)}</span><span class="a ${t.type}">${isN ? (t.type === "income" ? "+" : "−") : ""}${fmt(t.amount)}</span></button></div>`).join("");
   } else {
     const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + (isN && t.type === "expense" ? -t.amount : t.amount); });
     L.innerHTML = Object.keys(by).sort().reverse().map(k =>
@@ -101,6 +101,13 @@ function chart(list, pr) {
 }
 
 /* ---------- Add / edit sheet ---------- */
+/* The time of the last save or edit, shown in grey under the description; generated or older entries have no time */
+function txTime(t) {
+  if (!t.u) return "";
+  const d = new Date(t.u);
+  if (!d.getHours() && !d.getMinutes() && !d.getSeconds() && !d.getMilliseconds()) return "";
+  return "<small>" + d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) + "</small>";
+}
 function openAdd(t) {
   D = t ? { id: t.id, type: t.type, amt: String(t.amount), note: t.note || "", cat: t.cat, date: t.date, panel: "keys" }
         : { type: type === "net" ? "expense" : type, amt: "", note: "", cat: defaultCat(type === "net" ? "expense" : type), date: today(), panel: "keys" };
