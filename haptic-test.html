@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Haptic test</title>
+<style>
+  body{margin:0;padding:22px;background:#111;color:#eee;font:16px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}
+  h3{margin:8px 0 14px;font-size:20px}
+  p{color:#bbb;line-height:1.45;font-size:15px}
+  .own{display:flex;align-items:center;gap:14px;background:#1d1d1d;border-radius:14px;padding:14px;margin:12px 0}
+  button{display:block;width:100%;margin:10px 0;padding:15px;border:0;border-radius:14px;background:#2c2c2c;color:#fff;font-size:16px;text-align:left}
+  #info,#log{font-size:13px;color:#999;white-space:pre-wrap;margin-top:14px;line-height:1.4}
+</style></head><body>
+<h3>iPhone haptic test</h3>
+<p><b>Step 1.</b> Tap the switch below. Do you feel a small tap? It should also look like a switch, not a square box.</p>
+<label class="own"><input type="checkbox" switch id="own"><span>Switch</span></label>
+<p><b>Step 2.</b> Tap each button and note which ones gave a tap.</p>
+<button data-v="A">A. Hidden switch, opacity 0 (version 2.3.14)</button>
+<button data-v="B">B. Hidden switch, opacity 0.01 (version 2.3.15)</button>
+<button data-v="C">C. Switch off-screen, full size</button>
+<button data-v="D">D. Switch visible at top right</button>
+<div id="info"></div>
+<div id="log"></div>
+<script>
+  const $info = document.getElementById("info"), $log = document.getElementById("log");
+  const m = navigator.userAgent.match(/OS (\d+)[_.](\d+)/);
+  $info.textContent = "iOS " + (m ? m[1] + "." + m[2] : "(not an iPhone)") + " | Home Screen app: " + (navigator.standalone ? "yes" : "no") + " | navigator.vibrate: " + typeof navigator.vibrate;
+  const styles = {
+    A: "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none",
+    B: "position:fixed;left:8px;bottom:8px;width:51px;height:31px;opacity:0.01;pointer-events:none",
+    C: "position:fixed;left:-300px;top:0;width:51px;height:31px",
+    D: "position:fixed;right:8px;top:8px;width:51px;height:31px"
+  };
+  const made = {};
+  function make(v) {
+    const lab = document.createElement("label");
+    lab.setAttribute("aria-hidden", "true");
+    lab.style.cssText = styles[v];
+    const box = document.createElement("input");
+    box.type = "checkbox"; box.setAttribute("switch", ""); box.tabIndex = -1;
+    lab.appendChild(box); document.body.appendChild(lab);
+    return lab;
+  }
+  ["B", "C", "D"].forEach(v => made[v] = make(v));
+  document.querySelectorAll("button[data-v]").forEach(btn => btn.addEventListener("click", () => {
+    const v = btn.dataset.v;
+    if (!made[v]) made[v] = make(v);
+    made[v].click();
+    $log.textContent = "Pressed " + v + " at " + new Date().toLocaleTimeString() + "\n" + $log.textContent;
+  }));
+</script></body></html>
