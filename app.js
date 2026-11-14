@@ -118,21 +118,22 @@ function calendar() {
   return h + "</div></div>";
 }
 function drawAdd() {
-  const c = catInfo(D.type, D.cat);
+  const c = catInfo(D.type, D.cat), pop = D.pop ? " pop" : "";
+  D.pop = false;
   let body;
   if (D.panel === "cats") {
-    body = '<div class="cats">' + S.cats[D.type].map(k => `<div class="cwrap">${k[0] === "Other" ? "" : `<div class="cact"><button data-cedit="${esc(k[0])}">Edit</button><button data-cdel="${esc(k[0])}">Delete</button></div>`}<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button></div>`).join("")
+    body = '<div class="cats' + pop + '">' + S.cats[D.type].map(k => `<div class="cwrap">${k[0] === "Other" ? "" : `<div class="cact"><button data-cedit="${esc(k[0])}">Edit</button><button data-cdel="${esc(k[0])}">Delete</button></div>`}<button class="crow" data-cat="${esc(k[0])}"><span class="ce">${k[1]}</span><span class="cn">${esc(k[0])}</span><i style="background:${k[2]}"></i><b>${k[0] === D.cat ? "✓" : ""}</b></button></div>`).join("")
       + '<button class="crow" id="addCat"><span class="ce">＋</span><span class="cn">Add category</span></button></div>';
-  } else if (D.panel === "cal") body = calendar();
+  } else if (D.panel === "cal") body = calendar().replace('class="cal"', 'class="cal' + pop + '"');
   else body = '<div class="keys">' + [1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-k="${n}">${n}</button>`).join("") + '<button data-k="<">‹</button><button data-k="0">0</button><button class="save" id="nextBtn" data-k="save" aria-label="Save"' + (+D.amt > 0 ? "" : " disabled") + '>Save</button></div>';
   const dl = D.date === today() ? "Today" : new Date(+D.date.slice(0, 4), +D.date.slice(5, 7) - 1, +D.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  sheet.classList.remove("typing"); sheet.classList.toggle("p", D.panel !== "keys");
+  sheet.classList.remove("typing");
   sheet.innerHTML = `<div class="hd"></div>${D.id ? '<button class="del" id="delTx">Delete</button><button class="dup" id="dupTx">Copy</button>' : ""}
   <div class="seg mid"><button data-st="expense" class="${D.type === "expense" ? "on" : ""}">Expense</button><button data-st="income" class="${D.type === "income" ? "on" : ""}">Income</button></div>
   <div class="amt ${D.amt ? "" : "z"}" id="amt"><span>₹</span>${D.amt || 0}</div>
   <input class="note" id="note" placeholder="Description" maxlength="60" value="${esc(D.note)}">
-  ${quickHTML()}${pillHTML()}
-  <div class="chips"><button class="chip" id="dateBtn"><svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>${dl}</button>${D.id ? "" : `<button class="chip" id="repBtn" style="color:${D.rep ? "#4ade80" : "inherit"}"><span class="e">🔁</span> ${D.rep ? "Monthly" : "Once"}</button>`}<button class="chip" id="catBtn">All ⌄</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
+  ${quickHTML()}
+  <div class="chips"><button class="chip" id="catBtn">${esc(c[1])} ${esc(c[0])} ⌄</button><button class="chip" id="dateBtn"><svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>${dl}</button></div>${body}<div class="savebar"><button class="save wide" id="svBtn" data-k="save"${D.note.trim() || D.id ? "" : " disabled"}>Save</button></div>`;
 }
 function key(k) {
   if (k === "save") return saveTx();
@@ -158,8 +159,8 @@ sheet.onclick = e => {
   if (d.st) { D.type = d.st; if (!S.cats[D.type].some(c => c[0] === D.cat)) D.cat = D.type === "expense" ? "Other" : "Salary"; D.panel = "keys"; drawAdd(); }
   else if (d.k !== undefined) key(d.k);
   else if (d.cat !== undefined) { D.cat = d.cat; D.manual = true; D.panel = "keys"; drawAdd(); }
-  else if (b.id === "catBtn") { D.panel = D.panel === "cats" ? "keys" : "cats"; drawAdd(); }
-  else if (b.id === "dateBtn") { D.panel = D.panel === "cal" ? "keys" : "cal"; drawAdd(); }
+  else if (b.id === "catBtn") { D.panel = D.panel === "cats" ? "keys" : "cats"; D.pop = true; drawAdd(); }
+  else if (b.id === "dateBtn") { D.panel = D.panel === "cal" ? "keys" : "cal"; D.cm = D.date.slice(0, 7); D.pop = true; drawAdd(); }
   else if (b.id === "addCat") {
     const n = (prompt("Category name") || "").trim().slice(0, 20), list = S.cats[D.type];
     if (n && !list.some(c => c[0].toLowerCase() === n.toLowerCase())) {
@@ -170,7 +171,7 @@ sheet.onclick = e => {
   }
   else if (d.cm) { const dt = new Date(+D.cm.slice(0, 4), +D.cm.slice(5, 7) - 1 + +d.cm, 1); D.cm = dt.getFullYear() + "-" + pad(dt.getMonth() + 1); drawAdd(); }
   else if (d.d) { D.date = d.d; D.panel = "keys"; drawAdd(); }
-  else if (b.id === "repBtn") { D.rep = !D.rep; drawAdd(); }
+  
   else if (b.id === "delTx") { const id = D.id; hideSheet(); delTx(id); }
   else if (b.id === "setBudget") { if (B > 0) S.budgets[vm] = B; else delete S.budgets[vm]; S.su = Date.now(); save(); hideSheet(); render(); }
 };
