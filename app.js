@@ -101,23 +101,6 @@ function chart(list, pr) {
 }
 
 /* ---------- Add / edit sheet ---------- */
-/* Tap feedback. Android vibrates with a pattern. iPhone (iOS 18 and later) plays its own tap when a switch is toggled, so the switch is created when the page loads and both methods are tried */
-let hapticSwitch = null;
-function hapticSetup() {
-  const lab = document.createElement("label");
-  lab.setAttribute("aria-hidden", "true");
-  lab.style.cssText = "position:fixed;left:8px;bottom:8px;width:51px;height:31px;opacity:0.01;pointer-events:none";
-  const box = document.createElement("input");
-  box.type = "checkbox"; box.setAttribute("switch", ""); box.tabIndex = -1;
-  lab.appendChild(box); document.body.appendChild(lab); hapticSwitch = lab;
-}
-function haptic(kind) {
-  const pattern = { warn: [30, 70, 30], del: [40] }[kind] || [12];
-  if (navigator.vibrate) navigator.vibrate(pattern);
-  if (!hapticSwitch) hapticSetup();
-  hapticSwitch.click();
-}
-hapticSetup();
 /* The time of the last save or edit, shown in grey under the description; generated or older entries have no time */
 function txTime(t) {
   if (!t.u) return "";
@@ -169,12 +152,12 @@ function key(k) {
 function saveTx() {
   const a = +D.amt || 0;
   if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
-  if (!D.id && !D.note.trim()) { nudgeNote(); haptic("warn"); return; }
+  if (!D.id && !D.note.trim()) { nudgeNote(); return; }
   const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
   if (D.rep && !D.id) S.rec.push({ id: crypto.randomUUID(), type: tx.type, amount: tx.amount, cat: tx.cat, note: tx.note, day: +tx.date.slice(8), last: tx.date.slice(0, 7), u: Date.now() });
-  haptic(D.id ? "edit" : "ok"); save(); hideSheet(); if (type !== "net") type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
+  save(); hideSheet(); if (type !== "net") type = tx.type; vm = tx.date.slice(0, 7); range = "1M"; render(); catWarn(tx, !D.id);
 }
 sheet.oninput = e => { if (e.target.id === "note") { D.note = e.target.value; const b = $("#svBtn"); if (b) b.disabled = !(D.note.trim() || D.id); suggestCat(); } };
 sheet.onkeydown = e => { if (e.key === "Enter") e.target.blur(); };
@@ -440,7 +423,6 @@ function payEmi(id) {
   if (!confirm("Record " + fmt(a) + " EMI for " + l.name + "? This also adds an EMI expense for today.")) return;
   l.paid = r2(l.paid + a); l.u = Date.now();
   S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: a, date: today(), note: l.name + " EMI", cat: "EMI", u: Date.now() });
-  haptic("ok");
   save(); renderIns(); render();
 }
 function finishForm() { save(); hideSheet(); F = null; renderIns(); render(); }
@@ -449,20 +431,18 @@ sheet.addEventListener("click", e => {
   if (!F || !["fsave", "fdel", "psave"].includes(id)) return;
   const G = F.kind === "goal", key = { goal: "goals", loan: "loans" }[F.kind], list = S[key];
   const v = k => { const el = sheet.querySelector('[data-f="' + k + '"]'); return el ? el.value : ""; };
-  if (id === "fdel") { if (confirm("Delete this " + F.kind + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); haptic("del"); finishForm(); } return; }
+  if (id === "fdel") { if (confirm("Delete this " + F.kind + "?")) { S.del[F.id] = Date.now(); S[key] = list.filter(x => x.id !== F.id); finishForm(); } return; }
   if (id === "psave") {
     const a = num(v("amt")); if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
-    const g = S.goals.find(x => x.id === F.id); g.saved = r2(g.saved + a); g.u = Date.now(); haptic("ok"); finishForm(); return;
+    const g = S.goals.find(x => x.id === F.id); g.saved = r2(g.saved + a); g.u = Date.now(); finishForm(); return;
   }
   const name = v("name").trim();
   const o = G ? { name, target: num(v("target")), saved: num(v("saved")) } : { name, total: num(v("total")), emi: num(v("emi")), paid: num(v("paid")) };
   if (F.kind === "loan") o.paid = Math.min(o.paid, o.total);
   const need = G ? o.target : o.total;
   if (!name || !(need > 0)) { alert("Enter a name and an amount greater than zero."); return; }
-  const hapKind = F.id ? "edit" : "ok";
   const ex = list.find(x => x.id === F.id);
   if (ex) Object.assign(ex, o, { u: Date.now() }); else { const nid = crypto.randomUUID(); F.id = nid; list.push({ id: nid, ...o, u: Date.now() }); }
-  haptic(hapKind);
   finishForm();
 });
 $("#insBody").onclick = e => {
@@ -764,7 +744,7 @@ render = function () { baseRender.apply(this, arguments); if ($("#search").class
 /* ---------- Undo delete, smart category, CSV export ---------- */
 function delTx(id) {
   const tx = S.tx.find(t => t.id === id); if (!tx) return;
-  haptic("del"); S.del[id] = Date.now(); S.tx = S.tx.filter(t => t.id !== id); save(); render();
+  S.del[id] = Date.now(); S.tx = S.tx.filter(t => t.id !== id); save(); render();
   toast("Transaction deleted", () => { delete S.del[id]; S.tx.push({ ...tx, u: Date.now() }); save(); render(); });
 }
 function suggestCat() { // pick the category you usually use for this description, unless you already chose one
