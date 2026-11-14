@@ -101,21 +101,23 @@ function chart(list, pr) {
 }
 
 /* ---------- Add / edit sheet ---------- */
-/* Tap feedback. Android vibrates with a pattern; iPhone (iOS 18 and later) plays its own tap when a hidden switch is toggled */
+/* Tap feedback. Android vibrates with a pattern. iPhone (iOS 18 and later) plays its own tap when a switch is toggled, so the switch is created when the page loads and both methods are tried */
 let hapticSwitch = null;
+function hapticSetup() {
+  const lab = document.createElement("label");
+  lab.setAttribute("aria-hidden", "true");
+  lab.style.cssText = "position:fixed;left:8px;bottom:8px;width:51px;height:31px;opacity:0.01;pointer-events:none";
+  const box = document.createElement("input");
+  box.type = "checkbox"; box.setAttribute("switch", ""); box.tabIndex = -1;
+  lab.appendChild(box); document.body.appendChild(lab); hapticSwitch = lab;
+}
 function haptic(kind) {
   const pattern = { warn: [30, 70, 30], del: [40] }[kind] || [12];
-  if (navigator.vibrate) { navigator.vibrate(pattern); return; }
-  if (!hapticSwitch) {
-    const lab = document.createElement("label");
-    lab.setAttribute("aria-hidden", "true");
-    lab.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none";
-    const box = document.createElement("input");
-    box.type = "checkbox"; box.setAttribute("switch", ""); box.tabIndex = -1;
-    lab.appendChild(box); document.body.appendChild(lab); hapticSwitch = lab;
-  }
+  if (navigator.vibrate) navigator.vibrate(pattern);
+  if (!hapticSwitch) hapticSetup();
   hapticSwitch.click();
 }
+hapticSetup();
 /* The time of the last save or edit, shown in grey under the description; generated or older entries have no time */
 function txTime(t) {
   if (!t.u) return "";
