@@ -136,7 +136,7 @@ function drawAdd() {
 }
 function key(k) {
   if (k === "save") return saveTx();
-  if (k === "next") { if (+D.amt > 0) $("#note").focus(); return; }
+  if (k === "next") { if (+D.amt > 0) $("#note").focus({ preventScroll: true }); return; }
   if (k === "<") D.amt = D.amt.slice(0, -1);
   else if (D.amt.length < 9 && !(D.amt === "" && k === "0")) D.amt += k;
   const a = $("#amt"); a.innerHTML = "<span>₹</span>" + (D.amt || 0); a.classList.toggle("z", !D.amt); const nb = $("#nextBtn"); if (nb) nb.disabled = !(+D.amt > 0);
@@ -144,7 +144,7 @@ function key(k) {
 function saveTx() {
   const a = +D.amt || 0;
   if (!(a > 0)) { alert("Enter an amount greater than zero."); return; }
-  if (!D.id && !D.note.trim()) { $("#note").focus(); return; }
+  if (!D.id && !D.note.trim()) { $("#note").focus({ preventScroll: true }); return; }
   const tx = { id: D.id || crypto.randomUUID(), type: D.type, amount: a, date: D.date, note: D.note.trim(), cat: D.cat, u: Date.now() };
   const i = S.tx.findIndex(t => t.id === tx.id);
   if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
@@ -520,13 +520,7 @@ sheet.addEventListener("focusin", e => { if (e.target.id === "note") sheet.class
 sheet.addEventListener("focusout", e => { if (e.target.id === "note") setTimeout(() => { if (document.activeElement !== e.target) sheet.classList.remove("typing"); }, 150); });
 sheet.addEventListener("mousedown", e => { if (e.target.closest(".savebar")) e.preventDefault(); }); // keep the keyboard up while tapping Save
 sheet.addEventListener("click", e => { if (e.target.closest("#amt")) { sheet.classList.remove("typing"); if (document.activeElement && document.activeElement.id === "note") document.activeElement.blur(); } });
-if (window.visualViewport) { // lift the sheet above the on-screen keyboard
-  const vv = window.visualViewport, fit = () => {
-    const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-    sheet.style.bottom = kb ? kb + "px" : ""; sheet.style.maxHeight = kb ? Math.round(vv.height * .96) + "px" : "";
-  };
-  vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit);
-}
+// The sheet stays where it is; the on-screen keyboard opens over its lower part.
 (function () { // drag the handle down to close any sheet
   let on = false, y0 = 0, dy = 0;
   sheet.addEventListener("pointerdown", e => { if (e.pointerType === "touch" || !e.target.closest(".hd")) return; on = true; y0 = e.clientY; dy = 0; sheet.style.transition = "none"; try { sheet.setPointerCapture(e.pointerId); } catch (_) {} });
