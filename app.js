@@ -230,7 +230,7 @@ function renderIns() {
   el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
-const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } showPage($("#" + id)); };
+const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
 $$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
 $("#bk").onclick = async () => {
@@ -663,46 +663,53 @@ sheet.addEventListener("click", e => {
 $("#insBody").addEventListener("click", e => { const b = e.target.closest("[data-cb]"); if (b) openCB(b.dataset.cb); });
 
 /* ---------- Swipe a page sideways to go back, search & filter ---------- */
-/* ---------- Page transitions: scale-in on open, swipe right to close ---------- */
+/* ---------- Page transitions, matched to the reference recording: Settings slides in from the left and Insights from the right, while the home screen moves the other way. Search keeps its fade-in. ---------- */
 var lastVK = "", chartRAF = 0;
 const stage = $("#stage");
-function syncStage() { stage.classList.toggle("under", !!document.querySelector(".page.open")); }
+const PAGE_MOTION = { settings: { dir: -1, open: 350, close: 200 }, insights: { dir: 1, open: 300, close: 200 } };
+const pageEaseOut = t => 1 - Math.pow(1 - t, 3);
+const pageEaseInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+let slideRun = null;
+function syncStage() { stage.classList.toggle("under", !!document.querySelector("#search.open")); }
 function showPage(p) { p.style.transform = ""; p.classList.add("open"); syncStage(); }
+function slidePage(p, opening) {
+  if (slideRun) slideRun.finish();
+  const m = PAGE_MOTION[p.id], dir = m.dir, W = document.body.clientWidth || window.innerWidth;
+  const ms = opening ? m.open : m.close, ease = opening ? pageEaseOut : pageEaseInOut;
+  p.style.transition = "none"; stage.style.transition = "none";
+  if (opening) {
+    p.style.transform = "translateX(" + dir * W + "px)";
+    stage.style.transform = "translateX(0px)";
+    p.classList.add("open");
+  }
+  const run = { id: 0, finish: null };
+  run.finish = () => {
+    cancelAnimationFrame(run.id);
+    if (opening) { p.style.transform = ""; stage.style.transform = "translateX(" + (-dir * W) + "px)"; }
+    else { p.classList.remove("open"); p.style.transform = ""; stage.style.transform = ""; }
+    void stage.offsetWidth;
+    p.style.transition = ""; stage.style.transition = "";
+    if (slideRun === run) slideRun = null;
+    syncStage();
+  };
+  const t0 = performance.now();
+  const frame = now => {
+    const e = ease(Math.max(0, Math.min(1, (now - t0) / ms)));
+    p.style.transform = "translateX(" + (opening ? dir * W * (1 - e) : dir * W * e) + "px)";
+    stage.style.transform = "translateX(" + (opening ? -dir * W * e : -dir * W * (1 - e)) + "px)";
+    if (now - t0 < ms) run.id = requestAnimationFrame(frame); else run.finish();
+  };
+  slideRun = run;
+  run.id = requestAnimationFrame(frame);
+}
 function closePage(p) {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   if (!p.classList.contains("open")) return;
+  if (PAGE_MOTION[p.id]) { slidePage(p, false); return; }
   p.style.transition = "transform .26s cubic-bezier(.22,.7,.3,1)"; p.style.transform = "translateX(100%)";
   stage.style.transition = ""; stage.style.transform = ""; stage.classList.remove("under");
   setTimeout(() => { p.classList.remove("open"); p.style.transition = ""; p.style.transform = ""; syncStage(); }, 270);
 }
-$$(".page").forEach(p => {
-  let x0 = 0, y0 = 0, dx = 0, t0 = 0, on = false, drag = false;
-  const W = () => window.innerWidth;
-  p.addEventListener("touchstart", e => {
-    if (e.touches.length !== 1 || e.target.closest("input,textarea,select,.seg,.fl,.cats,.cwrap")) { on = false; return; }
-    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; t0 = Date.now(); on = true; drag = false;
-  }, { passive: true });
-  p.addEventListener("touchmove", e => {
-    if (!on) return;
-    const t = e.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
-    if (!drag) {
-      if (ddx > 22 && ddx > Math.abs(ddy) * 2.5) { drag = true; p.style.transition = "none"; stage.style.transition = "none"; }
-      else { if (Math.abs(ddy) > 12 || ddx < -12) on = false; return; }
-    }
-    dx = Math.max(0, ddx - 22); e.preventDefault();
-    p.style.transform = "translateX(" + dx + "px)";
-    stage.style.transform = "translateX(" + (-0.28 * W() * (1 - Math.min(1, Math.max(0, dx - 0.2 * W()) / (0.8 * W())))) + "px)";
-  }, { passive: false });
-  const end = () => {
-    const was = drag; drag = false; on = false;
-    if (!was) return;
-    p.style.transition = ""; stage.style.transition = "";
-    const fast = dx > 40 && dx / Math.max(1, Date.now() - t0) > 0.45;
-    if (dx > W() * 0.35 || fast) closePage(p);
-    else { p.style.transition = "transform .25s cubic-bezier(.22,.7,.3,1)"; p.style.transform = ""; stage.style.transform = ""; setTimeout(() => { p.style.transition = ""; }, 260); }
-  };
-  p.addEventListener("touchend", end); p.addEventListener("touchcancel", end);
-});
 function animateChart(list) {
   cancelAnimationFrame(chartRAF);
   const t0 = performance.now(), dur = 330, ease = t => 1 - Math.pow(1 - t, 3), clamp = v => Math.max(0, Math.min(1, v));
