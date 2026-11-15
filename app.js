@@ -30,6 +30,8 @@ scrim.onclick = hideSheet;
 
 /* ---------- Dashboard ---------- */
 function render() {
+  const selV = type + "|" + range + "|" + vm;
+  if (selV !== selKey) { selIdx = -1; selKey = selV; }
   $$("#typeSeg button").forEach(b => b.classList.toggle("on", b.dataset.t === type));
   $$("#rangeSeg button").forEach(b => b.classList.toggle("on", b.dataset.r === range));
   const yr = String(new Date().getFullYear()), all = type === "net" ? S.tx : S.tx.filter(t => t.type === type), isN = type === "net";
@@ -46,6 +48,7 @@ function render() {
   bl.className = "bl" + (isB && bud && tot > bud ? " over" : "") + (!isB && !isN && any ? (net >= 0 ? " pos" : " over") : "");
   const vk = type + "|" + range + "|" + vm, viewChanged = vk !== lastVK; lastVK = vk;
   if (viewChanged) animateChart(list); else chart(list);
+  applySelectedHeader();
   const L = $("#list"); if (viewChanged) { L.classList.remove("enter"); void L.offsetWidth; L.classList.add("enter"); }
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
   if (range === "1M") {
@@ -58,6 +61,7 @@ function render() {
   }
 }
 
+var selIdx = -1, selKey = "", chartGeo = null;
 function chart(list, pr) {
   const c = $("#chart"), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
   c.width = W * dpr; c.height = H * dpr;
@@ -84,15 +88,17 @@ function chart(list, pr) {
   const valsI = isN ? keys.map(k => sumK(k, "income")) : [], valsE = isN ? keys.map(k => sumK(k, "expense")) : [];
   const vals = isN ? keys.map((_, i) => Math.max(valsI[i], valsE[i])) : keys.map(k => sumK(k));
   const L = 26, R = 26, top = 10, base = H - 30, slot = (W - L - R) / keys.length;
+  chartGeo = { L, slot, n: keys.length, keys, one: range === "1M" };
   const bw = Math.min(range === "1M" ? 8 : 24, slot * .68), max = Math.max(1, ...vals);
   x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
   
   const td = +today().slice(8), isCur = range === "1M" && vm === tk.slice(0, 7);
   x.font = "13px -apple-system,sans-serif"; x.textAlign = "center";
+  x.beginPath(); x.moveTo(L, base + .5); x.lineTo(W - R, base + .5); x.stroke();
   vals.forEach((v, i) => {
     const cx = L + slot * (i + .5);
     const bar = (c2, val, col, w) => { if (val > 0) { const hh = Math.max(4, (base - top) * val / max * (pr ? pr(i) : 1)); x.fillStyle = col; x.beginPath(); (x.roundRect || x.rect).call(x, c2 - w / 2, base - hh, w, hh, 4); x.fill(); } };
-    if (isN) { bar(cx - bw / 4 - .5, valsI[i], "#4ade80", bw / 2 - 1); bar(cx + bw / 4 + .5, valsE[i], "#ff5f5f", bw / 2 - 1); } else bar(cx, v, type === "expense" ? "#fe4f4f" : "#4ade80", bw);
+    const dimB = selIdx >= 0 && i !== selIdx, cE = dimB ? "#5b2020" : "#fe4f4f", cI = dimB ? "#1f5a37" : "#4ade80", cNE = dimB ? "#5b2020" : "#ff5f5f"; if (isN) { bar(cx - bw / 4 - .5, valsI[i], cI, bw / 2 - 1); bar(cx + bw / 4 + .5, valsE[i], cNE, bw / 2 - 1); } else bar(cx, v, type === "expense" ? cE : cI, bw);
     const d = lab[i];
     const show = range !== "1M" || d === 1 || (isCur && d === td) || ((d - 1) % 4 === 0 && !(isCur && Math.abs(d - td) < 3));
     if (show) { x.fillStyle = "#cfcfcf"; x.fillText(String(d), cx, base + 21); }
@@ -630,10 +636,32 @@ function shiftMonth(d) {
   if (ym > today().slice(0, 7) || ym < lo) return; vm = ym; render();
 }
 $("#mPrev").onclick = () => shiftMonth(-1); $("#mNext").onclick = () => shiftMonth(1);
+/* Tapping a column selects that day (or month): the header shows its date and total, and the other columns dim */
+function pickChartBar(e) {
+  const g = chartGeo; if (!g) return;
+  const x = e.clientX - $("#chart").getBoundingClientRect().left;
+  const i = Math.floor((x - g.L) / g.slot);
+  selIdx = i >= 0 && i < g.n && i !== selIdx ? i : -1;
+  render();
+}
+function applySelectedHeader() {
+  const g = chartGeo;
+  if (!g || selIdx < 0) return;
+  if (selIdx >= g.n) { selIdx = -1; return; }
+  const key = g.keys[selIdx], isN = type === "net", yr = String(new Date().getFullYear());
+  const mk = g.one ? key.slice(0, 7) : key;
+  const rows = S.tx.filter(t => t.date.startsWith(key) && (isN || t.type === type));
+  const iS = sum(rows.filter(t => t.type === "income")), eS = sum(rows.filter(t => t.type === "expense")), nv = r2(iS - eS);
+  const yearTxt = mk.slice(0, 4) !== yr ? " " + mk.slice(0, 4) : "";
+  $("#period").textContent = g.one ? mname(mk) + " " + +key.slice(8) + yearTxt : mname(mk) + yearTxt;
+  $("#total").textContent = isN ? sgn(nv) : fmt(type === "income" ? iS : eS);
+  $("#total").className = "total" + (isN ? (nv >= 0 ? " pos" : " neg") : "");
+  $("#bl").textContent = isN ? "Income " + fmt(iS) + " · Spent " + fmt(eS) : "";
+}
 (function () { // swipe the chart sideways to change month
   const c = $("#chart"); let x0 = 0, y0 = 0, on = false;
   c.addEventListener("pointerdown", e => { on = true; x0 = e.clientX; y0 = e.clientY; });
-  c.addEventListener("pointerup", e => { if (!on) return; on = false; const dx = e.clientX - x0, dy = e.clientY - y0; if (range === "1M" && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftMonth(dx < 0 ? 1 : -1); });
+  c.addEventListener("pointerup", e => { if (!on) return; on = false; const dx = e.clientX - x0, dy = e.clientY - y0; if (range === "1M" && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) shiftMonth(dx < 0 ? 1 : -1); else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) pickChartBar(e); });
   c.addEventListener("pointercancel", () => { on = false; });
 })();
 function toast(m, undo) {
