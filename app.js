@@ -31,7 +31,7 @@ scrim.onclick = hideSheet;
 /* ---------- Dashboard ---------- */
 function render() {
   const selV = type + "|" + range + "|" + vm;
-  if (selV !== selKey) { selIdx = -1; selKey = selV; }
+  if (selV !== selKey) { selIdx = -1; fltOn = false; selKey = selV; }
   $$("#typeSeg button").forEach(b => b.classList.toggle("on", b.dataset.t === type));
   $$("#rangeSeg button").forEach(b => b.classList.toggle("on", b.dataset.r === range));
   const yr = String(new Date().getFullYear()), all = type === "net" ? S.tx : S.tx.filter(t => t.type === type), isN = type === "net";
@@ -50,9 +50,13 @@ function render() {
   if (viewChanged) animateChart(list); else chart(list);
   applySelectedHeader();
   const L = $("#list"); if (viewChanged) { L.classList.remove("enter"); void L.offsetWidth; L.classList.add("enter"); }
+  syncFilterBtn();
+  const fkey = fltOn && selIdx >= 0 && chartGeo ? chartGeo.keys[selIdx] : "";
+  const rowsL = fkey ? list.filter(t => t.date.startsWith(fkey)) : list;
   if (!list.length) { L.innerHTML = '<div class="empty">No transactions yet</div>'; return; }
-  if (range === "1M") {
-    L.innerHTML = [...list].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
+  if (fkey && !rowsL.length) { L.innerHTML = '<div class="empty">No transactions here</div>'; return; }
+  if (range === "1M" || fkey) {
+    L.innerHTML = [...rowsL].sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0)).map(t =>
       `<div class="rw"><div class="ra l"><button class="ed" data-redit="${esc(t.id)}" aria-label="Edit">${ICO_ED}</button></div><div class="ra r"><button class="dl" data-rdel="${esc(t.id)}" aria-label="Delete">${ICO_DEL}</button></div><button class="row" data-id="${esc(t.id)}"><div class="badge">${t.date.slice(8)}<small>${mname(t.date, { month: "short" }).toUpperCase()}</small></div><span class="n">${esc(t.note || t.cat)}${txTime(t)}</span><span class="a ${t.type}">${isN ? (t.type === "income" ? "+" : "−") : ""}${fmt(t.amount)}</span></button></div>`).join("");
   } else {
     const by = {}; list.forEach(t => { const k = t.date.slice(0, 7); by[k] = (by[k] || 0) + (isN && t.type === "expense" ? -t.amount : t.amount); });
@@ -61,7 +65,7 @@ function render() {
   }
 }
 
-var selIdx = -1, selKey = "", chartGeo = null;
+var selIdx = -1, selKey = "", chartGeo = null, fltOn = false;
 function chart(list, pr) {
   const c = $("#chart"), dpr = window.devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
   c.width = W * dpr; c.height = H * dpr;
@@ -89,6 +93,7 @@ function chart(list, pr) {
   const vals = isN ? keys.map((_, i) => Math.max(valsI[i], valsE[i])) : keys.map(k => sumK(k));
   const L = 26, R = 26, top = 10, base = H - 30, slot = (W - L - R) / keys.length;
   chartGeo = { L, slot, n: keys.length, keys, one: range === "1M" };
+  if (selIdx >= 0 && (selIdx >= keys.length || !rowsOn(keys[selIdx]).length)) selIdx = -1;
   const bw = Math.min(range === "1M" ? 8 : 24, slot * .68), max = Math.max(1, ...vals);
   x.strokeStyle = "#333"; x.lineWidth = 1.2; x.setLineDash([5, 6]);
   
@@ -636,21 +641,22 @@ function shiftMonth(d) {
   if (ym > today().slice(0, 7) || ym < lo) return; vm = ym; render();
 }
 $("#mPrev").onclick = () => shiftMonth(-1); $("#mNext").onclick = () => shiftMonth(1);
-/* Tapping a column selects that day (or month): the header shows its date and total, and the other columns dim */
+/* A column is selected only if it has spending or income: the header shows its date and total and the other columns dim. A column with no data, or a day still to come, clears the selection and the header goes back to the total */
+function rowsOn(key) { return S.tx.filter(t => t.date.startsWith(key) && (type === "net" || t.type === type)); }
 function pickChartBar(e) {
   const g = chartGeo; if (!g) return;
   const x = e.clientX - $("#chart").getBoundingClientRect().left;
   const i = Math.floor((x - g.L) / g.slot);
-  selIdx = i >= 0 && i < g.n && i !== selIdx ? i : -1;
+  const ok = i >= 0 && i < g.n && i !== selIdx && rowsOn(g.keys[i]).length > 0;
+  selIdx = ok ? i : -1;
   render();
 }
 function applySelectedHeader() {
   const g = chartGeo;
-  if (!g || selIdx < 0) return;
-  if (selIdx >= g.n) { selIdx = -1; return; }
+  if (!g || selIdx < 0 || selIdx >= g.n) return;
   const key = g.keys[selIdx], isN = type === "net", yr = String(new Date().getFullYear());
   const mk = g.one ? key.slice(0, 7) : key;
-  const rows = S.tx.filter(t => t.date.startsWith(key) && (isN || t.type === type));
+  const rows = rowsOn(key);
   const iS = sum(rows.filter(t => t.type === "income")), eS = sum(rows.filter(t => t.type === "expense")), nv = r2(iS - eS);
   const yearTxt = mk.slice(0, 4) !== yr ? " " + mk.slice(0, 4) : "";
   $("#period").textContent = g.one ? mname(mk) + " " + +key.slice(8) + yearTxt : mname(mk) + yearTxt;
@@ -658,6 +664,13 @@ function applySelectedHeader() {
   $("#total").className = "total" + (isN ? (nv >= 0 ? " pos" : " neg") : "");
   $("#bl").textContent = isN ? "Income " + fmt(iS) + " · Spent " + fmt(eS) : "";
 }
+/* The filter button is enabled only while a column with data is selected; when on, the list shows just that column's transactions */
+function syncFilterBtn() {
+  const fb = $("#fltBtn"); if (!fb) return;
+  fb.disabled = selIdx < 0;
+  fb.classList.toggle("on", fltOn && selIdx >= 0);
+}
+$("#fltBtn").onclick = () => { if (selIdx < 0) return; fltOn = !fltOn; render(); };
 (function () { // swipe the chart sideways to change month
   const c = $("#chart"); let x0 = 0, y0 = 0, on = false;
   c.addEventListener("pointerdown", e => { on = true; x0 = e.clientX; y0 = e.clientY; });
