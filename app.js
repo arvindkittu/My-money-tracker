@@ -1031,7 +1031,11 @@ sheet.addEventListener("click", e => {
 /* ---------- Full-height layout on the Home Screen app ---------- */
 function fitViewport() {
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
-  document.documentElement.style.setProperty("--app-h", (standalone ? Math.max(innerHeight, screen.height) : innerHeight) + "px");
+  const h = standalone ? Math.max(innerHeight, screen.height) : innerHeight;
+  document.documentElement.style.setProperty("--app-h", h + "px");
+  /* desktop app windows can be shorter than the screen: lift the add button onto the visible bottom edge (touch screens are unchanged) */
+  const lift = matchMedia("(any-pointer: fine)").matches ? Math.max(0, h - innerHeight) : 0;
+  document.documentElement.style.setProperty("--fab-lift", lift + "px");
 }
 fitViewport(); addEventListener("resize", fitViewport); addEventListener("orientationchange", fitViewport);
 
