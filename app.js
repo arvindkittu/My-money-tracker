@@ -396,18 +396,20 @@ function renderGoals(el) {
     const p = pct(g.saved, g.target), left = Math.max(0, r2(g.target - g.saved));
     return `<div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">${esc(g.name)}</span><span class="na">${fmt(g.saved)} / ${fmt(g.target)}</span></div><div class="nb"><i style="width:${p}%;background:var(--grn)"></i></div><div class="nf"><small>${p >= 100 ? "Goal reached 🎉" : p + "% · " + fmt(left) + " to go"}</small><button data-gedit="${esc(g.id)}">Edit</button><button class="acc g" data-gadd="${esc(g.id)}">+ Add</button></div></div>`;
   }).join("");
-  el.innerHTML = `<h2 class="hd2">Put money aside<br>for what <span class="acc g">matters.</span></h2>`
-    + `<div class="ncard">${rows || '<div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">Set a target for anything</span></div></div><div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">Add money as you save</span></div></div><div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">See how close you are</span></div></div>'}</div>`
-    + `<p class="hint">Save it first, then buy it.<br>No EMIs, no interest.</p><button class="acc g link" data-gnew="1">+ Add a goal</button>`;
+  const ex = ["Emergency fund", "iPhone 17", "MacBook Air", "Royal Enfield 350"].map(n => `<div class="nrow ex"><i class="dot g"></i><span class="nn">${n}</span></div>`).join("");
+  el.innerHTML = `<div class="nsec"><h2 class="hd2">Put money aside<br>for what <span class="acc g">matters.</span></h2>`
+    + `<div class="ncard">${rows || ex}</div>`
+    + `<p class="hint">Save it first, then buy it.<br>No EMIs, no interest.</p><button class="acc g link" data-gnew="1">+ Add a goal</button></div>`;
 }
 function renderLoans(el) {
   const rows = S.loans.map(l => {
     const p = pct(l.paid, l.total), left = Math.max(0, r2(l.total - l.paid)), n = l.emi > 0 ? Math.ceil(left / l.emi) : 0;
     return `<div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">${esc(l.name)}</span><span class="na">${fmt(l.paid)} / ${fmt(l.total)}</span></div><div class="nb"><i style="width:${p}%;background:var(--red)"></i></div><div class="nf"><small>${left <= 0 ? "Paid off 🎉" : fmt(left) + " left · " + n + " EMI" + (n === 1 ? "" : "s") + " of " + fmt(l.emi)}</small><button data-ledit="${esc(l.id)}">Edit</button>${left > 0 && l.emi > 0 ? `<button class="acc r" data-lpay="${esc(l.id)}">Pay EMI</button>` : ""}</div></div>`;
   }).join("");
-  el.innerHTML = `<h2 class="hd2">All your loans,<br>in <span class="acc r">one place.</span></h2>`
-    + `<div class="ncard">${rows || '<div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">Track every EMI you pay</span></div></div><div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">See your total EMI each month</span></div></div><div class="nrow"><div class="nt"><i class="dot r"></i><span class="nn">Know when each loan ends</span></div></div>'}</div>`
-    + `<button class="acc r link" data-lnew="1">+ Add a loan</button>`;
+  const ex = ["Track every EMI you pay", "See your total EMI each month", "Know when each loan ends"].map(n => `<div class="nrow ex"><i class="dot r"></i><span class="nn">${n}</span></div>`).join("");
+  el.innerHTML = `<div class="nsec"><h2 class="hd2">All your loans,<br>in <span class="acc r">one place.</span></h2>`
+    + `<div class="ncard">${rows || ex}</div>`
+    + `<button class="acc r link" data-lnew="1">+ Add a loan</button></div>`;
 }
 function openForm(kind, id) {
   const G = kind === "goal", it = (G ? S.goals : S.loans).find(x => x.id === id) || {};
