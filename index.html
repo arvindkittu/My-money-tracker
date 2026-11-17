@@ -269,6 +269,147 @@ body{overflow:hidden;overflow:clip}
 .nsec .hint{margin:0;font-size:11px;line-height:16px;color:#9a9a9a}
 .nsec .link{margin:0 auto;font-size:13px;font-weight:600}
 .nsec .hint + .link{margin-top:21px}
+
+/* v2.3.19: Savings tab built from the reference app's screens (list, monthly chart, goal detail, add/withdraw sheet, date wheel, jar, delete dialogs) */
+.stot{text-align:center;padding-top:9px}
+.stot small{margin-top:3px}
+.stot + .shd{margin-top:30px}
+.stot b{display:block;font-size:36px;font-weight:400;line-height:44px}
+.stot small{display:block;font-size:13px;color:#999}
+.shd{display:flex;align-items:center;justify-content:space-between;padding:0 18px;margin:22px 0 9px}
+.shd span{font-size:9px;letter-spacing:.8px;color:#666;text-transform:uppercase}
+.shd .addlink{background:none;border:0;padding:0;color:#4ade80;font-size:11px;font-weight:600}
+.shd.solo{justify-content:flex-start;margin-top:17px}
+.chc{position:relative;margin:0 -2px;height:174px;background:#141414;border-radius:28px;overflow:hidden}
+.chc.big{height:213px}
+.chv{position:absolute;left:0;right:0;top:25px;text-align:center;font-size:10.5px;font-weight:600;color:#4ade80}
+.chv.neg{color:#ff5f5f}
+.chv.zero{color:#8e8e93;font-weight:500}
+.chc.big .chv{top:64px}
+.chs{position:absolute;left:0;right:0;top:50px;height:80px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none}
+.chc.big .chs{top:88px}
+.chs::-webkit-scrollbar{display:none}
+.cht{display:flex;width:max-content;height:80px;padding:0 calc(50% - 14px)}
+.cc{position:relative;flex:none;width:28px;height:80px;display:flex;align-items:flex-end;justify-content:center;scroll-snap-align:center}
+.cc .b{display:block;width:10px;border-radius:5px;background:#545454}
+.cc .b.cur{background:#348c54}
+.cc .b.neg{background:#7a3a3a}
+.cc .d{display:block;width:6px;height:6px;border-radius:50%;background:#444;margin-bottom:2px}
+.cc.sel .b{background:#48dc80}
+.cc.sel .b.neg{background:#ff5f5f}
+.cc.sel .d{background:#fff}
+.chm{position:absolute;left:0;right:0;bottom:18px;text-align:center;font-size:10.5px;color:#8e8e93}
+.chc.big .chm{bottom:16px}
+.swrow{position:relative;overflow:hidden}
+.gsw{margin:0 -2px;border-radius:28px}
+.gsw + .gsw{margin-top:12px}
+.swc{position:relative;z-index:1;background:#141414;transition:transform .2s;touch-action:pan-y}
+.gcard{border-radius:28px;padding:16px 20px}
+.gtop{display:flex;align-items:center;justify-content:space-between;font-size:13px;min-width:0}
+.gname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gamt{flex:none;font-size:12px;white-space:nowrap}
+.gamt small{font-size:12px;color:#999}
+.gamt .chev{font-style:normal;color:#666;font-size:18px;margin-left:6px}
+.gbar{height:8px;border-radius:4px;background:#2c2c2c;overflow:hidden;margin-top:10px}
+.gbar i{display:block;height:100%;border-radius:4px;background:#4ade80}
+.swd{position:absolute;right:20px;top:50%;width:32px;height:32px;margin-top:-16px;padding:0;border:0;border-radius:50%;background:#ff453a;display:grid;place-items:center;z-index:0}
+.swd svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.gdh{text-align:center;margin-top:-7px}
+.gdn{position:relative;text-align:center}
+.gdn b{font-size:16px;font-weight:600}
+.gedit{position:absolute;left:50%;top:50%;transform:translate(14px,-50%);background:none;border:0;padding:4px;color:#8e8e93;display:grid;place-items:center}
+.gedit svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gdw{font-size:10.5px;color:#999;margin-top:2px}
+.gpc{margin:18px -2px 0;background:#141414;border-radius:28px;padding:21px 20px 20px}
+.gpr{display:flex;align-items:baseline;gap:6px;font-size:13px;color:#999;white-space:nowrap}
+.gpr b{font-size:19px;line-height:24px;font-weight:600;color:#fff}
+.gpr em{margin-left:auto;font-style:normal;font-size:10.5px}
+.gpc .gbar{background:#182c20;margin-top:10px}
+.mavg{position:absolute;left:20px;top:18px}
+.mavg b{display:block;font-size:18px;font-weight:600;line-height:22px}
+.mavg small{display:block;margin-top:2px;font-size:11px;line-height:14px;color:#999}
+.gpc + .shd{margin-top:33px;margin-bottom:3px}
+.hcard{margin:0 -2px;background:#141414;border-radius:28px;overflow:hidden}
+.hrow{border-bottom:1px solid #1c1c1c}
+.hrow:last-child{border-bottom:0}
+.hcard .row{padding:12px 16px}
+.hcard .row .n{font-size:11px}
+.hcard .row .a{font-size:11.5px}
+.a.gp{color:#4ade80}
+.a.gw{color:#8a8a8a}
+.hempty{padding:18px 16px;color:#666;font-size:14px}
+.sheet.gform{top:39.5%;display:flex;flex-direction:column;padding:0 20px}
+.gfh{text-align:center;font-size:14px;font-weight:600;margin:14px 0 20px}
+.grow{display:flex;align-items:center;justify-content:space-between;gap:10px;height:44px;padding:0 17px;margin:0 0 12px;border-radius:22px;background:#242424;box-sizing:border-box}
+.grow span{flex:none;font-size:14px;color:#fff;white-space:nowrap}
+.grow input{flex:1;min-width:0;text-align:right;background:none;border:0;outline:0;padding:0;color:#dfdfdf;font:inherit;font-size:14px}
+.grow input::placeholder{color:#a8a8a8}
+.gbtn{margin:auto 0 calc(env(safe-area-inset-bottom, 0px) + 10px);width:100%;height:49px;border-radius:25px;font-size:15px;font-weight:600;background:#d4d4d4;color:#000}
+.gbtn:disabled{background:#747474;color:#1a1a1a;opacity:1}
+.sheet:has(#mAmt){top:25%;display:flex;flex-direction:column}
+.sheet.msheet .mseg{align-self:center}
+.mamt{font-size:46px;font-weight:400;margin:22px 0 6px}
+.mamt span{font-size:26px;color:#919191}
+.sheet.msheet .note{font-size:14px;margin:14px 0 12px;color:#fff}
+.sheet.msheet .note::placeholder{color:#555}
+.sheet.msheet .chips{justify-content:center;margin:0 0 6px}
+.mkeys .save{width:101px!important;height:50px!important;border-radius:25px!important;font-size:16px!important;justify-self:end;align-self:center}
+.wheel{position:absolute;left:0;right:0;bottom:0;height:372px;background:#101010;border-radius:28px 28px 0 0;overflow:hidden}
+.wdone{position:absolute;top:19px;right:35px;z-index:2;background:none;border:0;color:#fff;font-size:15px;font-weight:600;padding:0}
+.wsel{position:absolute;left:8px;right:8px;top:117px;height:39px;border-radius:20px;background:#282828;z-index:0}
+.wcols{position:absolute;left:20px;right:20px;top:39px;height:195px;display:flex;z-index:1}
+.wcol{position:relative;height:195px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none}
+.wcol::-webkit-scrollbar{display:none}
+.wcol[data-wc="d"]{width:116px}
+.wcol[data-wc="m"]{width:104px}
+.wcol[data-wc="y"]{width:133px}
+.wi{height:39px;display:flex;align-items:center;justify-content:center;font-size:17px;color:#666;scroll-snap-align:center}
+.wi.on{color:#fff;font-weight:500}
+.wsp{display:block;height:78px}
+#jarfx{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.72);display:none;flex-direction:column;align-items:center;padding-top:327px;box-sizing:border-box}
+#jarfx.on{display:flex;animation:fadeIn .2s ease both}
+#jarfx .jbox{position:relative;width:98px;height:156px}
+#jarfx .jbox svg{position:absolute;left:0;top:0;width:98px;height:156px}
+.coin{position:absolute;width:27px;height:9px;border-radius:5px;background:linear-gradient(#ebcb62,#e0b848 55%,#b99636);box-shadow:0 2px 0 #9c7a2b;animation:coinIn .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes coinIn{from{transform:translateY(-44px);opacity:0}to{transform:none;opacity:1}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.jv{position:absolute;left:86px;top:30px;font-size:15px;font-weight:600;white-space:nowrap}
+.jv.pos{color:#4ade80}
+.jv.neg{color:#ff5f5f}
+#jarfx .jn{margin-top:34px;font-size:14px;color:#fff}
+#jarfx .jt{margin-top:10px;font-size:22px;color:#fff}
+#jarfx .jt small{font-size:14px;color:#999;margin-left:4px}
+#cfm{position:fixed;inset:0;z-index:65;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
+#cfm.on{display:flex}
+.cfmbox{width:345px;box-sizing:border-box;background:#141414;border-radius:28px;padding:38px 25px 25px}
+.cfmbox b{display:block;font-size:15px;font-weight:600;line-height:18px;margin-bottom:8px}
+.cfmbox p{margin:0 0 23px;font-size:14px;line-height:18px;color:#a1a1a1}
+.cfmbox button{width:100%;height:41px;border:0;border-radius:21px;background:#342020;color:#e46969;font-size:15px;font-weight:600}
+#savFab{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom, 0px) + 14px + var(--fab-lift, 0px));transform:translateX(-50%);width:68px;height:68px;border-radius:50%;border:0;padding:0;background:#333234;display:none;place-items:center;z-index:12}
+#savFab.on{display:grid}
+#savFab svg{width:34px;height:34px;stroke:#fff;stroke-width:2.2;stroke-linecap:round;fill:none}
+/* v2.3.20 pass: values measured against the reference screens (money sheet, date wheel, jar, dialogs, swipe) */
+.swc .swrow{background:inherit;position:relative;z-index:1}
+.sheet.msheet{padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 10px)}
+.sheet.msheet .mseg{background:#262626;border-radius:22px;padding:3px;display:inline-flex}
+.sheet.msheet .mseg button{background:none;color:#a8a8a8;padding:6px 22px;border-radius:19px;font-size:15px;font-weight:500}
+.sheet.msheet .mseg button.on{background:#3a3a3a;color:#fff}
+.sheet.msheet .note{font-size:13px;color:#bdbdbd;margin:44px 0 0}
+.sheet.msheet .chips{margin:34px 0 0}
+.sheet.msheet .chip{font-size:17px}
+.sheet.msheet .mkeys{margin-top:auto}
+.mkeys button{height:70px;font-size:26px;font-weight:500}
+.mkeys .save{width:101px!important;height:48px!important;border-radius:24px!important;font-size:17px!important}
+.wcols,.wcol{height:117px}
+#cfm .cfmbox{padding:22px}
+#cfm .cfmbox b{font-size:15px!important}
+#cfm .cfmbox p{font-size:13.5px!important;line-height:1.4!important}
+#cfm .cfmbox button{font-size:15px!important;height:40px!important}
+#jarfx{background:rgba(0,0,0,.92)}
+#jarfx .jbox{width:112px;height:170px}
+#jarfx .jbox svg{width:112px;height:170px}
+#jarfx .jlvl{position:absolute;left:14px;right:14px;top:62px;border-top:1px dashed #3a3a3a}
+.sheet.gform .save.wide{font-size:15px!important;font-weight:500!important;height:49px!important;border-radius:25px}
 </style></head><body>
 <div id="stage"><header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24" style="stroke-width:1.4;stroke-linecap:butt"><path d="M1.5 5.74h20.9M1.5 12h15.2M1.5 18.26h18.5"/></svg></button>
@@ -283,8 +424,9 @@ body{overflow:hidden;overflow:clip}
 </main>
 <button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button></div>
 
-<section class="page" id="insights"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div></section>
+<section class="page" id="insights"><div class="top"><button id="insBack" aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div><button id="savFab" aria-label="Add or withdraw money"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+</section>
 
 <section class="page" id="settings"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="ttl">Settings</span></div>
 <div class="av"><svg viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg></div><button class="nm" id="nm"></button><div class="em">Data is stored on this device</div>
@@ -297,12 +439,14 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.18</div></section>
+</div><div class="ver">v2.3.20</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
 <div class="fl" id="sPer"></div><div class="fl" id="sCat"></div><div id="sSum"></div><div id="sList"></div></section>
 <div id="scrim"></div><div class="sheet" id="sheet"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<div id="jarfx"><div class="jbox"><svg viewBox="0 0 98 156"><path d="M34 4H64V16C64 26 92 30 92 46V142Q92 152 82 152H16Q6 152 6 142V46C6 30 34 26 34 16Z" fill="rgba(255,255,255,.02)" stroke="#4a4a4a" stroke-width="3" stroke-linejoin="round"/></svg><div class="jv"></div></div><div class="jn"></div><div class="jt"></div></div>
+<div id="cfm"><div class="cfmbox"><b></b><p></p><button></button></div></div>
 <script src="app.js"></script>
 </body></html>
