@@ -81,7 +81,7 @@ jobs:
               pg.click("#search [data-close]"); pg.wait_for_timeout(400)
               pg.click("#menuBtn"); pg.wait_for_timeout(400)
               check(pg.locator("#insBody .icard").count() > 0, "Insights page is empty")
-              pg.click("#insights [data-close]"); pg.wait_for_timeout(400)
+              pg.click("#insBack"); pg.wait_for_timeout(400)
               pg.click("#walletBtn"); pg.wait_for_timeout(400)
               check(pg.locator("#settings .menu").count() > 3, "Settings page is missing its rows")
               b.close()
