@@ -13,10 +13,10 @@ const DC = {
   expense: [["Food", "🍔", "#f59e0b"], ["Bills", "🧾", "#a78bfa"], ["Home", "🏠", "#34d399"], ["Health", "🏥", "#f87171"], ["EMI", "🏦", "#fb923c"], ["Travel", "🚗", "#60a5fa"], ["Shopping", "🛍️", "#f472b6"], ["Investment", "📈", "#22d3ee"], ["Other", "📦", "#9ca3af"]],
   income: [["Salary", "💼", "#34d399"], ["Business", "🏢", "#f59e0b"], ["Side income", "💻", "#60a5fa"], ["Bonus", "🎉", "#f472b6"], ["Interest", "📈", "#a78bfa"], ["Other", "💰", "#9ca3af"]]
 };
-const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], cb: {} });
+const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], gent: [], cb: {} });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {};
+S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.gent = S.gent || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {};
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -25,7 +25,7 @@ const catInfo = (t, n) => S.cats[t].find(c => c[0] === n) || ["Other", "📦", "
 const sheet = $("#sheet"), scrim = $("#scrim");
 const ICO_ED = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>', ICO_DEL = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg>', CHECK = '<svg viewBox="0 0 24 24" style="width:26px;height:26px;stroke:#000;fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const showSheet = () => { scrim.classList.add("on"); sheet.classList.add("open"); };
-const hideSheet = () => { scrim.classList.remove("on"); sheet.classList.remove("open"); if (document.activeElement) document.activeElement.blur(); };
+const hideSheet = () => { MS = null; GF = null; scrim.classList.remove("on"); sheet.classList.remove("open"); if (document.activeElement) document.activeElement.blur(); };
 scrim.onclick = hideSheet;
 
 /* ---------- Dashboard ---------- */
@@ -240,8 +240,8 @@ function renderIns() {
   Object.entries(S.cb).forEach(([n, lim]) => { const v = sum(ex.filter(t => t.cat === n)); if (lim && v >= lim * .8) cards.push([n + (v > lim ? " is over its limit" : " is near its limit"), Math.round(v / lim * 100) + "% of " + fmt(lim)]); });
   el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
 }
-$("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; renderIns(); } };
-const openPage = id => { if (id === "insights") renderIns(); else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
+$("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; savGid = null; renderIns(); } };
+const openPage = id => { if (id === "insights") { savGid = null; renderIns(); } else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
 $$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
 $("#bk").onclick = async () => {
@@ -263,7 +263,7 @@ $("#imp").onchange = async e => {
     const ids = new Set(n.tx.map(t => t.id)), del = { ...(n.del || {}), ...S.del }; S.tx.forEach(t => { if (!ids.has(t.id)) del[t.id] = Date.now(); }); n.del = del; n.su = Date.now(); n.tx.forEach(t => t.u = Date.now()); S = n; save(); render(); alert("Imported.");
   } catch (err) { alert("That file is not a valid backup."); }
 };
-$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); closePage($("#settings")); } };
+$("#er").onclick = () => { if (confirm("Erase all data on this device? This cannot be undone.") && confirm("Really erase everything?")) { const del = { ...S.del }; S.tx.forEach(t => del[t.id] = Date.now()); S.rec.forEach(r => del[r.id] = Date.now()); S.goals.forEach(r => del[r.id] = Date.now()); S.gent.forEach(r => del[r.id] = Date.now()); S.loans.forEach(r => del[r.id] = Date.now()); S = fresh(); S.del = del; S.su = Date.now(); save(); render(); closePage($("#settings")); } };
 
 /* ---------- Cloud sync (Supabase) ---------- */
 const SB_URL = "https://qmqwzhfkvykvdkdurtdh.supabase.co";
@@ -278,7 +278,7 @@ function refreshAcct() {
   $("#lo").hidden = !user;
 }
 // Merge two states: transactions by id (newest edit wins, deletes tracked), settings newest-wins
-function merge(a, b) {
+function mergeRaw(a, b) {
   if (!b || !Array.isArray(b.tx)) return a;
   const now = Date.now(), del = {};
   [a.del, b.del].forEach(o => Object.entries(o || {}).forEach(([k, v]) => { if (now - v < 90 * 864e5) del[k] = Math.max(del[k] || 0, v); }));
@@ -289,8 +289,9 @@ function merge(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), gent: mix(a.gent, b.gent), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
+function merge(a, b) { const m = mergeRaw(a, b); if (m && Array.isArray(m.goals) && Array.isArray(m.gent)) fixSavings(m); return m; }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
   syncing = true; setMsg("Syncing…");
@@ -391,16 +392,338 @@ sheet.addEventListener("click", e => {
 const num = v => Math.max(0, r2(parseFloat(String(v).replace(/,/g, "")) || 0));
 const pct = (a, b) => b > 0 ? Math.min(100, Math.round(a / b * 100)) : 0;
 let F = null;
-function renderGoals(el) {
-  const rows = S.goals.map(g => {
-    const p = pct(g.saved, g.target), left = Math.max(0, r2(g.target - g.saved));
-    return `<div class="nrow"><div class="nt"><i class="dot g"></i><span class="nn">${esc(g.name)}</span><span class="na">${fmt(g.saved)} / ${fmt(g.target)}</span></div><div class="nb"><i style="width:${p}%;background:var(--grn)"></i></div><div class="nf"><small>${p >= 100 ? "Goal reached 🎉" : p + "% · " + fmt(left) + " to go"}</small><button data-gedit="${esc(g.id)}">Edit</button><button class="acc g" data-gadd="${esc(g.id)}">+ Add</button></div></div>`;
-  }).join("");
-  const ex = ["Emergency fund", "iPhone 17", "MacBook Air", "Royal Enfield 350"].map(n => `<div class="nrow ex"><i class="dot g"></i><span class="nn">${n}</span></div>`).join("");
-  el.innerHTML = `<div class="nsec"><h2 class="hd2">Put money aside<br>for what <span class="acc g">matters.</span></h2>`
-    + `<div class="ncard">${rows || ex}</div>`
-    + `<p class="hint">Save it first, then buy it.<br>No EMIs, no interest.</p><button class="acc g link" data-gnew="1">+ Add a goal</button></div>`;
+/* ---------- Savings: goals, monthly chart, history, money in and out (follows the reference app's Savings tab) ---------- */
+var savGid = null, chSel = {}, MS = null, GF = null, jarT = 0, wT = 0;
+const CAL_ICON = '<svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
+const addMonths = (k, n) => { const d = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1 + n, 1); return d.getFullYear() + "-" + pad(d.getMonth() + 1); };
+const gSigned = e => (e.kind === "wd" ? -e.amt : e.amt);
+const gEnts = gid => S.gent.filter(e => e.gid === gid);
+const numIn = s => Math.max(0, r2(parseFloat(String(s).replace(/[^\d.]/g, "")) || 0));
+const fmtIn = n => (n > 0 ? "₹" + (+n).toLocaleString("en-IN") : "");
+function fixSavings(o) {
+  o.gent = o.gent.filter(e => o.goals.some(g => g.id === e.gid));
+  o.goals.forEach(g => { g.saved = r2(o.gent.filter(e => e.gid === g.id).reduce((s, e) => s + gSigned(e), 0)); });
 }
+function recalcGoals() { fixSavings(S); }
+function migrateSavings() {
+  S.goals.forEach(g => {
+    if (!g.created) g.created = today();
+    if (+g.saved > 0 && !S.gent.some(e => e.gid === g.id)) S.gent.push({ id: "start-" + g.id, gid: g.id, kind: "start", amt: r2(+g.saved), note: "", date: g.created, u: 1 });
+  });
+  recalcGoals();
+}
+
+function savStart(gid) {
+  const g = gid ? S.goals.find(x => x.id === gid) : null;
+  const dates = gid ? [(g && g.created) || today(), ...gEnts(gid).map(e => e.date)] : [...S.goals.map(x => x.created || today()), ...S.gent.map(e => e.date)];
+  return dates.length ? dates.reduce((a, b) => (b < a ? b : a)).slice(0, 7) : today().slice(0, 7);
+}
+function savKeys(gid) {
+  const cur = today().slice(0, 7), sels = Object.values(chSel).filter(Boolean);
+  let last = addMonths(cur, 6); sels.forEach(k => { if (k > last) last = k; });
+  const keys = [];
+  for (let k = savStart(gid); k <= last; k = addMonths(k, 1)) keys.push(k);
+  return keys;
+}
+function savNet(gid) {
+  const net = {};
+  (gid ? gEnts(gid) : S.gent).forEach(e => { const k = e.date.slice(0, 7); net[k] = r2((net[k] || 0) + gSigned(e)); });
+  return net;
+}
+function avgPerMonth(gid) {
+  const g = S.goals.find(x => x.id === gid), cur = today().slice(0, 7), st = savStart(gid);
+  const n = Math.max(1, (+cur.slice(0, 4) - +st.slice(0, 4)) * 12 + (+cur.slice(5, 7) - +st.slice(5, 7)) + 1);
+  return r2((g ? g.saved : 0) / n);
+}
+function chartHTML(gid, id, big, pre) {
+  const keys = savKeys(gid), net = savNet(gid), cur = today().slice(0, 7);
+  const max = Math.max(1, ...keys.map(k => Math.abs(net[k] || 0)));
+  const sel = chSel[id] && keys.includes(chSel[id]) ? chSel[id] : cur;
+  const cols = keys.map(k => {
+    const v = net[k] || 0, h = Math.max(6, Math.round(Math.abs(v) / max * 80));
+    const bar = v ? `<i class="b${k === cur ? " cur" : ""}${v < 0 ? " neg" : ""}" style="height:${h}px"></i>` : '<i class="d"></i>';
+    return `<div class="cc${k === sel ? " sel" : ""}" data-k="${k}">${bar}</div>`;
+  }).join("");
+  return `<div class="chc${big ? " big" : ""}" data-ch="${id}" data-gid="${gid || ""}">${pre || ""}<div class="chv"></div><div class="chs"><div class="cht">${cols}</div></div><div class="chm"></div></div>`;
+}
+function chartInit(card) {
+  const id = card.dataset.ch, gid = card.dataset.gid || null, keys = savKeys(gid), net = savNet(gid), cur = today().slice(0, 7);
+  const scr = card.querySelector(".chs"), vEl = card.querySelector(".chv"), mEl = card.querySelector(".chm");
+  const show = k => {
+    const v = net[k] || 0;
+    vEl.textContent = v > 0 ? "+" + fmt(v) : v < 0 ? "−" + fmt(-v) : "₹0";
+    vEl.className = "chv" + (v < 0 ? " neg" : v === 0 ? " zero" : "");
+    mEl.textContent = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    card.querySelectorAll(".cc.sel").forEach(c => c.classList.remove("sel"));
+    const c = card.querySelector(`.cc[data-k="${k}"]`); if (c) c.classList.add("sel");
+  };
+  const at = Math.max(0, keys.indexOf(chSel[id] || cur));
+  scr.scrollLeft = at * 28;
+  show(keys[at]);
+  let raf = 0;
+  scr.addEventListener("scroll", () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      const i = Math.max(0, Math.min(keys.length - 1, Math.round(scr.scrollLeft / 28)));
+      if (chSel[id] !== keys[i]) { chSel[id] = keys[i]; show(keys[i]); }
+    });
+  }, { passive: true });
+}
+function goalRowHTML(g) {
+  const p = pct(g.saved, g.target);
+  return `<div class="swrow gsw"><div class="swc gcard" data-gopen="${esc(g.id)}"><div class="gtop"><span class="gname">${esc(g.name)}</span><span class="gamt">${fmt(g.saved)} <small>saved</small><i class="chev">›</i></span></div><div class="gbar"><i style="width:${p}%"></i></div></div><button class="swd" data-gdel="${esc(g.id)}" aria-label="Delete goal">${ICO_DEL}</button></div>`;
+}
+function entryRowHTML(e) {
+  const day = e.date.slice(8), mon = new Date(+e.date.slice(0, 4), +e.date.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  const title = e.note || (e.kind === "start" ? "Already saved" : e.kind === "wd" ? "Withdrawn" : "Added");
+  return `<div class="swrow hrow"><div class="swc"><div class="row"><div class="badge">${day}<small>${mon}</small></div><span class="n">${esc(title)}</span><span class="a ${e.kind === "wd" ? "gw" : "gp"}">${e.kind === "wd" ? "−" : "+"}${fmt(e.amt)}</span></div></div><button class="swd" data-sdel="${esc(e.id)}" aria-label="Delete entry">${ICO_DEL}</button></div>`;
+}
+function renderGoals(el) {
+  if (savGid && S.goals.some(g => g.id === savGid)) return renderGoalDetail(el, savGid);
+  savGid = null; syncSavFab();
+  if (!S.goals.length) {
+    const ex = ["Emergency fund", "iPhone 17", "MacBook Air", "Royal Enfield 350"].map(n => `<div class="nrow ex"><i class="dot g"></i><span class="nn">${n}</span></div>`).join("");
+    el.innerHTML = `<div class="nsec"><h2 class="hd2">Put money aside<br>for what <span class="acc g">matters.</span></h2><div class="ncard">${ex}</div><p class="hint">Save it first, then buy it.<br>No EMIs, no interest.</p><button class="acc g link" data-gnew="1">+ Add a goal</button></div>`;
+    return;
+  }
+  const total = r2(S.goals.reduce((s, g) => s + (g.saved || 0), 0));
+  el.innerHTML = `<div class="stot"><b>${fmt(total)}</b><small>saved so far</small></div>`
+    + `<div class="shd"><span>Monthly savings</span><button class="addlink" data-gnew="1">+ Add a goal</button></div>`
+    + chartHTML(null, "list", false)
+    + `<div class="shd solo"><span>Goals · ${S.goals.length}</span></div>`
+    + S.goals.map(goalRowHTML).join("");
+  el.querySelectorAll(".chc").forEach(chartInit);
+}
+function renderGoalDetail(el, gid) {
+  const g = S.goals.find(x => x.id === gid), p = pct(g.saved, g.target);
+  const ents = gEnts(gid).slice().sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0));
+  const avg = `<div class="mavg"><b>${fmt(avgPerMonth(gid))}</b><small>average per month</small></div>`;
+  el.innerHTML = `<div class="gdh"><div class="gdn"><b>${esc(g.name)}</b><button class="gedit" data-gedit="${esc(gid)}" aria-label="Edit goal">${ICO_ED}</button></div><div class="gdw">${g.where ? "in " + esc(g.where) : "Where it's kept: not set"}</div></div>`
+    + `<div class="gpc"><div class="gpr"><b>${fmt(g.saved)}</b><small>of ${fmt(g.target)}</small><em>${p}% saved</em></div><div class="gbar"><i style="width:${p}%"></i></div></div>`
+    + `<div class="shd"><span>Monthly savings</span></div>`
+    + chartHTML(gid, "g" + gid, true, avg)
+    + `<div class="shd"><span>History</span></div>`
+    + `<div class="hcard">${ents.length ? ents.map(entryRowHTML).join("") : '<div class="hempty">No entries yet</div>'}</div>`;
+  el.querySelectorAll(".chc").forEach(chartInit);
+  savGid = gid; syncSavFab();
+}
+function syncSavFab() {
+  const f = $("#savFab"); if (f) f.classList.toggle("on", tab === "savings" && !!savGid && $("#insights").classList.contains("open"));
+}
+/* Add / edit goal form */
+function openGoalForm(gid) {
+  const g = gid ? S.goals.find(x => x.id === gid) : null;
+  D = null; F = null; MS = null; GF = { id: g ? g.id : null };
+  sheet.className = "sheet gform";
+  sheet.innerHTML = `<div class="hd"></div><h3 class="gfh">${g ? "Edit saving goal" : "Add saving goal"}</h3>`
+    + `<label class="grow"><span>Goal name</span><input id="gName" maxlength="30" placeholder="Not set" value="${esc(g ? g.name : "")}"></label>`
+    + `<label class="grow"><span>Target amount</span><input id="gTarget" inputmode="decimal" placeholder="Set amount" value="${esc(g ? fmtIn(g.target) : "")}"></label>`
+    + `<label class="grow"><span>Where it's kept</span><input id="gWhere" maxlength="24" placeholder="Not set" value="${esc(g ? g.where || "" : "")}"></label>`
+    + (g ? "" : `<label class="grow"><span>Already saved</span><input id="gSaved" inputmode="decimal" placeholder="Not set"></label>`)
+    + `<button class="save gbtn" id="gSave">${g ? "Save changes" : "Add Goal"}</button>`;
+  gformCheck(); showSheet();
+}
+function gformCheck() {
+  const n = $("#gName"), t = $("#gTarget"), b = $("#gSave");
+  if (!n || !t || !b) return;
+  b.disabled = !(n.value.trim() && numIn(t.value) > 0);
+}
+function gformSave() {
+  if (!GF) return;
+  const name = $("#gName").value.trim(), target = numIn($("#gTarget").value), where = $("#gWhere").value.trim();
+  if (!name || !(target > 0)) return;
+  if (GF.id) {
+    const g = S.goals.find(x => x.id === GF.id); if (!g) return;
+    Object.assign(g, { name, target, where, u: Date.now() }); savGid = g.id;
+  } else {
+    const id = crypto.randomUUID(), now = Date.now(), saved = $("#gSaved") ? numIn($("#gSaved").value) : 0;
+    S.goals.push({ id, name, target, where, created: today(), u: now, saved: 0 });
+    if (saved > 0) S.gent.push({ id: crypto.randomUUID(), gid: id, kind: "start", amt: saved, note: "", date: today(), u: now });
+    savGid = null;
+  }
+  recalcGoals(); save(); GF = null; hideSheet(); renderIns();
+}
+/* Add / withdraw money */
+function openMoney(gid) {
+  if (!S.goals.some(g => g.id === gid)) return;
+  D = null; F = null; GF = null;
+  MS = { gid, mode: "add", amt: "", note: "", date: today(), panel: "keys" };
+  sheet.className = "sheet msheet";
+  drawMoney(); showSheet();
+}
+function drawMoney() {
+  if (!MS || !S.goals.some(g => g.id === MS.gid)) return;
+  const dl = MS.date === today() ? "Today" : new Date(+MS.date.slice(0, 4), +MS.date.slice(5, 7) - 1, +MS.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const body = MS.panel === "wheel" ? wheelHTML()
+    : `<div class="keys mkeys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-mk="${n}">${n}</button>`).join("")}<button data-mk="&lt;" aria-label="Delete">‹</button><button data-mk="0">0</button><button class="save" id="mSave" data-mk="save" aria-label="Save"${+MS.amt > 0 ? "" : " disabled"}>Save</button></div>`;
+  sheet.innerHTML = `<div class="hd"></div>`
+    + `<div class="seg mseg"><button data-ms="add" class="${MS.mode === "add" ? "on" : ""}">Add</button><button data-ms="wd" class="${MS.mode === "wd" ? "on" : ""}">Withdraw</button></div>`
+    + `<div class="amt mamt${MS.amt ? "" : " z"}" id="mAmt"><span>₹</span>${MS.amt || 0}</div>`
+    + `<input class="note" id="mNote" placeholder="Note (optional)" maxlength="40" value="${esc(MS.note)}">`
+    + (MS.panel === "wheel" ? "" : `<div class="chips"><button class="chip" id="mDate">${CAL_ICON}${esc(dl)}</button></div>`)
+    + body;
+  if (MS.panel === "wheel") wheelInit();
+}
+function mKey(k) {
+  if (k === "save") return mSave();
+  if (k === "<") MS.amt = MS.amt.slice(0, -1);
+  else if (MS.amt.length < 9 && !(MS.amt === "" && k === "0")) MS.amt += k;
+  drawMoney();
+}
+function mSave() {
+  const g = S.goals.find(x => x.id === MS.gid), a = r2(+MS.amt);
+  if (!g || !(a > 0)) return;
+  if (MS.mode === "wd" && a > g.saved) { alert("Only " + fmt(g.saved) + " is saved in " + g.name + "."); return; }
+  const kind = MS.mode === "wd" ? "wd" : "add", now = Date.now();
+  S.gent.push({ id: crypto.randomUUID(), gid: g.id, kind, amt: a, note: MS.note.trim(), date: MS.date, u: now });
+  g.u = now; recalcGoals(); save();
+  const info = { kind, amt: a, name: g.name, total: g.saved, p: pct(g.saved, g.target) };
+  MS = null; hideSheet(); renderIns(); showJar(info);
+}
+/* Date wheel (day, month, year) */
+function wheelHTML() {
+  const now = new Date(), cy = now.getFullYear(), cm = now.getMonth() + 1, cd = now.getDate();
+  const y = +MS.date.slice(0, 4), m = +MS.date.slice(5, 7), dd = +MS.date.slice(8);
+  const years = [cy - 2, cy - 1, cy], names = [...Array(12)].map((_, i) => new Date(2000, i, 1).toLocaleDateString("en-IN", { month: "long" }));
+  const months = y === cy ? names.slice(0, cm) : names;
+  const last = (y === cy && m === cm) ? cd : new Date(y, m, 0).getDate();
+  const days = [...Array(last)].map((_, i) => i + 1);
+  const col = (key, items, sel) => `<div class="wcol" data-wc="${key}" data-sel="${sel}"><i class="wsp"></i>${items.map((t, i) => `<div class="wi${i === sel ? " on" : ""}">${t}</div>`).join("")}</div>`;
+  return `<div class="wheel"><button class="wdone" id="wDone">Done</button><i class="wsel"></i><div class="wcols">`
+    + col("d", days, Math.min(dd, last) - 1) + col("m", months, m - 1) + col("y", years, Math.max(0, years.indexOf(y))) + `</div></div>`;
+}
+function wheelInit() {
+  sheet.querySelectorAll(".wcol").forEach(c => {
+    c.scrollTop = (+c.dataset.sel) * 39;
+    c.addEventListener("scroll", () => {
+      const i = Math.round(c.scrollTop / 39);
+      c.querySelectorAll(".wi").forEach((it, j) => it.classList.toggle("on", j === i));
+      clearTimeout(wT); wT = setTimeout(wheelSettle, 140);
+    }, { passive: true });
+  });
+}
+function wheelSettle() {
+  if (!MS) return;
+  const now = new Date(), cy = now.getFullYear(), cm = now.getMonth() + 1, cd = now.getDate();
+  const names = [...Array(12)].map((_, i) => new Date(2000, i, 1).toLocaleDateString("en-IN", { month: "long" }));
+  const years = [cy - 2, cy - 1, cy];
+  const idx = k => { const c = sheet.querySelector(`.wcol[data-wc="${k}"]`); return c ? Math.round(c.scrollTop / 39) : 0; };
+  const y = years[Math.min(2, Math.max(0, idx("y")))], nM = y === cy ? cm : 12;
+  const m = Math.min(idx("m") + 1, nM), mc = sheet.querySelector('.wcol[data-wc="m"]');
+  if (mc && mc.querySelectorAll(".wi").length !== nM) { mc.innerHTML = `<i class="wsp"></i>` + names.slice(0, nM).map((t, i) => `<div class="wi${i + 1 === m ? " on" : ""}">${t}</div>`).join(""); mc.scrollTop = (m - 1) * 39; }
+  const last = (y === cy && m === cm) ? cd : new Date(y, m, 0).getDate();
+  const d = Math.min(idx("d") + 1, last), dc = sheet.querySelector('.wcol[data-wc="d"]');
+  if (dc && dc.querySelectorAll(".wi").length !== last) { dc.innerHTML = `<i class="wsp"></i>` + [...Array(last)].map((_, i) => `<div class="wi${i + 1 === d ? " on" : ""}">${i + 1}</div>`).join(""); dc.scrollTop = (d - 1) * 39; }
+  let nd = `${y}-${pad(m)}-${pad(d)}`;
+  if (nd > today()) nd = today();
+  MS.date = nd;
+}
+function wheelDone() {
+  if (!MS) return;
+  clearTimeout(wT); wheelSettle(); MS.panel = "keys"; drawMoney();
+}
+/* Jar animation after adding or withdrawing */
+function showJar(info) {
+  const j = $("#jarfx"), box = j.querySelector(".jbox"), wd = info.kind === "wd";
+  const n = Math.max(1, Math.min(14, Math.round(info.p / 5)));
+  const jv = box.querySelector(".jv");
+  jv.textContent = (wd ? "−" : "+") + fmt(info.amt); jv.className = "jv " + (wd ? "neg" : "pos");
+  if (!box.querySelector(".jlvl")) { const lv = document.createElement("i"); lv.className = "jlvl"; box.appendChild(lv); }
+  box.querySelectorAll(".coin").forEach(c => c.remove());
+  for (let i = 0; i < n; i++) {
+    const c = document.createElement("i"); c.className = "coin";
+    c.style.left = (8 + (i % 3) * 28 + (Math.floor(i / 3) % 2) * 13) + "px";
+    c.style.bottom = (6 + Math.floor(i / 3) * 9) + "px";
+    c.style.animationDelay = (i * 0.07).toFixed(2) + "s";
+    box.appendChild(c);
+  }
+  j.querySelector(".jn").textContent = info.name;
+  j.querySelector(".jt").innerHTML = fmt(info.total) + " <small>saved</small>";
+  j.classList.add("on");
+  clearTimeout(jarT); jarT = setTimeout(() => j.classList.remove("on"), 1900);
+}
+/* Delete confirmations */
+function askConfirm(title, msg, label, ok) {
+  const d = $("#cfm");
+  d.querySelector("b").textContent = title; d.querySelector("p").textContent = msg;
+  const btn = d.querySelector("button"); btn.textContent = label;
+  btn.onclick = () => { d.classList.remove("on"); ok(); };
+  d.classList.add("on");
+}
+function askDeleteEntry(eid) {
+  const e = S.gent.find(x => x.id === eid); if (!e) return;
+  const g = S.goals.find(x => x.id === e.gid), what = e.kind === "wd" ? "withdrawal" : e.kind === "start" ? "starting amount" : "deposit";
+  askConfirm("Delete entry?", `This ${fmt(e.amt)} ${what} will be removed from ${g ? g.name : "this goal"}.`, "Delete", () => {
+    S.del[eid] = Date.now(); S.gent = S.gent.filter(x => x.id !== eid); recalcGoals(); save(); renderIns();
+  });
+}
+function askDeleteGoal(gid) {
+  const g = S.goals.find(x => x.id === gid); if (!g) return;
+  askConfirm("Delete goal?", `${g.name} and its ${fmt(g.saved)} history will be deleted. This can't be undone.`, "Delete", () => {
+    const now = Date.now(); S.del[gid] = now; gEnts(gid).forEach(e => { S.del[e.id] = now; });
+    S.gent = S.gent.filter(e => e.gid !== gid); S.goals = S.goals.filter(x => x.id !== gid);
+    if (savGid === gid) savGid = null;
+    recalcGoals(); save(); renderIns();
+  });
+}
+/* Swipe a row to reveal its delete button */
+const rowOf = c => c.querySelector(".swrow") || c;
+const shutSw = t => { t.classList.remove("open"); const rw = rowOf(t); rw.style.transform = ""; rw.style.transition = ""; };
+function bindSwipe(root) {
+  const W = 72; let r = null, x0 = 0, y0 = 0, base = 0, dx = 0, mv = false;
+  root.addEventListener("pointerdown", e => {
+    const t = e.target.closest(".swc"); if (!t) return;
+    root.querySelectorAll(".swc.open").forEach(o => { if (o !== t) shutSw(o); });
+    r = t; x0 = e.clientX; y0 = e.clientY; base = t.classList.contains("open") ? -W : 0; dx = 0; mv = false;
+  });
+  root.addEventListener("pointermove", e => {
+    if (!r) return; dx = e.clientX - x0;
+    if (!mv && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(e.clientY - y0)) { mv = true; rowOf(r).style.transition = "none"; }
+    if (mv) rowOf(r).style.transform = "translateX(" + Math.max(-W, Math.min(0, base + dx)) + "px)";
+  });
+  const end = () => {
+    if (!r) return; const t = r; r = null; rowOf(t).style.transition = "";
+    if (mv) { if (base + dx < -W / 2) { t.classList.add("open"); rowOf(t).style.transform = "translateX(-" + W + "px)"; } else shutSw(t); }
+    setTimeout(() => { mv = false; }, 150);
+  };
+  root.addEventListener("pointerup", end); root.addEventListener("pointercancel", end);
+  root.addEventListener("click", e => {
+    const t = e.target.closest(".swc"); if (!t) return;
+    if (mv || t.classList.contains("open")) { e.stopPropagation(); e.preventDefault(); if (!mv) shutSw(t); }
+  }, true);
+}
+/* Listeners for the goal form and the money sheet (they only act while their form is open) */
+sheet.addEventListener("click", e => {
+  if (GF && e.target.id === "gSave") return gformSave();
+  if (!MS) return;
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.ms) { MS.mode = b.dataset.ms; return drawMoney(); }
+  if (b.dataset.mk !== undefined) return mKey(b.dataset.mk);
+  if (b.id === "mDate") { MS.panel = MS.panel === "wheel" ? "keys" : "wheel"; return drawMoney(); }
+  if (b.id === "wDone") return wheelDone();
+});
+sheet.addEventListener("input", e => {
+  if (GF && (e.target.id === "gTarget" || e.target.id === "gSaved")) { const d = e.target.value.replace(/\D/g, ""); e.target.value = d ? "₹" + (+d).toLocaleString("en-IN") : ""; }
+  if (GF) gformCheck();
+  if (MS && e.target.id === "mNote") MS.note = e.target.value.slice(0, 40);
+});
+$("#insBody").onclick = e => {
+  const t = e.target, hit = s => t.closest(s);
+  if (hit("[data-sdel]")) return askDeleteEntry(hit("[data-sdel]").dataset.sdel);
+  if (hit("[data-gdel]")) return askDeleteGoal(hit("[data-gdel]").dataset.gdel);
+  if (hit("[data-gopen]")) { savGid = hit("[data-gopen]").dataset.gopen; return renderIns(); }
+  if (hit("[data-gedit]")) return openGoalForm(hit("[data-gedit]").dataset.gedit);
+  if (hit("[data-gnew]")) return openGoalForm(null);
+  const d = (t.closest("button") || {}).dataset; if (!d) return;
+  if (d.lnew) openForm("loan"); else if (d.ledit) openForm("loan", d.ledit); else if (d.lpay) payEmi(d.lpay);
+};
+bindSwipe($("#insBody"));
+$("#insBack").onclick = () => { if (tab === "savings" && savGid) { savGid = null; renderIns(); } else closePage($("#insights")); };
+$("#savFab").onclick = () => { if (savGid) openMoney(savGid); };
+$("#cfm").onclick = e => { if (e.target.id === "cfm") $("#cfm").classList.remove("on"); };
+$("#jarfx").onclick = () => $("#jarfx").classList.remove("on");
+migrateSavings();
+
 function renderLoans(el) {
   const rows = S.loans.map(l => {
     const p = pct(l.paid, l.total), left = Math.max(0, r2(l.total - l.paid)), n = l.emi > 0 ? Math.ceil(left / l.emi) : 0;
@@ -421,13 +744,6 @@ function openForm(kind, id) {
   sheet.innerHTML = `<div class="hd"></div>${it.id ? '<button class="del" id="fdel">Delete</button>' : ""}<h3>${it.id ? "Edit" : "New"} ${G ? "goal" : "loan"}</h3><p class="sub"></p>`
     + fields.map(f => `<div class="lab">${f[0]}</div><input class="fi" data-f="${f[1]}" type="text" inputmode="${f[3]}" value="${esc(f[2])}" ${f[3] === "text" ? 'maxlength="30"' : 'placeholder="0"'}>`).join("")
     + '<button class="save wide" id="fsave">Save</button>';
-  showSheet();
-}
-function openAddMoney(id) {
-  const g = S.goals.find(x => x.id === id); if (!g) return;
-  F = { kind: "goal", id };
-  sheet.className = "sheet";
-  sheet.innerHTML = `<div class="hd"></div><h3>Add to ${esc(g.name)}</h3><p class="sub">${fmt(g.saved)} of ${fmt(g.target)} saved</p><input class="fi" data-f="amt" type="text" inputmode="decimal" placeholder="Amount (₹)"><button class="save wide" id="psave">Add</button>`;
   showSheet();
 }
 function payEmi(id) {
@@ -458,11 +774,7 @@ sheet.addEventListener("click", e => {
   if (ex) Object.assign(ex, o, { u: Date.now() }); else { const nid = crypto.randomUUID(); F.id = nid; list.push({ id: nid, ...o, u: Date.now() }); }
   finishForm();
 });
-$("#insBody").onclick = e => {
-  const d = (e.target.closest("button") || {}).dataset; if (!d) return;
-  if (d.gnew) openForm("goal"); else if (d.gedit) openForm("goal", d.gedit); else if (d.gadd) openAddMoney(d.gadd);
-  else if (d.lnew) openForm("loan"); else if (d.ledit) openForm("loan", d.ledit); else if (d.lpay) payEmi(d.lpay);
-};
+
 
 /* ---------- Category swipe: edit / delete ---------- */
 let swipeMoved = false;
