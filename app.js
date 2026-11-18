@@ -6,6 +6,8 @@ const today = () => iso(new Date());
 const r2 = n => Math.round(n * 100) / 100;
 const fmt = n => "₹" + (+n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const sgn = n => (n >= 0 ? "+" : "−") + fmt(r2(Math.abs(n)));
+const sfmt = n => { const v = Math.round((+n || 0) * 100) / 100, a = Math.abs(v), sg = v < 0 ? "−" : "", tr = x => x.toFixed(2).replace(/\.?0+$/, ""); if (a >= 1e7) return sg + "₹" + tr(a / 1e7) + " Cr"; if (a >= 1e5) return sg + "₹" + tr(a / 1e5) + "L"; if (a >= 1000) return sg + "₹" + tr(a / 1000) + "K"; return sg + "₹" + a.toLocaleString("en-IN", { maximumFractionDigits: 2 }); };
+const ssgn = n => (n >= 0 ? "+" : "−") + sfmt(Math.abs(n));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const mname = (k, o) => new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-IN", o || { month: "long" });
 const sum = a => r2(a.reduce((s, t) => s + t.amount, 0));
@@ -214,6 +216,7 @@ function openBudget() {
 
 /* ---------- Insights & settings pages ---------- */
 function renderIns() {
+  { const pg = $("#insights"), tb = $("#insTabs").parentElement; pg.classList.toggle("svmode", tab === "savings"); tb.classList.add("svtop"); pg.style.setProperty("--tabsH", tb.offsetHeight + "px"); }
   $$("#insTabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   const el = $("#insBody"), ex = S.tx.filter(t => t.type === "expense" && t.date.startsWith(vm)), tot = sum(ex);
   if (tab === "savings") return renderGoals(el);
@@ -451,7 +454,7 @@ function chartInit(card) {
   const scr = card.querySelector(".chs"), vEl = card.querySelector(".chv"), mEl = card.querySelector(".chm");
   const show = k => {
     const v = net[k] || 0;
-    vEl.textContent = v > 0 ? "+" + fmt(v) : v < 0 ? "−" + fmt(-v) : "₹0";
+    vEl.textContent = v > 0 ? "+" + sfmt(v) : v < 0 ? "−" + sfmt(-v) : "₹0";
     vEl.className = "chv" + (v < 0 ? " neg" : v === 0 ? " zero" : "");
     mEl.textContent = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
     card.querySelectorAll(".cc.sel").forEach(c => c.classList.remove("sel"));
@@ -471,12 +474,22 @@ function chartInit(card) {
 }
 function goalRowHTML(g) {
   const p = pct(g.saved, g.target);
-  return `<div class="swrow gsw"><div class="swc gcard" data-gopen="${esc(g.id)}"><div class="gtop"><span class="gname">${esc(g.name)}</span><span class="gamt">${fmt(g.saved)} <small>saved</small><i class="chev">›</i></span></div><div class="gbar"><i style="width:${p}%"></i></div></div><button class="swd" data-gdel="${esc(g.id)}" aria-label="Delete goal">${ICO_DEL}</button></div>`;
+  return `<div class="swrow gsw"><div class="swc gcard" data-gopen="${esc(g.id)}"><div class="gtop"><span class="gname">${esc(g.name)}</span><span class="gamt">${sfmt(g.saved)} <small>saved</small><i class="chev">›</i></span></div><div class="gbar"><i style="width:${p}%"></i></div></div><button class="swd" data-gdel="${esc(g.id)}" aria-label="Delete goal">${ICO_DEL}</button></div>`;
 }
 function entryRowHTML(e) {
   const day = e.date.slice(8), mon = new Date(+e.date.slice(0, 4), +e.date.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short" }).toUpperCase();
   const title = e.note || (e.kind === "start" ? "Already saved" : e.kind === "wd" ? "Withdrawn" : "Added");
-  return `<div class="swrow hrow"><div class="swc"><div class="row"><div class="badge">${day}<small>${mon}</small></div><span class="n">${esc(title)}</span><span class="a ${e.kind === "wd" ? "gw" : "gp"}">${e.kind === "wd" ? "−" : "+"}${fmt(e.amt)}</span></div></div><button class="swd" data-sdel="${esc(e.id)}" aria-label="Delete entry">${ICO_DEL}</button></div>`;
+  return `<div class="swrow hrow"><div class="swc" data-sedit="${esc(e.id)}"><div class="row"><div class="badge">${day}<small>${mon}</small></div><span class="n">${esc(title)}</span><span class="a ${e.kind === "wd" ? "gw" : "gp"}">${e.kind === "wd" ? "−" : "+"}${sfmt(e.amt)}</span></div></div><button class="swd" data-sdel="${esc(e.id)}" aria-label="Delete entry">${ICO_DEL}</button></div>`;
+}
+function avgAll() {
+  if (!S.gent.length) return 0;
+  const cur = today().slice(0, 7), first = S.gent.reduce((m, e) => (e.date.slice(0, 7) < m ? e.date.slice(0, 7) : m), cur);
+  const span = (+cur.slice(0, 4) - +first.slice(0, 4)) * 12 + (+cur.slice(5) - +first.slice(5)) + 1;
+  return r2(S.goals.reduce((t, g) => t + (g.saved || 0), 0) / Math.max(1, span));
+}
+function histRows(ents) {
+  const multi = new Set(ents.map(e => e.date.slice(0, 4))).size > 1; let ly = null;
+  return ents.map(e => { const y = e.date.slice(0, 4), sep = multi && y !== ly ? `<div class="yrsep"><span>${y}</span></div>` : ""; ly = y; return sep + entryRowHTML(e); }).join("");
 }
 function renderGoals(el) {
   if (savGid && S.goals.some(g => g.id === savGid)) return renderGoalDetail(el, savGid);
@@ -487,23 +500,24 @@ function renderGoals(el) {
     return;
   }
   const total = r2(S.goals.reduce((s, g) => s + (g.saved || 0), 0));
-  el.innerHTML = `<div class="stot"><b>${fmt(total)}</b><small>saved so far</small></div>`
+  const avg = `<div class="mavg"><b>${sfmt(avgAll())}</b><small>average per month</small></div>`;
+  el.innerHTML = `<div class="svhead"><div class="stot"><b>${sfmt(total)}</b><small>saved so far</small></div>`
     + `<div class="shd"><span>Monthly savings</span><button class="addlink" data-gnew="1">+ Add a goal</button></div>`
-    + chartHTML(null, "list", false)
-    + `<div class="shd solo"><span>Goals · ${S.goals.length}</span></div>`
-    + S.goals.map(goalRowHTML).join("");
+    + chartHTML(null, "list", false, avg)
+    + `<div class="shd solo"><span>Goals · ${S.goals.length}</span></div></div>`
+    + `<div class="svlist">${S.goals.map(goalRowHTML).join("")}</div>`;
   el.querySelectorAll(".chc").forEach(chartInit);
 }
 function renderGoalDetail(el, gid) {
   const g = S.goals.find(x => x.id === gid), p = pct(g.saved, g.target);
   const ents = gEnts(gid).slice().sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0));
-  const avg = `<div class="mavg"><b>${fmt(avgPerMonth(gid))}</b><small>average per month</small></div>`;
-  el.innerHTML = `<div class="gdh"><div class="gdn"><b>${esc(g.name)}</b><button class="gedit" data-gedit="${esc(gid)}" aria-label="Edit goal">${ICO_ED}</button></div><div class="gdw">${g.where ? "in " + esc(g.where) : "Where it's kept: not set"}</div></div>`
-    + `<div class="gpc"><div class="gpr"><b>${fmt(g.saved)}</b><small>of ${fmt(g.target)}</small><em>${p}% saved</em></div><div class="gbar"><i style="width:${p}%"></i></div></div>`
+  const avg = `<div class="mavg"><b>${sfmt(avgPerMonth(gid))}</b><small>average per month</small></div>`;
+  el.innerHTML = `<div class="svhead"><div class="gdh"><div class="gdn"><b>${esc(g.name)}</b><button class="gedit" data-gedit="${esc(gid)}" aria-label="Edit goal">${ICO_ED}</button></div><div class="gdw">${g.where ? "in " + esc(g.where) : "Where it's kept: not set"}</div></div>`
+    + `<div class="gpc"><div class="gpr"><b>${sfmt(g.saved)}</b><small>of ${sfmt(g.target)}</small><em>${p}% saved</em></div><div class="gbar"><i style="width:${p}%"></i></div></div>`
     + `<div class="shd"><span>Monthly savings</span></div>`
     + chartHTML(gid, "g" + gid, true, avg)
-    + `<div class="shd"><span>History</span></div>`
-    + `<div class="hcard">${ents.length ? ents.map(entryRowHTML).join("") : '<div class="hempty">No entries yet</div>'}</div>`;
+    + `<div class="shd"><span>History</span></div></div>`
+    + `<div class="hcard svlist">${ents.length ? histRows(ents) : '<div class="hempty">No entries yet</div>'}</div>`;
   el.querySelectorAll(".chc").forEach(chartInit);
   savGid = gid; syncSavFab();
 }
@@ -544,10 +558,11 @@ function gformSave() {
   recalcGoals(); save(); GF = null; hideSheet(); renderIns();
 }
 /* Add / withdraw money */
-function openMoney(gid) {
+function openMoney(gid, eid) {
   if (!S.goals.some(g => g.id === gid)) return;
   D = null; F = null; GF = null;
-  MS = { gid, mode: "add", amt: "", note: "", date: today(), panel: "keys" };
+  const ed = eid ? S.gent.find(x => x.id === eid) : null;
+  MS = ed ? { gid, eid: ed.id, mode: ed.kind === "wd" ? "wd" : "add", amt: String(ed.amt), note: ed.note || "", date: ed.date, panel: "keys" } : { gid, mode: "add", amt: "", note: "", date: today(), panel: "keys" };
   sheet.className = "sheet msheet";
   drawMoney(); showSheet();
 }
@@ -575,12 +590,24 @@ function mKey(k) {
 function mSave() {
   const g = S.goals.find(x => x.id === MS.gid), a = r2(+MS.amt);
   if (!g || !(a > 0)) return;
-  if (MS.mode === "wd" && a > g.saved) { alert("Only " + fmt(g.saved) + " is saved in " + g.name + "."); return; }
-  const kind = MS.mode === "wd" ? "wd" : "add", now = Date.now();
+  const before = g.saved || 0, now = Date.now();
+  if (MS.eid) {
+    const e = S.gent.find(x => x.id === MS.eid); if (!e) return;
+    const base = before - (e.kind === "wd" ? -e.amt : e.amt), nxt = base + (MS.mode === "wd" ? -a : a);
+    if (nxt < 0) { alert("Only " + sfmt(base) + " is available in " + g.name + "."); return; }
+    e.amt = a; e.kind = MS.mode === "wd" ? "wd" : (e.kind === "start" ? "start" : "add"); e.note = MS.note.trim(); e.date = MS.date; e.u = now;
+    g.u = now; recalcGoals(); save();
+    const after = g.saved || 0; MS = null; hideSheet(); renderIns();
+    showJar({ amt: Math.abs(after - before), name: g.name, total: after, out: after < before, p0: before / g.target * 100, p1: after / g.target * 100 });
+    return;
+  }
+  if (MS.mode === "wd" && a > before) { alert("Only " + sfmt(before) + " is saved in " + g.name + "."); return; }
+  const kind = MS.mode === "wd" ? "wd" : "add";
   S.gent.push({ id: crypto.randomUUID(), gid: g.id, kind, amt: a, note: MS.note.trim(), date: MS.date, u: now });
   g.u = now; recalcGoals(); save();
-  const info = { kind, amt: a, name: g.name, total: g.saved, p: pct(g.saved, g.target) };
-  MS = null; hideSheet(); renderIns(); showJar(info);
+  const after = g.saved || 0;
+  MS = null; hideSheet(); renderIns();
+  showJar({ amt: a, name: g.name, total: after, out: kind === "wd", p0: before / g.target * 100, p1: after / g.target * 100 });
 }
 /* Date wheel (day, month, year) */
 function wheelHTML() {
@@ -626,23 +653,20 @@ function wheelDone() {
 }
 /* Jar animation after adding or withdrawing */
 function showJar(info) {
-  const j = $("#jarfx"), box = j.querySelector(".jbox"), wd = info.kind === "wd";
-  const n = Math.max(1, Math.min(14, Math.round(info.p / 5)));
+  const j = $("#jarfx"), box = j.querySelector(".jbox"), out = !!info.out;
+  const N = 20, cnt = p => Math.round(Math.max(0, Math.min(100, p)) / 100 * N);
+  const c0 = cnt(info.p0), c1 = cnt(info.p1), lo = Math.min(c0, c1), hi = Math.max(c0, c1), removing = c1 < c0;
   const jv = box.querySelector(".jv");
-  jv.textContent = (wd ? "−" : "+") + fmt(info.amt); jv.className = "jv " + (wd ? "neg" : "pos");
+  jv.textContent = (out ? "−" : "+") + sfmt(info.amt); jv.className = "jv " + (out ? "neg" : "pos");
   if (!box.querySelector(".jlvl")) { const lv = document.createElement("i"); lv.className = "jlvl"; box.appendChild(lv); }
   box.querySelectorAll(".coin").forEach(c => c.remove());
-  for (let i = 0; i < n; i++) {
-    const c = document.createElement("i"); c.className = "coin";
-    c.style.left = (8 + (i % 3) * 28 + (Math.floor(i / 3) % 2) * 13) + "px";
-    c.style.bottom = (6 + Math.floor(i / 3) * 9) + "px";
-    c.style.animationDelay = (i * 0.07).toFixed(2) + "s";
-    box.appendChild(c);
-  }
+  const place = (c, i) => { c.style.left = (8 + (i % 3) * 28 + (Math.floor(i / 3) % 2) * 13) + "px"; c.style.bottom = (6 + Math.floor(i / 3) * 9) + "px"; };
+  for (let i = 0; i < lo; i++) { const c = document.createElement("i"); c.className = "coin st"; place(c, i); box.appendChild(c); }
+  for (let k = 0; k < hi - lo; k++) { const i = lo + k, c = document.createElement("i"); c.className = "coin " + (removing ? "pop" : "drop"); place(c, i); c.style.animationDelay = (k * 0.12).toFixed(2) + "s"; box.appendChild(c); }
   j.querySelector(".jn").textContent = info.name;
-  j.querySelector(".jt").innerHTML = fmt(info.total) + " <small>saved</small>";
+  j.querySelector(".jt").innerHTML = sfmt(info.total) + " <small>saved</small>";
   j.classList.add("on");
-  clearTimeout(jarT); jarT = setTimeout(() => j.classList.remove("on"), 1900);
+  clearTimeout(jarT); jarT = setTimeout(() => j.classList.remove("on"), 2600);
 }
 /* Delete confirmations */
 function askConfirm(title, msg, label, ok) {
@@ -656,7 +680,9 @@ function askDeleteEntry(eid) {
   const e = S.gent.find(x => x.id === eid); if (!e) return;
   const g = S.goals.find(x => x.id === e.gid), what = e.kind === "wd" ? "withdrawal" : e.kind === "start" ? "starting amount" : "deposit";
   askConfirm("Delete entry?", `This ${fmt(e.amt)} ${what} will be removed from ${g ? g.name : "this goal"}.`, "Delete", () => {
+    const g0 = S.goals.find(x => x.id === e.gid), before = g0 ? (g0.saved || 0) : 0;
     S.del[eid] = Date.now(); S.gent = S.gent.filter(x => x.id !== eid); recalcGoals(); save(); renderIns();
+    if (g0) { const after = g0.saved || 0; showJar({ amt: e.amt, name: g0.name, total: after, out: after < before, p0: before / g0.target * 100, p1: after / g0.target * 100 }); }
   });
 }
 function askDeleteGoal(gid) {
@@ -1374,3 +1400,6 @@ render();
 runRecurring();
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+/* v2.3.23: tapping a savings entry opens it for editing */
+document.addEventListener("click", e => { const t = e.target.closest && e.target.closest("[data-sedit]"); if (t && savGid) openMoney(savGid, t.dataset.sedit); });
