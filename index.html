@@ -410,6 +410,24 @@ body{overflow:hidden;overflow:clip}
 #jarfx .jbox svg{width:112px;height:170px}
 #jarfx .jlvl{position:absolute;left:14px;right:14px;top:62px;border-top:1px dashed #3a3a3a}
 .sheet.gform .save.wide{font-size:15px!important;font-weight:500!important;height:49px!important;border-radius:25px}
+/* v2.3.22 pass: money sheet type from the second reference screenshot; sliding Add / Withdraw highlight; wheel years from 2010 */
+.sheet.msheet .mseg{position:relative;display:grid;grid-template-columns:1fr 1fr;box-sizing:border-box;width:180px;height:31px;padding:3px;margin:0 auto;background:#262626;border-radius:22px}
+.sheet.msheet .mseg .segpill{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:19px;background:#3a3a3a;transition:transform .32s cubic-bezier(.3,.7,.3,1);z-index:0}
+.sheet.msheet .mseg[data-m="wd"] .segpill{transform:translateX(100%)}
+.sheet.msheet .mseg button,.sheet.msheet .mseg button.on{position:relative;z-index:1;background:none!important;padding:0;font-size:13px;font-weight:500;color:#a8a8a8;border-radius:19px;transition:color .32s ease}
+.sheet.msheet .mseg button.on{color:#fff}
+.sheet.msheet .note{font-size:12px}
+.sheet.msheet .chip{font-size:13.5px}
+.sheet.msheet .mkeys button{font-size:22px}
+.sheet.msheet .mkeys .save{font-size:14px!important;font-weight:600}
+.wheel .wi{font-size:14px!important}
+.wheel .wdone{font-size:14px!important;font-weight:600!important}
+.sheet.msheet .mamt{margin-top:10px}
+.sheet.msheet .note{margin-top:53px}
+.sheet.msheet .chips{margin-top:55px}
+/* snap points line up with the highlighted row, so the chosen year is the one shown */
+.wcol{scroll-padding-top:78px}
+.wcol .wi{scroll-snap-align:start}
 </style></head><body>
 <div id="stage"><header>
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24" style="stroke-width:1.4;stroke-linecap:butt"><path d="M1.5 5.74h20.9M1.5 12h15.2M1.5 18.26h18.5"/></svg></button>
@@ -439,7 +457,7 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.21</div></section>
+</div><div class="ver">v2.3.22</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
