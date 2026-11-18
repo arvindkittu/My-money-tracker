@@ -551,17 +551,19 @@ function openMoney(gid) {
   sheet.className = "sheet msheet";
   drawMoney(); showSheet();
 }
-function drawMoney() {
+function drawMoney(fromMode) {
   if (!MS || !S.goals.some(g => g.id === MS.gid)) return;
   const dl = MS.date === today() ? "Today" : new Date(+MS.date.slice(0, 4), +MS.date.slice(5, 7) - 1, +MS.date.slice(8)).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   const body = MS.panel === "wheel" ? wheelHTML()
     : `<div class="keys mkeys">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-mk="${n}">${n}</button>`).join("")}<button data-mk="&lt;" aria-label="Delete">‹</button><button data-mk="0">0</button><button class="save" id="mSave" data-mk="save" aria-label="Save"${+MS.amt > 0 ? "" : " disabled"}>Save</button></div>`;
   sheet.innerHTML = `<div class="hd"></div>`
-    + `<div class="seg mseg"><button data-ms="add" class="${MS.mode === "add" ? "on" : ""}">Add</button><button data-ms="wd" class="${MS.mode === "wd" ? "on" : ""}">Withdraw</button></div>`
+    + `<div class="seg mseg" data-m="${MS.mode}"><i class="segpill"></i><button data-ms="add" class="${MS.mode === "add" ? "on" : ""}">Add</button><button data-ms="wd" class="${MS.mode === "wd" ? "on" : ""}">Withdraw</button></div>`
     + `<div class="amt mamt${MS.amt ? "" : " z"}" id="mAmt"><span>₹</span>${MS.amt || 0}</div>`
     + `<input class="note" id="mNote" placeholder="Note (optional)" maxlength="40" value="${esc(MS.note)}">`
     + (MS.panel === "wheel" ? "" : `<div class="chips"><button class="chip" id="mDate">${CAL_ICON}${esc(dl)}</button></div>`)
     + body;
+  const sg = sheet.querySelector(".mseg");
+  if (sg && fromMode && fromMode !== MS.mode) { sg.dataset.m = fromMode; sg.getBoundingClientRect(); requestAnimationFrame(() => requestAnimationFrame(() => { sg.dataset.m = MS.mode; })); }
   if (MS.panel === "wheel") wheelInit();
 }
 function mKey(k) {
@@ -584,7 +586,7 @@ function mSave() {
 function wheelHTML() {
   const now = new Date(), cy = now.getFullYear(), cm = now.getMonth() + 1, cd = now.getDate();
   const y = +MS.date.slice(0, 4), m = +MS.date.slice(5, 7), dd = +MS.date.slice(8);
-  const years = [cy - 2, cy - 1, cy], names = [...Array(12)].map((_, i) => new Date(2000, i, 1).toLocaleDateString("en-IN", { month: "long" }));
+  const years = [...Array(cy - 2009)].map((_, i) => 2010 + i), names = [...Array(12)].map((_, i) => new Date(2000, i, 1).toLocaleDateString("en-IN", { month: "long" }));
   const months = y === cy ? names.slice(0, cm) : names;
   const last = (y === cy && m === cm) ? cd : new Date(y, m, 0).getDate();
   const days = [...Array(last)].map((_, i) => i + 1);
@@ -606,9 +608,9 @@ function wheelSettle() {
   if (!MS) return;
   const now = new Date(), cy = now.getFullYear(), cm = now.getMonth() + 1, cd = now.getDate();
   const names = [...Array(12)].map((_, i) => new Date(2000, i, 1).toLocaleDateString("en-IN", { month: "long" }));
-  const years = [cy - 2, cy - 1, cy];
+  const years = [...Array(cy - 2009)].map((_, i) => 2010 + i);
   const idx = k => { const c = sheet.querySelector(`.wcol[data-wc="${k}"]`); return c ? Math.round(c.scrollTop / 39) : 0; };
-  const y = years[Math.min(2, Math.max(0, idx("y")))], nM = y === cy ? cm : 12;
+  const y = years[Math.min(years.length - 1, Math.max(0, idx("y")))], nM = y === cy ? cm : 12;
   const m = Math.min(idx("m") + 1, nM), mc = sheet.querySelector('.wcol[data-wc="m"]');
   if (mc && mc.querySelectorAll(".wi").length !== nM) { mc.innerHTML = `<i class="wsp"></i>` + names.slice(0, nM).map((t, i) => `<div class="wi${i + 1 === m ? " on" : ""}">${t}</div>`).join(""); mc.scrollTop = (m - 1) * 39; }
   const last = (y === cy && m === cm) ? cd : new Date(y, m, 0).getDate();
@@ -697,7 +699,7 @@ sheet.addEventListener("click", e => {
   if (GF && e.target.id === "gSave") return gformSave();
   if (!MS) return;
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.ms) { MS.mode = b.dataset.ms; return drawMoney(); }
+  if (b.dataset.ms) { const prevMode = MS.mode; MS.mode = b.dataset.ms; return drawMoney(prevMode); }
   if (b.dataset.mk !== undefined) return mKey(b.dataset.mk);
   if (b.id === "mDate") { MS.panel = MS.panel === "wheel" ? "keys" : "wheel"; return drawMoney(); }
   if (b.id === "wDone") return wheelDone();
