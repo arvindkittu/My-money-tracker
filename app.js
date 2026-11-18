@@ -887,7 +887,7 @@ function defaultCat(t) {
 (function () { // swipe down anywhere on a sheet to close it (touch)
   let t0 = false, y0 = 0, x0 = 0, dy = 0, drag = false, scroller = null;
   sheet.addEventListener("touchstart", e => {
-    if (e.touches.length !== 1 || e.target.closest("input,.ruler")) { t0 = false; return; }
+    if (e.touches.length !== 1 || e.target.closest("input,.ruler,.wheel")) { t0 = false; return; }
     scroller = e.target.closest(".cats"); // a scrolling list only starts a drag when it is at the top
     y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; drag = false; t0 = true;
   }, { passive: true });
