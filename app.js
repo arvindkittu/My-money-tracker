@@ -459,6 +459,7 @@ function chartInit(card) {
     mEl.textContent = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
     card.querySelectorAll(".cc.sel").forEach(c => c.classList.remove("sel"));
     const c = card.querySelector(`.cc[data-k="${k}"]`); if (c) c.classList.add("sel");
+    const bEl = c && (c.querySelector(".b") || c.querySelector(".d")); if (bEl) vEl.style.top = Math.round(bEl.getBoundingClientRect().top - card.getBoundingClientRect().top - 22) + "px";
   };
   const at = Math.max(0, keys.indexOf(chSel[id] || cur));
   scr.scrollLeft = at * 28;
@@ -503,7 +504,7 @@ function renderGoals(el) {
   const avg = `<div class="mavg"><b>${sfmt(avgAll())}</b><small>average per month</small></div>`;
   el.innerHTML = `<div class="svhead"><div class="stot"><b>${sfmt(total)}</b><small>saved so far</small></div>`
     + `<div class="shd"><span>Monthly savings</span><button class="addlink" data-gnew="1">+ Add a goal</button></div>`
-    + chartHTML(null, "list", false, avg)
+    + chartHTML(null, "list", true, avg)
     + `<div class="shd solo"><span>Goals · ${S.goals.length}</span></div></div>`
     + `<div class="svlist">${S.goals.map(goalRowHTML).join("")}</div>`;
   el.querySelectorAll(".chc").forEach(chartInit);
