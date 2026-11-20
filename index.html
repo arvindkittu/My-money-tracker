@@ -314,12 +314,12 @@ body{overflow:hidden;overflow:clip}
 .gbar i{display:block;height:100%;border-radius:4px;background:#4ade80}
 .swd{position:absolute;right:20px;top:50%;width:32px;height:32px;margin-top:-16px;padding:0;border:0;border-radius:50%;background:#ff453a;display:grid;place-items:center;z-index:0}
 .swd svg{width:16px;height:16px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.gdh{text-align:center;margin-top:-7px}
+.gdh{text-align:center;margin-top:12px}
 .gdn{position:relative;text-align:center}
-.gdn b{font-size:16px;font-weight:600}
+.gdn b{font-size:17px;font-weight:600;letter-spacing:-.1px}
 .gedit{position:absolute;left:50%;top:50%;transform:translate(14px,-50%);background:none;border:0;padding:4px;color:#8e8e93;display:grid;place-items:center}
 .gedit svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.gdw{font-size:10.5px;color:#999;margin-top:2px}
+.gdw{font-size:11.5px;color:#8e8e93;margin-top:3px}
 .gpc{margin:18px -2px 0;background:#141414;border-radius:28px;padding:21px 20px 20px}
 .gpr{display:flex;align-items:baseline;gap:6px;font-size:13px;color:#999;white-space:nowrap}
 .gpr b{font-size:19px;line-height:24px;font-weight:600;color:#fff}
@@ -330,11 +330,11 @@ body{overflow:hidden;overflow:clip}
 .mavg small{display:block;margin-top:2px;font-size:11px;line-height:14px;color:#999}
 .gpc + .shd{margin-top:33px;margin-bottom:3px}
 .hcard{margin:0 -2px;background:#141414;border-radius:28px;overflow:hidden}
-.hrow{border-bottom:1px solid #1c1c1c}
-.hrow:last-child{border-bottom:0}
-.hcard .row{padding:12px 16px}
-.hcard .row .n{font-size:11px}
-.hcard .row .a{font-size:11.5px}
+.hrow{border-bottom:0}
+.hrow:last-child::after{display:none}
+.hcard .row{padding:12px 20px;gap:12px}
+.hcard .row .n{font-size:14px}
+.hcard .row .a{font-size:14px;font-weight:500}
 .a.gp{color:#4ade80}
 .a.gw{color:#8a8a8a}
 .hempty{padding:18px 16px;color:#666;font-size:14px}
@@ -432,25 +432,32 @@ body{overflow:hidden;overflow:clip}
 .gdn{display:flex;justify-content:center;align-items:center;gap:8px;width:max-content;margin:0 auto}
 .gdn b{white-space:nowrap}
 .hcard .a.gw{color:#ff5f5f!important}
-.yrsep{display:flex;align-items:center;gap:10px;margin:14px 6px 8px;font-size:11px;color:#8e8e93}
+.yrsep{display:flex;align-items:center;gap:10px;margin:14px 20px 8px;font-size:11px;color:#8e8e93}
 .yrsep::before,.yrsep::after{content:"";flex:1;height:1px;background:#2a2a2a}
-#insights.svmode .svtop{position:sticky;top:0;z-index:6;background:#000}
-#insights.svmode .svhead{position:sticky;top:var(--tabsH,56px);z-index:5;background:#000;padding-bottom:4px}
+#insights.svmode .svtop{position:relative;flex:none;z-index:6;background:#000}
+#insights.svmode .svhead{position:relative;flex:none;z-index:5;background:#000;padding-bottom:4px}
 .coin.st{animation:none}
 .coin.pop{animation:coinPop .6s cubic-bezier(.4,0,.6,1) both}
 .coin.drop{animation:coinDrop .65s cubic-bezier(.2,.8,.3,1) both}
 @keyframes coinDrop{0%{transform:translateY(-150px) rotate(-20deg);opacity:0}60%{opacity:1}100%{transform:translateY(0) rotate(0);opacity:1}}
 @keyframes coinPop{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(-140px) rotate(25deg) scale(.8);opacity:0}}
 /* v2.3.24 pass: fixed header runs edge to edge, no elastic bounce on the savings page, pencil beside the goal name */
-#insights.svmode{overscroll-behavior-y:none;padding-top:0}
+#insights.svmode{overscroll-behavior-y:none;padding-top:0;padding-bottom:0;display:flex;flex-direction:column;overflow:hidden}
 #insights.svmode .svtop{margin:0 -42px 0 -22px;padding:calc(env(safe-area-inset-top, 0px) + 18px) 42px 0 22px}
 #insights.svmode .svhead{margin:0 -42px 0 -22px;padding:0 42px 4px 22px}
 .gdn .gedit{position:static;transform:none;margin-left:6px}
+/* v2.3.26 pass: on the savings screen only the list scrolls, under the still tabs and goal header, the same way the expense list scrolls; history card and rows refined */
+#insights.svmode #insBody:has(.svscroll){flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+#insights.svmode .svscroll{flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;margin:0 -2px;padding-bottom:calc(min(env(safe-area-inset-bottom, 0px), 34px) + 112px)}
+#insights.svmode .svscroll .hcard,#insights.svmode .svscroll .gsw{margin-left:0;margin-right:0}
+.hrow::after{content:"";position:absolute;left:66px;right:20px;bottom:0;height:1px;background:#202020;z-index:2;pointer-events:none}
+.hcard .badge{width:34px;height:34px;border-radius:10px;background:#1e1e1e;font-size:12px}
+.hcard .badge small{font-size:7.5px}
 </style></head><body>
 <div id="stage"><header>
-<button id="menuBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
+<button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
 <div class="seg" id="typeSeg"><button data-t="expense" class="on">Expense</button><button data-t="income">Income</button><button data-t="net">Net</button></div>
-<button id="walletBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24" style="stroke-width:1.4;stroke-linecap:butt"><path d="M1.5 5.74h20.9M1.5 12h15.2M1.5 18.26h18.5"/></svg></button>
+<button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24" style="stroke-width:1.4;stroke-linecap:butt"><path d="M1.5 5.74h20.9M1.5 12h15.2M1.5 18.26h18.5"/></svg></button>
 </header>
 <main id="home">
 <div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
@@ -475,7 +482,7 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.25</div></section>
+</div><div class="ver">v2.3.26</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
