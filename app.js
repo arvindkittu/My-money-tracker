@@ -294,7 +294,7 @@ function mergeRaw(a, b) {
   const s = (b.su || 0) > (a.su || 0) ? b : a;
   return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), gent: mix(a.gent, b.gent), del, cb: s.cb || {}, budgets: s.budgets || {}, iq: Object.assign({}, a.iq || {}, b.iq || {}), cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
-function merge(a, b) { const m = mergeRaw(a, b); if (m && Array.isArray(m.goals) && Array.isArray(m.gent)) fixSavings(m); return m; }
+function merge(a, b) { const m = mergeRaw(a, b); if (m && Array.isArray(m.goals) && Array.isArray(m.gent)) fixSavings(m); if (m) purgeInvest(m); return m; }
 async function syncNow() {
   if (!sb || !user || syncing || !navigator.onLine) return;
   syncing = true; setMsg("Syncing…");
@@ -597,7 +597,7 @@ function mSave() {
     const e = S.gent.find(x => x.id === MS.eid); if (!e) return;
     const base = before - (e.kind === "wd" ? -e.amt : e.amt), nxt = base + (MS.mode === "wd" ? -a : a);
     if (nxt < 0) { alert("Only " + sfmt(base) + " is available in " + g.name + "."); return; }
-    e.amt = a; e.kind = MS.mode === "wd" ? "wd" : (e.kind === "start" ? "start" : "add"); e.note = MS.note.trim(); e.date = MS.date; e.u = now; ivSync(e);
+    e.amt = a; e.kind = MS.mode === "wd" ? "wd" : (e.kind === "start" ? "start" : "add"); e.note = MS.note.trim(); e.date = MS.date; e.u = now;
     g.u = now; recalcGoals(); save();
     const after = g.saved || 0; MS = null; hideSheet(); renderIns();
     showJar({ amt: Math.abs(after - before), name: g.name, total: after, out: after < before, p0: before / g.target * 100, p1: after / g.target * 100 });
@@ -678,7 +678,7 @@ function askConfirm(title, msg, label, ok) {
   btn.onclick = () => { d.classList.remove("on"); ok(); };
   d.classList.add("on");
 }
-/* Monthly investment question: each goal asks once a month; Yes repeats the last deposit (amount and note) and records it as an Investment expense */
+/* Monthly investment question: each goal asks once a month; Yes repeats the last deposit (amount and note) as a new deposit on that goal */
 const ivKey = (gid, m) => gid + "|" + m;
 function ivTemplate(gid) { // the latest deposit made before this month
   const cm = today().slice(0, 7);
@@ -691,12 +691,11 @@ function ivDone(gid) { // a Yes this month still has its deposit
 function ivAsk(gid) { // the question stays until this month is answered
   return !!ivTemplate(gid) && !ivDone(gid) && S.iq[ivKey(gid, today().slice(0, 7))] !== "no";
 }
-function ivConfirm(gid) { // Yes: add the deposit and its expense, then show the jar and an undo
+function ivConfirm(gid) { // Yes: add the deposit to the goal, then show the jar and an undo
   const g = S.goals.find(x => x.id === gid), tpl = ivTemplate(gid);
   if (!g || !tpl || !ivAsk(gid)) return renderIns();
   const id = crypto.randomUUID(), now = Date.now(), d = today(), note = tpl.note || g.name, before = g.saved || 0;
   S.gent.push({ id, gid, kind: "add", amt: tpl.amt, note, date: d, u: now, inv: 1 });
-  S.tx.push({ id: "iv-" + id, type: "expense", amount: tpl.amt, date: d, note, cat: "Investment", u: now });
   g.u = now; recalcGoals(); save(); render(); renderIns();
   showJar({ amt: tpl.amt, name: g.name, total: g.saved || 0, out: false, p0: before / g.target * 100, p1: (g.saved || 0) / g.target * 100 });
   toast("Investment added to " + g.name, () => { dropEntry(id); render(); renderIns(); });
@@ -704,18 +703,14 @@ function ivConfirm(gid) { // Yes: add the deposit and its expense, then show the
 function ivSkip(gid) { // No: the question goes away for this month
   S.iq[ivKey(gid, today().slice(0, 7))] = "no"; save(); renderIns();
 }
-function ivRemove(eid) { // deletes the expense that a savings entry created
-  const lt = "iv-" + eid;
-  if (S.tx.some(t => t.id === lt)) { S.del[lt] = Date.now(); S.tx = S.tx.filter(t => t.id !== lt); }
+function purgeInvest(o) { // investment deposits stay on the savings goals; removes the Expense rows an earlier version created
+  const old = o.tx.filter(t => String(t.id).startsWith("iv-"));
+  if (!old.length) return false;
+  const now = Date.now(); old.forEach(t => { o.del[t.id] = now; });
+  o.tx = o.tx.filter(t => !String(t.id).startsWith("iv-")); return true;
 }
-function ivSync(e) { // an edited savings entry updates its expense, or removes it when it becomes a withdrawal
-  const t = S.tx.find(x => x.id === "iv-" + e.id); if (!t) return;
-  if (e.kind === "wd") return ivRemove(e.id);
-  const g = S.goals.find(x => x.id === e.gid);
-  Object.assign(t, { amount: e.amt, date: e.date, note: e.note || (g ? g.name : t.note), u: e.u });
-}
-function dropEntry(eid) { // deletes a savings entry together with its expense
-  S.del[eid] = Date.now(); ivRemove(eid); S.gent = S.gent.filter(x => x.id !== eid); recalcGoals(); save();
+function dropEntry(eid) { // deletes a savings entry
+  S.del[eid] = Date.now(); S.gent = S.gent.filter(x => x.id !== eid); recalcGoals(); save();
 }
 function askDeleteEntry(eid) {
   const e = S.gent.find(x => x.id === eid); if (!e) return;
@@ -729,7 +724,7 @@ function askDeleteEntry(eid) {
 function askDeleteGoal(gid) {
   const g = S.goals.find(x => x.id === gid); if (!g) return;
   askConfirm("Delete goal?", `${g.name} and its ${fmt(g.saved)} history will be deleted. This can't be undone.`, "Delete", () => {
-    const now = Date.now(); S.del[gid] = now; gEnts(gid).forEach(e => { S.del[e.id] = now; ivRemove(e.id); });
+    const now = Date.now(); S.del[gid] = now; gEnts(gid).forEach(e => { S.del[e.id] = now; });
     S.gent = S.gent.filter(e => e.gid !== gid); S.goals = S.goals.filter(x => x.id !== gid);
     if (savGid === gid) savGid = null;
     recalcGoals(); save(); renderIns();
@@ -794,6 +789,7 @@ $("#savFab").onclick = () => { if (savGid) openMoney(savGid); };
 $("#cfm").onclick = e => { if (e.target.id === "cfm") $("#cfm").classList.remove("on"); };
 $("#jarfx").onclick = () => $("#jarfx").classList.remove("on");
 migrateSavings();
+if (purgeInvest(S)) save();
 
 function renderLoans(el) {
   const rows = S.loans.map(l => {
