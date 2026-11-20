@@ -506,7 +506,7 @@ function renderGoals(el) {
     + `<div class="shd"><span>Monthly savings</span><button class="addlink" data-gnew="1">+ Add a goal</button></div>`
     + chartHTML(null, "list", true, avg)
     + `<div class="shd solo"><span>Goals · ${S.goals.length}</span></div></div>`
-    + `<div class="svlist">${S.goals.map(goalRowHTML).join("")}</div>`;
+    + `<div class="svscroll"><div class="svlist">${S.goals.map(goalRowHTML).join("")}</div></div>`;
   el.querySelectorAll(".chc").forEach(chartInit);
 }
 function renderGoalDetail(el, gid) {
@@ -518,7 +518,7 @@ function renderGoalDetail(el, gid) {
     + `<div class="shd"><span>Monthly savings</span></div>`
     + chartHTML(gid, "g" + gid, true, avg)
     + `<div class="shd"><span>History</span></div></div>`
-    + `<div class="hcard svlist">${ents.length ? histRows(ents) : '<div class="hempty">No entries yet</div>'}</div>`;
+    + `<div class="svscroll"><div class="hcard svlist">${ents.length ? histRows(ents) : '<div class="hempty">No entries yet</div>'}</div></div>`;
   el.querySelectorAll(".chc").forEach(chartInit);
   savGid = gid; syncSavFab();
 }
