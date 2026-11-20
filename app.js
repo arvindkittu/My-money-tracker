@@ -18,7 +18,7 @@ const DC = {
 const fresh = () => ({ tx: [], budgets: {}, cats: JSON.parse(JSON.stringify(DC)), name: "My Money", del: {}, su: 0, rec: [], goals: [], loans: [], gent: [], cb: {} });
 let S; try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 if (!S || !Array.isArray(S.tx)) S = fresh();
-S.del = S.del || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.gent = S.gent || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {};
+S.del = S.del || {}; S.iq = S.iq || {}; S.su = S.su || 0; S.rec = S.rec || []; S.goals = S.goals || []; S.loans = S.loans || []; S.gent = S.gent || []; delete S.inv; delete S.snaps; try { localStorage.removeItem("mm3pk"); } catch (e) {} S.cb = S.cb || {};
 const saveLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Could not save data on this device."); } };
 const save = () => { saveLocal(); schedSync(); };
 let type = "expense", range = "1M", vm = today().slice(0, 7), D = null, B = 0, tab = "insights";
@@ -292,7 +292,7 @@ function mergeRaw(a, b) {
     return [...m.values()];
   };
   const s = (b.su || 0) > (a.su || 0) ? b : a;
-  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), gent: mix(a.gent, b.gent), del, cb: s.cb || {}, budgets: s.budgets || {}, cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
+  return { tx: mix(a.tx, b.tx), rec: mix(a.rec, b.rec), goals: mix(a.goals, b.goals), loans: mix(a.loans, b.loans), gent: mix(a.gent, b.gent), del, cb: s.cb || {}, budgets: s.budgets || {}, iq: Object.assign({}, a.iq || {}, b.iq || {}), cats: s.cats || a.cats, name: s.name || a.name, su: Math.max(a.su || 0, b.su || 0) };
 }
 function merge(a, b) { const m = mergeRaw(a, b); if (m && Array.isArray(m.goals) && Array.isArray(m.gent)) fixSavings(m); return m; }
 async function syncNow() {
@@ -475,7 +475,8 @@ function chartInit(card) {
 }
 function goalRowHTML(g) {
   const p = pct(g.saved, g.target);
-  return `<div class="swrow gsw"><div class="swc gcard" data-gopen="${esc(g.id)}"><div class="gtop"><span class="gname">${esc(g.name)}</span><span class="gamt">${sfmt(g.saved)} <small>saved</small><i class="chev">›</i></span></div><div class="gbar"><i style="width:${p}%"></i></div></div><button class="swd" data-gdel="${esc(g.id)}" aria-label="Delete goal">${ICO_DEL}</button></div>`;
+  const ask = ivAsk(g.id) ? `<div class="ask"><p>Did you make an investment this month?</p><div class="ab"><button class="ay" data-iv-yes="${esc(g.id)}">Yes</button><button class="an" data-iv-no="${esc(g.id)}">No</button></div></div>` : "";
+  return `<div class="swrow gsw"><div class="swc gcard" data-gopen="${esc(g.id)}"><div class="gtop"><span class="gname">${esc(g.name)}</span><span class="gamt">${sfmt(g.saved)} <small>saved</small><i class="chev">›</i></span></div><div class="gbar"><i style="width:${p}%"></i></div>${ask}</div><button class="swd" data-gdel="${esc(g.id)}" aria-label="Delete goal">${ICO_DEL}</button></div>`;
 }
 function entryRowHTML(e) {
   const day = e.date.slice(8), mon = new Date(+e.date.slice(0, 4), +e.date.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short" }).toUpperCase();
@@ -596,7 +597,7 @@ function mSave() {
     const e = S.gent.find(x => x.id === MS.eid); if (!e) return;
     const base = before - (e.kind === "wd" ? -e.amt : e.amt), nxt = base + (MS.mode === "wd" ? -a : a);
     if (nxt < 0) { alert("Only " + sfmt(base) + " is available in " + g.name + "."); return; }
-    e.amt = a; e.kind = MS.mode === "wd" ? "wd" : (e.kind === "start" ? "start" : "add"); e.note = MS.note.trim(); e.date = MS.date; e.u = now;
+    e.amt = a; e.kind = MS.mode === "wd" ? "wd" : (e.kind === "start" ? "start" : "add"); e.note = MS.note.trim(); e.date = MS.date; e.u = now; ivSync(e);
     g.u = now; recalcGoals(); save();
     const after = g.saved || 0; MS = null; hideSheet(); renderIns();
     showJar({ amt: Math.abs(after - before), name: g.name, total: after, out: after < before, p0: before / g.target * 100, p1: after / g.target * 100 });
@@ -677,19 +678,58 @@ function askConfirm(title, msg, label, ok) {
   btn.onclick = () => { d.classList.remove("on"); ok(); };
   d.classList.add("on");
 }
+/* Monthly investment question: each goal asks once a month; Yes repeats the last deposit (amount and note) and records it as an Investment expense */
+const ivKey = (gid, m) => gid + "|" + m;
+function ivTemplate(gid) { // the latest deposit made before this month
+  const cm = today().slice(0, 7);
+  return S.gent.filter(e => e.gid === gid && e.kind === "add" && e.date.slice(0, 7) < cm).sort((a, b) => b.date.localeCompare(a.date) || (b.u || 0) - (a.u || 0))[0] || null;
+}
+function ivDone(gid) { // a Yes this month still has its deposit
+  const cm = today().slice(0, 7);
+  return S.gent.some(e => e.gid === gid && e.inv && e.kind === "add" && e.date.slice(0, 7) === cm);
+}
+function ivAsk(gid) { // the question stays until this month is answered
+  return !!ivTemplate(gid) && !ivDone(gid) && S.iq[ivKey(gid, today().slice(0, 7))] !== "no";
+}
+function ivConfirm(gid) { // Yes: add the deposit and its expense, then show the jar and an undo
+  const g = S.goals.find(x => x.id === gid), tpl = ivTemplate(gid);
+  if (!g || !tpl || !ivAsk(gid)) return renderIns();
+  const id = crypto.randomUUID(), now = Date.now(), d = today(), note = tpl.note || g.name, before = g.saved || 0;
+  S.gent.push({ id, gid, kind: "add", amt: tpl.amt, note, date: d, u: now, inv: 1 });
+  S.tx.push({ id: "iv-" + id, type: "expense", amount: tpl.amt, date: d, note, cat: "Investment", u: now });
+  g.u = now; recalcGoals(); save(); render(); renderIns();
+  showJar({ amt: tpl.amt, name: g.name, total: g.saved || 0, out: false, p0: before / g.target * 100, p1: (g.saved || 0) / g.target * 100 });
+  toast("Investment added to " + g.name, () => { dropEntry(id); render(); renderIns(); });
+}
+function ivSkip(gid) { // No: the question goes away for this month
+  S.iq[ivKey(gid, today().slice(0, 7))] = "no"; save(); renderIns();
+}
+function ivRemove(eid) { // deletes the expense that a savings entry created
+  const lt = "iv-" + eid;
+  if (S.tx.some(t => t.id === lt)) { S.del[lt] = Date.now(); S.tx = S.tx.filter(t => t.id !== lt); }
+}
+function ivSync(e) { // an edited savings entry updates its expense, or removes it when it becomes a withdrawal
+  const t = S.tx.find(x => x.id === "iv-" + e.id); if (!t) return;
+  if (e.kind === "wd") return ivRemove(e.id);
+  const g = S.goals.find(x => x.id === e.gid);
+  Object.assign(t, { amount: e.amt, date: e.date, note: e.note || (g ? g.name : t.note), u: e.u });
+}
+function dropEntry(eid) { // deletes a savings entry together with its expense
+  S.del[eid] = Date.now(); ivRemove(eid); S.gent = S.gent.filter(x => x.id !== eid); recalcGoals(); save();
+}
 function askDeleteEntry(eid) {
   const e = S.gent.find(x => x.id === eid); if (!e) return;
   const g = S.goals.find(x => x.id === e.gid), what = e.kind === "wd" ? "withdrawal" : e.kind === "start" ? "starting amount" : "deposit";
   askConfirm("Delete entry?", `This ${fmt(e.amt)} ${what} will be removed from ${g ? g.name : "this goal"}.`, "Delete", () => {
     const g0 = S.goals.find(x => x.id === e.gid), before = g0 ? (g0.saved || 0) : 0;
-    S.del[eid] = Date.now(); S.gent = S.gent.filter(x => x.id !== eid); recalcGoals(); save(); renderIns();
+    dropEntry(eid); renderIns();
     if (g0) { const after = g0.saved || 0; showJar({ amt: e.amt, name: g0.name, total: after, out: after < before, p0: before / g0.target * 100, p1: after / g0.target * 100 }); }
   });
 }
 function askDeleteGoal(gid) {
   const g = S.goals.find(x => x.id === gid); if (!g) return;
   askConfirm("Delete goal?", `${g.name} and its ${fmt(g.saved)} history will be deleted. This can't be undone.`, "Delete", () => {
-    const now = Date.now(); S.del[gid] = now; gEnts(gid).forEach(e => { S.del[e.id] = now; });
+    const now = Date.now(); S.del[gid] = now; gEnts(gid).forEach(e => { S.del[e.id] = now; ivRemove(e.id); });
     S.gent = S.gent.filter(e => e.gid !== gid); S.goals = S.goals.filter(x => x.id !== gid);
     if (savGid === gid) savGid = null;
     recalcGoals(); save(); renderIns();
@@ -738,6 +778,8 @@ sheet.addEventListener("input", e => {
 });
 $("#insBody").onclick = e => {
   const t = e.target, hit = s => t.closest(s);
+  if (hit("[data-iv-yes]")) return ivConfirm(hit("[data-iv-yes]").dataset.ivYes);
+  if (hit("[data-iv-no]")) return ivSkip(hit("[data-iv-no]").dataset.ivNo);
   if (hit("[data-sdel]")) return askDeleteEntry(hit("[data-sdel]").dataset.sdel);
   if (hit("[data-gdel]")) return askDeleteGoal(hit("[data-gdel]").dataset.gdel);
   if (hit("[data-gopen]")) { savGid = hit("[data-gopen]").dataset.gopen; return renderIns(); }
