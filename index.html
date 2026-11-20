@@ -453,7 +453,7 @@ body{overflow:hidden;overflow:clip}
 .hrow::after{content:"";position:absolute;left:66px;right:20px;bottom:0;height:1px;background:#202020;z-index:2;pointer-events:none}
 .hcard .badge{width:34px;height:34px;border-radius:10px;background:#1e1e1e;font-size:12px}
 .hcard .badge small{font-size:7.5px}
-/* v2.3.27 pass: monthly investment question under each goal; Yes adds the deposit and its Investment expense */
+/* v2.3.28 pass: monthly investment question under each goal; Yes adds the deposit to that goal only */
 .ask{display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid #242424}
 .ask p{flex:1;min-width:0;margin:0;font-size:12.5px;line-height:1.3;color:#aeaeb2}
 .ask .ab{display:flex;gap:6px;flex:none}
@@ -489,7 +489,7 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.27</div></section>
+</div><div class="ver">v2.3.28</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
