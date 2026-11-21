@@ -1100,12 +1100,12 @@ function lnRuleRow(k, label, max, val) { // a row that opens into a ruler; the r
 function drawLoanForm() {
   if (!LN) return;
   const E = LN.kind === "emi";
-  lnSheetCls("lnSheet");
+  lnSheetCls("lnSheet" + (E ? " lnFix" : ""));
   sheet.innerHTML = '<div class="hd"></div><div class="lnNav"><button class="lnBack" id="lnBackBtn" aria-label="Back">‹</button><h3>New loan</h3></div>'
     + '<div class="lnRows">'
     + '<label class="lnRow2"><span>Debt name</span><input id="lnfName" type="text" maxlength="30" placeholder="Not set" autocomplete="off" value="' + esc(LN.name) + '"></label>'
     + '<label class="lnRow2"><span>' + (E ? "Total loan amount" : "Amount owed") + '</span><input id="lnfAmt" inputmode="numeric" placeholder="Set amount" autocomplete="off" value="' + (LN.amt ? LN.amt.toLocaleString("en-IN") : "") + '"></label>'
-    + (E ? lnRuleRow("n", "Total EMIs", 360, LN.n)
+    + (E ? lnRuleRow("n", "Total EMIs", 300, LN.n)
       + '<label class="lnRow2"><span>Monthly EMI</span><input id="lnfEmi" inputmode="numeric" placeholder="Not set" autocomplete="off" value="' + (LN.emi ? LN.emi.toLocaleString("en-IN") : "") + '"></label>'
       + lnRuleRow("ap", "EMIs already paid", LN.n, LN.ap)
       + '<button class="lnRow2 lnDate" id="lnfNext"><span>Next EMI</span><b>' + ldFmtD(LN.next) + "</b></button>" : "")
@@ -1117,6 +1117,8 @@ function drawLoanForm() {
 function lnRulers() {
   document.querySelectorAll(".lnRwin").forEach(win => {
     const k = win.dataset.k, max = +win.dataset.max;
+    const trk = win.querySelector(".lnRtrk"), half = (win.clientWidth || 313) / 2 + "px";
+    if (trk) { trk.style.paddingLeft = half; trk.style.paddingRight = half; } // explicit half-window padding, so the centre reaches both ends
     win.scrollLeft = LN[k] * TK;
     let raf = 0;
     win.addEventListener("scroll", () => {
@@ -1126,6 +1128,7 @@ function lnRulers() {
         if (v === LN[k]) return;
         LN[k] = v;
         if (k === "n" && LN.ap > v) LN.ap = v;
+        if (k === "n") lnAutoEmi();
         const unit = v === 1 ? "month" : "months";
         const rv = document.getElementById("rv-" + k), rb = document.getElementById("rb-" + k);
         if (rv) rv.textContent = v + " " + unit;
@@ -1135,6 +1138,12 @@ function lnRulers() {
       });
     }, { passive: true });
   });
+}
+function lnAutoEmi(force) { // the monthly EMI is the amount spread over the months, until a monthly EMI typed by the user takes over
+  if (!LN || LN.kind !== "emi" || LN.emiAuto === false) return;
+  LN.emi = LN.amt > 0 && LN.n > 0 ? Math.round(LN.amt / LN.n) : 0;
+  const f = document.getElementById("lnfEmi");
+  if (f && (force || document.activeElement !== f)) f.value = LN.emi ? LN.emi.toLocaleString("en-IN") : "";
 }
 function lnRefresh() { // validation and the loan summary, without redrawing the sheet
   if (!LN) return;
@@ -1179,10 +1188,12 @@ sheet.addEventListener("input", e => {
   const t = e.target;
   if (t.id === "lnfName") LN.name = t.value;
   else if (t.id === "lnfAmt") LN.amt = num(t.value);
-  else if (t.id === "lnfEmi") LN.emi = num(t.value);
+  else if (t.id === "lnfEmi") { LN.emi = num(t.value); LN.emiAuto = t.value.trim() === ""; }
   else return;
+  lnAutoEmi();
   lnRefresh();
 });
+sheet.addEventListener("blur", e => { if (e.target.id === "lnfEmi" && LN && LN.emiAuto !== false) lnAutoEmi(true); }, true);
 sheet.addEventListener("change", e => {
   if (!LN) return;
   const t = e.target;
@@ -1341,7 +1352,7 @@ function defaultCat(t) {
 (function () { // swipe down anywhere on a sheet to close it (touch)
   let t0 = false, y0 = 0, x0 = 0, dy = 0, drag = false, scroller = null;
   sheet.addEventListener("touchstart", e => {
-    if (e.touches.length !== 1 || e.target.closest("input,.ruler,.wheel")) { t0 = false; return; }
+    if (e.touches.length !== 1 || e.target.closest("input,.ruler,.wheel,.lnRwin")) { t0 = false; return; }
     scroller = e.target.closest(".cats"); // a scrolling list only starts a drag when it is at the top
     y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; dy = 0; drag = false; t0 = true;
   }, { passive: true });
