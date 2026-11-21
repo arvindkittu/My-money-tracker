@@ -247,7 +247,7 @@ function renderIns() {
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; savGid = null; renderIns(); } };
 const openPage = id => { if (id === "insights") { savGid = null; renderIns(); } else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
 $$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
-$("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; } };
+$("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; renderGreet(); } };
 $("#bk").onclick = async () => {
   const f = new File([JSON.stringify(S, null, 1)], "my-money-backup-" + today() + ".json", { type: "application/json" });
   if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e.name === "AbortError") return; } }
@@ -1879,3 +1879,19 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catc
 
 /* v2.3.23: tapping a savings entry opens it for editing */
 document.addEventListener("click", e => { const t = e.target.closest && e.target.closest("[data-sedit]"); if (t && savGid) openMoney(savGid, t.dataset.sedit); });
+
+/* home greeting: time of day in IST, the profile name, and net worth (savings held minus loans still to pay) */
+function renderGreet() {
+  const h = +new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", hour12: false }).formatToParts(new Date()).find(p => p.type === "hour").value % 24;
+  const part = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+  const nm = (S.name || "").trim();
+  const invested = (S.goals || []).reduce((t, g) => t + (g.saved || 0), 0);
+  const owed = (S.loans || []).reduce((t, l) => t + (l.cleared ? 0 : ldRem(l)), 0);
+  const nw = r2(invested - owed);
+  const hi = document.getElementById("gHi"), nwEl = document.getElementById("gNw");
+  if (hi) hi.textContent = "Good " + part + (nm ? ", " + nm : "");
+  if (nwEl) nwEl.innerHTML = "Net worth <em>" + sfmt(nw) + "</em>";
+}
+(function () { const r = render; render = function () { r.apply(this, arguments); renderGreet(); }; })();
+setInterval(renderGreet, 60000);
+renderGreet();
