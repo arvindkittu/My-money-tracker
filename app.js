@@ -913,6 +913,7 @@ function renderLoanList(el) {
     document.getElementById("lnMon").textContent = ldYmLbl(ldYm(i));
     document.getElementById("lnBig").textContent = fmt(h.big);
     document.getElementById("lnSub").textContent = h.sub;
+    const rowsEl = el.querySelector(".svlist"); if (rowsEl) rowsEl.innerHTML = act.map(l => ldRowHTML(l, i, cm)).join("");
   });
 }
 function ldRowHTML(l, sel, cm) {
@@ -931,6 +932,15 @@ function ldTracker(l) { // one row per year, one circle per EMI month: filled wh
     out += '<div class="lnTr"><span>' + y + '</span><div class="lnTc">' + c + "</div></div>";
   }
   return out;
+}
+function ldPayList(l) { // newest first; an EMI loan lists each paid EMI on its due day, and an early close as one payment
+  const pays = l.pays || [];
+  if (l.kind !== "emi") return pays.slice().reverse();
+  const closes = pays.filter(p => p.t === "close"), c = closes[closes.length - 1];
+  const cnt = c && l.emi > 0 ? Math.max(0, l.n - Math.round(c.amt / l.emi)) : l.done;
+  const rows = [];
+  for (let i = 0; i < cnt; i++) rows.push({ id: "e" + i, t: "emi", amt: l.emi, date: ldAdd(l.start, i), note: "" });
+  return rows.concat(closes).sort((a, b) => b.date.localeCompare(a.date));
 }
 function ldPayRow(p) {
   const d = ldDate(p.date);
@@ -954,7 +964,7 @@ function renderLoanDetail(el, l) {
     else status = '<div class="lnPill"><span>Next EMI · ' + ldFmtD(ldNext(l)) + "</span></div>";
   } else if (rem <= 0) status = '<div class="lnPill lnPillOk"><span>✓ Loan cleared</span><button class="lnMark" data-lnmark="' + id + '">Mark as cleared</button></div>';
   const head = '<div class="svhead lnHead"><div class="lnTtl"><span>' + esc(l.name) + '</span><button class="lnPen" data-lnedit="' + id + '" aria-label="Edit loan">' + LN_PEN + "</button></div>" + card + status + "</div>";
-  const pays = l.pays || [];
+  const pays = l.pays || [], rowsAll = ldPayList(l);
   let body = "", bind = null;
   if (isEmi) body = '<div class="lnSec"><span>EMI TRACKER</span></div><div class="lnTrk">' + ldTracker(l) + "</div>";
   else if (pays.length) {
@@ -971,7 +981,7 @@ function renderLoanDetail(el, l) {
     } };
   }
   body += '<div class="lnSec"><span>PAYMENTS</span>' + (isEmi && !l.cleared ? '<button class="lnClose" data-lnclose="' + id + '">Close early</button>' : "") + "</div>"
-    + '<div class="lnPc">' + (pays.length ? pays.slice().reverse().map(ldPayRow).join("") : '<p class="lnNone">No payments logged yet.</p>') + "</div>";
+    + '<div class="lnPc">' + (rowsAll.length ? rowsAll.map(ldPayRow).join("") : '<p class="lnNone">No payments logged yet.</p>') + "</div>";
   el.innerHTML = head + '<div class="svscroll">' + body + "</div>" + ldTray(l);
   if (bind) ldBindChart("lpSc", bind.a, bind.n, bind.sel, 28, bind.onPick);
 }
@@ -1079,12 +1089,11 @@ function openLoanForm(kind) {
   LN = { kind, name: "", amt: 0, n: 0, emi: 0, ap: 0, next: ldAdd(today(), 1), open: null };
   drawLoanForm(); showSheet();
 }
-function openLoanEdit(id) {
+function openLoanEdit(id) { // the same form as creating a loan, filled with the loan's own values
   const l = S.loans.find(x => x.id === id); if (!l) return;
-  LN = { edit: id, name: l.name, open: null };
-  lnSheetCls("lnSheet");
-  sheet.innerHTML = '<div class="hd"></div><div class="lnNav"><h3>Edit loan</h3></div><div class="lnRows"><label class="lnRow2"><span>Debt name</span><input id="lnfName" type="text" maxlength="30" autocomplete="off" value="' + esc(l.name) + '"></label></div><button class="lnBtn" id="lnfSave">Save</button>';
-  lnRefresh(); showSheet();
+  if (l.kind === "emi") LN = { edit: id, kind: "emi", name: l.name, amt: l.amt, n: l.n, emi: l.emi, ap: l.done, next: ldAdd(l.start, l.done), open: null, emiAuto: l.emi === Math.round(l.amt / l.n) };
+  else LN = { edit: id, kind: "flex", name: l.name, amt: l.amt, n: 0, emi: 0, ap: 0, next: ldAdd(today(), 1), open: null };
+  drawLoanForm(); showSheet();
 }
 function lnTicks(max) {
   let s = "";
@@ -1101,7 +1110,7 @@ function drawLoanForm() {
   if (!LN) return;
   const E = LN.kind === "emi";
   lnSheetCls("lnSheet" + (E ? " lnFix" : ""));
-  sheet.innerHTML = '<div class="hd"></div><div class="lnNav"><button class="lnBack" id="lnBackBtn" aria-label="Back">‹</button><h3>New loan</h3></div>'
+  sheet.innerHTML = '<div class="hd"></div><div class="lnNav">' + (LN.edit ? "" : '<button class="lnBack" id="lnBackBtn" aria-label="Back">‹</button>') + '<h3>' + (LN.edit ? "Edit loan" : "New loan") + '</h3></div>'
     + '<div class="lnRows">'
     + '<label class="lnRow2"><span>Debt name</span><input id="lnfName" type="text" maxlength="30" placeholder="Not set" autocomplete="off" value="' + esc(LN.name) + '"></label>'
     + '<label class="lnRow2"><span>' + (E ? "Total loan amount" : "Amount owed") + '</span><input id="lnfAmt" inputmode="numeric" placeholder="Set amount" autocomplete="off" value="' + (LN.amt ? LN.amt.toLocaleString("en-IN") : "") + '"></label>'
@@ -1111,14 +1120,18 @@ function drawLoanForm() {
       + '<button class="lnRow2 lnDate" id="lnfNext"><span>Next EMI</span><b>' + ldFmtD(LN.next) + "</b></button>" : "")
     + "</div>"
     + '<div class="lnSum" id="lnfSum" style="display:none"></div>'
-    + '<button class="lnBtn" id="lnfSave" disabled>Add Loan</button>';
+    + '<button class="lnBtn" id="lnfSave" disabled>' + (LN.edit ? "Save" : "Add Loan") + '</button>';
   lnRulers(); lnRefresh();
 }
 function lnRulers() {
   document.querySelectorAll(".lnRwin").forEach(win => {
     const k = win.dataset.k, max = +win.dataset.max;
     const trk = win.querySelector(".lnRtrk"), half = (win.clientWidth || 313) / 2 + "px";
-    if (trk) { trk.style.paddingLeft = half; trk.style.paddingRight = half; } // explicit half-window padding, so the centre reaches both ends
+    if (trk) { // half-window spacers at both ends, as flex items: trailing padding is not always scrollable on phones
+      trk.style.padding = "0";
+      if (!trk.querySelector(".lnRsp")) { trk.insertAdjacentHTML("afterbegin", '<i class="lnRsp"></i>'); trk.insertAdjacentHTML("beforeend", '<i class="lnRsp"></i>'); }
+      trk.querySelectorAll(".lnRsp").forEach(x => { x.style.flex = "0 0 " + half; });
+    }
     win.scrollLeft = LN[k] * TK;
     let raf = 0;
     win.addEventListener("scroll", () => {
@@ -1148,7 +1161,7 @@ function lnAutoEmi(force) { // the monthly EMI is the amount spread over the mon
 function lnRefresh() { // validation and the loan summary, without redrawing the sheet
   if (!LN) return;
   const E = LN.kind === "emi", nm = LN.name.trim();
-  const ok = LN.edit ? !!nm : (!!nm && LN.amt > 0 && (!E || (LN.emi > 0 && LN.n > 0 && LN.ap <= LN.n)));
+  const ok = !!nm && LN.amt > 0 && (!E || (LN.emi > 0 && LN.n > 0 && LN.ap <= LN.n));
   const b = document.getElementById("lnfSave"); if (b) b.disabled = !ok;
   const s = document.getElementById("lnfSum");
   if (s) {
@@ -1171,7 +1184,7 @@ function lnSaveForm() {
   const name = LN.name.trim(), now = Date.now();
   if (LN.edit) {
     const l = S.loans.find(x => x.id === LN.edit);
-    if (l && name) { l.name = name; l.u = now; }
+    if (l && name) { l.name = name; l.u = now; if (l.kind === "emi") { l.amt = LN.amt; l.n = LN.n; l.emi = LN.emi; l.start = ldAdd(LN.next, -LN.ap); l.done = LN.ap; l.cleared = LN.ap >= LN.n; } else if (LN.amt > 0) l.amt = LN.amt; }
     LN = null; hideSheet(); save(); renderIns(); render(); return;
   }
   if (!name || !(LN.amt > 0)) return;
