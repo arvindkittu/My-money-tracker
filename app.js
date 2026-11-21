@@ -439,6 +439,31 @@ function avgPerMonth(gid) {
   const n = Math.max(1, (+cur.slice(0, 4) - +st.slice(0, 4)) * 12 + (+cur.slice(5, 7) - +st.slice(5, 7)) + 1);
   return r2((g ? g.saved : 0) / n);
 }
+function goalSavedAt(g, k) { // what a goal held by the end of month k (k is YYYY-MM)
+  if (k >= today().slice(0, 7)) return g.saved || 0;
+  return Math.max(0, r2(gEnts(g.id).filter(e => e.date.slice(0, 7) <= k).reduce((t, e) => t + gSigned(e), 0)));
+}
+function savAt(card, k) { // the monthly chart drives the amounts: the total, the goal rows and the goal's bar follow the chosen month
+  if (!k) return;
+  const cur = today().slice(0, 7), head = card.closest(".svhead");
+  if (!head) return;
+  const past = k < cur, lbl = new Date(+k.slice(0, 4), +k.slice(5, 7) - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  if (card.dataset.ch === "list") {
+    const total = r2(S.goals.reduce((t, g) => t + goalSavedAt(g, k), 0));
+    const tb = head.querySelector(".stot b"), ts = head.querySelector(".stot small");
+    if (tb) tb.textContent = sfmt(total);
+    if (ts) ts.textContent = past ? "saved by " + lbl : "saved so far";
+    const rows = head.parentElement.querySelector(".svlist");
+    if (rows) rows.innerHTML = S.goals.map(g => goalRowHTML(Object.assign({}, g, { saved: goalSavedAt(g, k) }), !past)).join("");
+  } else {
+    const g = S.goals.find(x => x.id === card.dataset.gid); if (!g) return;
+    const v = goalSavedAt(g, k), p = pct(v, g.target);
+    const gb = head.querySelector(".gpr b"), ge = head.querySelector(".gpr em"), gi = head.querySelector(".gbar i");
+    if (gb) gb.textContent = sfmt(v);
+    if (ge) ge.textContent = p + "% saved";
+    if (gi) gi.style.width = p + "%";
+  }
+}
 function chartHTML(gid, id, big, pre) {
   const keys = savKeys(gid), net = savNet(gid), cur = today().slice(0, 7);
   const max = Math.max(1, ...keys.map(k => Math.abs(net[k] || 0)));
@@ -461,6 +486,7 @@ function chartInit(card) {
     card.querySelectorAll(".cc.sel").forEach(c => c.classList.remove("sel"));
     const c = card.querySelector(`.cc[data-k="${k}"]`); if (c) c.classList.add("sel");
     const bEl = c && (c.querySelector(".b") || c.querySelector(".d")); if (bEl) vEl.style.top = Math.round(bEl.getBoundingClientRect().top - card.getBoundingClientRect().top - 22) + "px";
+    savAt(card, k);
   };
   const at = Math.max(0, keys.indexOf(chSel[id] || cur));
   scr.scrollLeft = at * 28;
@@ -474,9 +500,9 @@ function chartInit(card) {
     });
   }, { passive: true });
 }
-function goalRowHTML(g) {
+function goalRowHTML(g, showAsk = true) {
   const p = pct(g.saved, g.target);
-  const ask = ivAsk(g.id) ? `<div class="ask"><p>Did you make an investment this month?</p><div class="ab"><button class="ay" data-iv-yes="${esc(g.id)}">Yes</button><button class="an" data-iv-no="${esc(g.id)}">No</button></div></div>` : "";
+  const ask = showAsk && ivAsk(g.id) ? `<div class="ask"><p>Did you make an investment this month?</p><div class="ab"><button class="ay" data-iv-yes="${esc(g.id)}">Yes</button><button class="an" data-iv-no="${esc(g.id)}">No</button></div></div>` : "";
   return `<div class="swrow gsw"><div class="swc gcard" data-gopen="${esc(g.id)}"><div class="gtop"><span class="gname">${esc(g.name)}</span><span class="gamt">${sfmt(g.saved)} <small>saved</small><i class="chev">›</i></span></div><div class="gbar"><i style="width:${p}%"></i></div>${ask}</div><button class="swd" data-gdel="${esc(g.id)}" aria-label="Delete goal">${ICO_DEL}</button></div>`;
 }
 function entryRowHTML(e) {
@@ -508,7 +534,7 @@ function renderGoals(el) {
     + `<div class="shd"><span>Monthly savings</span><button class="addlink" data-gnew="1">+ Add a goal</button></div>`
     + chartHTML(null, "list", true, avg)
     + `<div class="shd solo"><span>Goals · ${S.goals.length}</span></div></div>`
-    + `<div class="svscroll"><div class="svlist">${S.goals.map(goalRowHTML).join("")}</div></div>`;
+    + `<div class="svscroll"><div class="svlist">${S.goals.map(g => goalRowHTML(g)).join("")}</div></div>`;
   el.querySelectorAll(".chc").forEach(chartInit);
 }
 function renderGoalDetail(el, gid) {
@@ -897,9 +923,9 @@ function renderLoanList(el) {
     for (let i = R.a; i <= R.b; i++) bars += '<div class="lnBar' + (i === sel ? " on" : "") + '" data-i="' + i + '"><i class="' + (ldEmiAt(i) ? "" : "dt") + '"></i></div>';
     const v = ldEmiAt(sel);
     chart = '<div class="lnSecH"><span>MONTHLY EMI</span><button class="lnNew" data-lnew="1">+ Add a loan</button></div>'
-      + '<div class="lnChartc"><div class="lnVal" id="lnVal">' + (v ? "−" + fmt(v) : "") + '</div><div class="lnSc" id="lnSc"><div class="lnPad"></div>' + bars + '<div class="lnPad"></div></div><div class="lnMon" id="lnMon">' + ldYmLbl(ldYm(sel)) + "</div></div>";
+      + '<div class="lnChartc"><div class="lnVal" id="lnVal">' + (v ? "−" + sfmt(v) : "") + '</div><div class="lnSc" id="lnSc"><div class="lnPad"></div>' + bars + '<div class="lnPad"></div></div><div class="lnMon" id="lnMon">' + ldYmLbl(ldYm(sel)) + "</div></div>";
   }
-  el.innerHTML = '<div class="svhead lnHead"><div class="lnBig" id="lnBig">' + fmt(hd.big) + '</div><div class="lnSub" id="lnSub">' + hd.sub + "</div>" + chart + "</div>"
+  el.innerHTML = '<div class="svhead lnHead"><div class="lnBig" id="lnBig">' + sfmt(hd.big) + '</div><div class="lnSub" id="lnSub">' + hd.sub + "</div>" + chart + "</div>"
     + '<div class="svscroll">'
     + '<div class="lnSec"><span>LOANS · ' + act.length + "</span>" + (R ? "" : '<button class="lnNew" data-lnew="1">+ Add a loan</button>') + "</div>"
     + (act.length ? '<div class="svlist">' + act.map(l => ldRowHTML(l, sel, cm)).join("") + "</div>" : "")
@@ -909,9 +935,9 @@ function renderLoanList(el) {
     lnSel = i;
     el.querySelectorAll("#lnSc .lnBar").forEach(b => b.classList.toggle("on", +b.dataset.i === i));
     const v = ldEmiAt(i), h = ldHeadFor(i, cm, act);
-    document.getElementById("lnVal").textContent = v ? "−" + fmt(v) : "";
+    document.getElementById("lnVal").textContent = v ? "−" + sfmt(v) : "";
     document.getElementById("lnMon").textContent = ldYmLbl(ldYm(i));
-    document.getElementById("lnBig").textContent = fmt(h.big);
+    document.getElementById("lnBig").textContent = sfmt(h.big);
     document.getElementById("lnSub").textContent = h.sub;
     const rowsEl = el.querySelector(".svlist"); if (rowsEl) rowsEl.innerHTML = act.map(l => ldRowHTML(l, i, cm)).join("");
   });
@@ -919,7 +945,7 @@ function renderLoanList(el) {
 function ldRowHTML(l, sel, cm) {
   const id = esc(l.id);
   if (l.cleared) return '<div class="swrow lnRow"><div class="swc lnCard lnDone" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + LN_CHECK_SM + esc(l.name) + '</span></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + LN_TRASH + "</button></div>";
-  return '<div class="swrow lnRow"><div class="swc lnCard" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + esc(l.name) + '</span><span class="lnAmt">' + fmt(ldShown(l, sel, cm)) + " <small>left</small>" + LN_CHEV + '</span></div><div class="lnBarP2"><i style="width:' + ldPctShown(l, sel, cm) + '%"></i></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + LN_TRASH + "</button></div>";
+  return '<div class="swrow lnRow"><div class="swc lnCard" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + esc(l.name) + '</span><span class="lnAmt">' + sfmt(ldShown(l, sel, cm)) + " <small>left</small>" + LN_CHEV + '</span></div><div class="lnBarP2"><i style="width:' + ldPctShown(l, sel, cm) + '%"></i></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + LN_TRASH + "</button></div>";
 }
 
 /* ---------- Loan detail ---------- */
@@ -944,23 +970,23 @@ function ldPayList(l) { // newest first; an EMI loan lists each paid EMI on its 
 }
 function ldPayRow(p) {
   const d = ldDate(p.date);
-  return '<div class="lpRow"><div class="lpDay"><b>' + d.getDate() + "</b><small>" + d.toLocaleDateString("en-IN", { month: "short" }).toUpperCase() + '</small></div><span class="lpLbl">' + esc(p.note || LN_LBL[p.t] || "Payment") + '</span><span class="lpAmt">+' + fmt(p.amt) + "</span></div>";
+  return '<div class="lpRow"><div class="lpDay"><b>' + d.getDate() + "</b><small>" + d.toLocaleDateString("en-IN", { month: "short" }).toUpperCase() + '</small></div><span class="lpLbl">' + esc(p.note || LN_LBL[p.t] || "Payment") + '</span><span class="lpAmt">+' + sfmt(p.amt) + "</span></div>";
 }
 function ldTray(l) { // asks whether the latest payment should also be an expense; once answered, or superseded by a newer payment, it is not asked again
   const p = (l.pays || []).slice(-1)[0];
   if (!p || p.exp !== undefined) return "";
   const id = esc(l.id), pid = esc(p.id);
-  return '<div class="lnTray' + (l.kind === "flex" && !l.cleared ? " up" : "") + '"><span>Add ' + fmt(p.amt) + " for " + esc(l.name) + ' as expense</span><button class="lnTrayY" data-lntray="yes" data-lid="' + id + '" data-pid="' + pid + '" aria-label="Add as expense">' + LN_CHECK + '</button><button class="lnTrayN" data-lntray="no" data-lid="' + id + '" data-pid="' + pid + '" aria-label="Skip">✕</button></div>';
+  return '<div class="lnTray' + (l.kind === "flex" && !l.cleared ? " up" : "") + '"><span>Add ' + sfmt(p.amt) + " for " + esc(l.name) + ' as expense</span><button class="lnTrayY" data-lntray="yes" data-lid="' + id + '" data-pid="' + pid + '" aria-label="Add as expense">' + LN_CHECK + '</button><button class="lnTrayN" data-lntray="no" data-lid="' + id + '" data-pid="' + pid + '" aria-label="Skip">✕</button></div>';
 }
 function renderLoanDetail(el, l) {
   const id = esc(l.id), isEmi = l.kind === "emi", rem = ldRem(l), p = ldPct(l), cm = ldIdx(today().slice(0, 7));
   let card = "", status = "";
-  if (isEmi) card = '<div class="lnSum3"><div class="lnBig3">' + fmt(rem) + '</div><div class="lnSub3">left to pay</div><div class="lnSep"></div><div class="lnStats"><div><small>Total loan</small><b>' + fmt(l.amt) + "</b></div><div><small>EMI / month</small><b>" + fmt(l.emi) + "</b></div><div><small>EMIs left</small><b>" + (l.n - l.done) + "</b></div></div></div>";
-  else card = '<div class="lnSum3"><div class="lnRowTop"><div><b class="lnBig4">' + fmt(rem) + '</b> <small>of ' + fmt(l.amt) + '</small></div><span class="lnPct">' + p + '% paid</span></div><div class="lnBarP"><i style="width:' + p + '%"></i></div></div>';
+  if (isEmi) card = '<div class="lnSum3"><div class="lnBig3">' + sfmt(rem) + '</div><div class="lnSub3">left to pay</div><div class="lnSep"></div><div class="lnStats"><div><small>Total loan</small><b>' + sfmt(l.amt) + "</b></div><div><small>EMI / month</small><b>" + sfmt(l.emi) + "</b></div><div><small>EMIs left</small><b>" + (l.n - l.done) + "</b></div></div></div>";
+  else card = '<div class="lnSum3"><div class="lnRowTop"><div><b class="lnBig4">' + sfmt(rem) + '</b> <small>of ' + sfmt(l.amt) + '</small></div><span class="lnPct">' + p + '% paid</span></div><div class="lnBarP"><i style="width:' + p + '%"></i></div></div>';
   if (l.cleared) status = '<div class="lnPill lnPillOk"><span>✓ Cleared</span><button class="lnReo" data-lnreopen="' + id + '">Reopen</button></div>';
   else if (isEmi) {
     if (ldPaidNow(l)) status = '<div class="lnPill lnPillOk"><span>✓ EMI paid · next ' + ldFmtD(ldNext(l)) + "</span></div>";
-    else if (ldNext(l) <= today()) status = '<button class="lnPill lnPillAct" data-lnpay="' + id + '">Pay ' + fmt(l.emi) + " EMI</button>";
+    else if (ldNext(l) <= today()) status = '<button class="lnPill lnPillAct" data-lnpay="' + id + '">Pay ' + sfmt(l.emi) + " EMI</button>";
     else status = '<div class="lnPill"><span>Next EMI · ' + ldFmtD(ldNext(l)) + "</span></div>";
   } else if (rem <= 0) status = '<div class="lnPill lnPillOk"><span>✓ Loan cleared</span><button class="lnMark" data-lnmark="' + id + '">Mark as cleared</button></div>';
   const head = '<div class="svhead lnHead"><div class="lnTtl"><span>' + esc(l.name) + '</span><button class="lnPen" data-lnedit="' + id + '" aria-label="Edit loan">' + LN_PEN + "</button></div>" + card + status + "</div>";
@@ -973,10 +999,10 @@ function renderLoanDetail(el, l) {
     let bars = "";
     for (let i = a; i <= b; i++) bars += '<div class="lnBar g' + (i === sel ? " on" : "") + '" data-i="' + i + '"><i class="' + (ldPayAt(l, i) ? "" : "dt") + '"></i></div>';
     const avg = Math.round(ldPaid(l) / Math.max(1, cm - first + 1));
-    body = '<div class="lnSec"><span>MONTHLY PAYMENTS</span></div><div class="lnPayCard"><div class="lnAvgL">' + fmt(avg) + '</div><div class="lnAvgS">average per month</div><div class="lnVal" id="lpVal">' + fmt(ldPayAt(l, sel)) + '</div><div class="lnSc" id="lpSc"><div class="lnPad"></div>' + bars + '<div class="lnPad"></div></div><div class="lnMon" id="lpMon">' + ldYmLbl(ldYm(sel)) + "</div></div>";
+    body = '<div class="lnSec"><span>MONTHLY PAYMENTS</span></div><div class="lnPayCard"><div class="lnAvgL">' + sfmt(avg) + '</div><div class="lnAvgS">average per month</div><div class="lnVal" id="lpVal">' + sfmt(ldPayAt(l, sel)) + '</div><div class="lnSc" id="lpSc"><div class="lnPad"></div>' + bars + '<div class="lnPad"></div></div><div class="lnMon" id="lpMon">' + ldYmLbl(ldYm(sel)) + "</div></div>";
     bind = { a, n: b - a + 1, sel, onPick: i => {
       el.querySelectorAll("#lpSc .lnBar").forEach(x => x.classList.toggle("on", +x.dataset.i === i));
-      document.getElementById("lpVal").textContent = fmt(ldPayAt(l, i));
+      document.getElementById("lpVal").textContent = sfmt(ldPayAt(l, i));
       document.getElementById("lpMon").textContent = ldYmLbl(ldYm(i));
     } };
   }
@@ -995,7 +1021,7 @@ function lnPayEmi(id) { // pays the EMI that is due
   const full = l.done >= l.n;
   if (full) l.cleared = true;
   save(); renderIns(); render();
-  if (full) ldCelebrate(l.name, "Fully paid", fmt(r2(l.n * l.emi)) + " repaid");
+  if (full) ldCelebrate(l.name, "Fully paid", sfmt(r2(l.n * l.emi)) + " repaid");
 }
 function lnMark(id, on) {
   const l = S.loans.find(x => x.id === id); if (!l) return;
@@ -1168,7 +1194,7 @@ function lnRefresh() { // validation and the loan summary, without redrawing the
     if (E && LN.amt > 0 && LN.emi > 0 && LN.n > 0) {
       const repay = r2(LN.emi * LN.n);
       s.style.display = "";
-      s.innerHTML = '<small>LOAN SUMMARY</small><div><span>You borrowed</span><b>' + fmt(LN.amt) + "</b></div><div><span>You’ll repay</span><b>" + fmt(repay) + "</b></div><div><span>Extra you’ll pay</span><b>" + fmt(Math.max(0, repay - LN.amt)) + "</b></div>";
+      s.innerHTML = '<small>LOAN SUMMARY</small><div><span>You borrowed</span><b>' + sfmt(LN.amt) + "</b></div><div><span>You’ll repay</span><b>" + sfmt(repay) + "</b></div><div><span>Extra you’ll pay</span><b>" + sfmt(Math.max(0, repay - LN.amt)) + "</b></div>";
     } else s.style.display = "none";
   }
 }
