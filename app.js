@@ -1105,7 +1105,7 @@ function drawLoanForm() {
     + '<div class="lnRows">'
     + '<label class="lnRow2"><span>Debt name</span><input id="lnfName" type="text" maxlength="30" placeholder="Not set" autocomplete="off" value="' + esc(LN.name) + '"></label>'
     + '<label class="lnRow2"><span>' + (E ? "Total loan amount" : "Amount owed") + '</span><input id="lnfAmt" inputmode="numeric" placeholder="Set amount" autocomplete="off" value="' + (LN.amt ? LN.amt.toLocaleString("en-IN") : "") + '"></label>'
-    + (E ? lnRuleRow("n", "Total EMIs", 600, LN.n)
+    + (E ? lnRuleRow("n", "Total EMIs", 360, LN.n)
       + '<label class="lnRow2"><span>Monthly EMI</span><input id="lnfEmi" inputmode="numeric" placeholder="Not set" autocomplete="off" value="' + (LN.emi ? LN.emi.toLocaleString("en-IN") : "") + '"></label>'
       + lnRuleRow("ap", "EMIs already paid", LN.n, LN.ap)
       + '<button class="lnRow2 lnDate" id="lnfNext"><span>Next EMI</span><b>' + ldFmtD(LN.next) + "</b></button>" : "")
