@@ -245,7 +245,7 @@ function renderIns() {
   el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
 }
 $("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; savGid = null; renderIns(); } };
-const openPage = id => { if (id === "insights") { savGid = null; renderIns(); } else { $("#nm").textContent = S.name + " ✎"; refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
+const openPage = id => { if (id === "insights") { savGid = null; renderIns(); } else { renderGreet(); refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
 $$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; renderGreet(); } };
 $("#bk").onclick = async () => {
@@ -1888,9 +1888,9 @@ function renderGreet() {
   const invested = (S.goals || []).reduce((t, g) => t + (g.saved || 0), 0);
   const owed = (S.loans || []).reduce((t, l) => t + (l.cleared ? 0 : ldRem(l)), 0);
   const nw = r2(invested - owed);
-  const hi = document.getElementById("gHi"), nwEl = document.getElementById("gNw");
-  if (hi) hi.textContent = "Good " + part + (nm ? ", " + nm : "");
-  if (nwEl) nwEl.innerHTML = "Net worth <em>" + sfmt(nw) + "</em>";
+  const nmEl = document.getElementById("nm"), nwEl = document.getElementById("gNw");
+  if (nmEl) nmEl.textContent = "Good " + part + (nm ? ", " + nm : "") + " ✎"; // the greeting sits in the profile section, and the name stays editable from it
+  if (nwEl) nwEl.innerHTML = "Your Current Net worth is : <em>" + sfmt(nw) + "</em>";
 }
 (function () { const r = render; render = function () { r.apply(this, arguments); renderGreet(); }; })();
 setInterval(renderGreet, 60000);
