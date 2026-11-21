@@ -616,9 +616,9 @@ body{overflow:hidden;overflow:clip}
 .lnSheet.lnFix .lnRows,.lnSheet.lnFix #lnfSum{flex:none}
 .lnSheet.lnFix #lnfSave{flex:none;margin-top:auto}
 /* v2.3.34 pass: greeting above the month on the home page: time of day in IST, profile name, net worth. It takes no space, so the month and amount stay where they were */
-.greet{height:44px;margin-top:-46px;margin-bottom:2px;padding:4px 20px 0;text-align:center;position:relative}
+.greet{height:16px;margin-top:-32px;margin-bottom:16px;padding:0;text-align:center;position:relative;white-space:nowrap}
 .greet b{display:block;font-size:15px;font-weight:500;color:#f2f2f7;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.greet small{display:block;margin-top:3px;font-size:12.5px;color:#8e8e93}
+.greet small{display:block;margin:0;font-size:13px;line-height:16px;color:#8e8e93}
 .greet small em{font-style:normal;color:#f2f2f7;font-weight:600}
 </style></head><body>
 <div id="stage"><header>
@@ -627,7 +627,7 @@ body{overflow:hidden;overflow:clip}
 <button id="menuBtn" aria-label="Insights"><svg class="ico" viewBox="0 0 24 24" style="stroke-width:1.4;stroke-linecap:butt"><path d="M1.5 5.74h20.9M1.5 12h15.2M1.5 18.26h18.5"/></svg></button>
 </header>
 <main id="home">
-<div class="greet" id="greet"><b id="gHi"></b><small id="gNw"></small></div><div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
+<div class="greet" id="greet"><small id="gNw"></small></div><div class="period"><button id="mPrev" aria-label="Previous month">‹</button><span id="period"></span><button id="mNext" aria-label="Next month">›</button></div><div class="total" id="total"></div><button class="bl" id="bl"></button>
 <canvas id="chart"></canvas>
 <div class="rgrow"><div class="seg" id="rangeSeg"><button data-r="1M" class="on">1M</button><button data-r="1Y">1Y</button><button data-r="All">All</button></div><button id="fltBtn" aria-label="Show only the selected column" disabled><svg viewBox="0 0 24 24"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5z"/></svg></button><button id="srchBtn" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button></div>
 <div id="listWrap"><div id="list"></div></div>
@@ -649,7 +649,7 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.34</div></section>
+</div><div class="ver">v2.3.35</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
