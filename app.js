@@ -215,21 +215,38 @@ function openBudget() {
 }
 
 /* ---------- Insights & settings pages ---------- */
-function pieSection(by, tot) { // the categories used this month, as a pie; each legend row still sets that category's limit
+let pieSel = null, pieData = null;
+function pieRowHTML(n, by, tot) { // the one category shown under the pie
+  const c = catInfo("expense", n), v = r2(by[n] || 0);
+  return '<button class="legRow" data-cb="' + esc(n) + '"><i style="background:' + c[2] + '"></i><span>' + c[1] + " " + esc(n) + "</span><em>" + fmt(v) + " · " + Math.round(v / tot * 100) + "%</em></button>";
+}
+function pieSection(by, tot) { // the categories used this month as a pie, with percentages; the major one shows under it, and a tap anywhere on the pie picks the slice in that direction
   const used = Object.entries(by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   if (!used.length || !tot) return "";
-  const items = used.map(([n, v]) => ({ n, v, c: catInfo("expense", n) }));
-  let a0 = -Math.PI / 2, paths = "";
-  items.forEach(it => {
-    const f = it.v / tot;
-    if (f >= 0.9999) { paths += '<circle cx="100" cy="100" r="96" fill="' + it.c[2] + '"/>'; return; }
-    const a1 = a0 + f * 2 * Math.PI, big = f > 0.5 ? 1 : 0;
-    const x0 = 100 + 96 * Math.cos(a0), y0 = 100 + 96 * Math.sin(a0), x1 = 100 + 96 * Math.cos(a1), y1 = 100 + 96 * Math.sin(a1);
-    paths += '<path d="M100 100L' + x0.toFixed(2) + " " + y0.toFixed(2) + "A96 96 0 " + big + " 1 " + x1.toFixed(2) + " " + y1.toFixed(2) + 'Z" fill="' + it.c[2] + '" stroke="#000" stroke-width="2"/>';
-    a0 = a1;
+  pieData = { by, tot };
+  if (!used.some(u => u[0] === pieSel)) pieSel = used[0][0];
+  let a0 = 0, paths = "", labels = "";
+  used.forEach(([n, v]) => {
+    const c = catInfo("expense", n), f = v / tot, f1 = a0 + f, on = n === pieSel ? "on" : "";
+    if (f >= 0.9999) { paths += '<circle data-cat="' + esc(n) + '" data-f0="0" data-f1="1" class="' + on + '" cx="100" cy="100" r="96" fill="' + c[2] + '"/>'; labels += '<text class="pl" x="100" y="100" text-anchor="middle" dominant-baseline="central">100%</text>'; }
+    else {
+      const t0 = -Math.PI / 2 + a0 * 2 * Math.PI, t1 = -Math.PI / 2 + f1 * 2 * Math.PI, big = f > 0.5 ? 1 : 0;
+      const x0 = 100 + 96 * Math.cos(t0), y0 = 100 + 96 * Math.sin(t0), x1 = 100 + 96 * Math.cos(t1), y1 = 100 + 96 * Math.sin(t1);
+      paths += '<path data-cat="' + esc(n) + '" data-f0="' + a0.toFixed(5) + '" data-f1="' + f1.toFixed(5) + '" class="' + on + '" d="M100 100L' + x0.toFixed(2) + " " + y0.toFixed(2) + "A96 96 0 " + big + " 1 " + x1.toFixed(2) + " " + y1.toFixed(2) + 'Z" fill="' + c[2] + '" stroke="#000" stroke-width="2"/>';
+      if (f >= 0.04) { const tm = (t0 + t1) / 2; labels += '<text class="pl" x="' + (100 + 62 * Math.cos(tm)).toFixed(1) + '" y="' + (100 + 62 * Math.sin(tm)).toFixed(1) + '" text-anchor="middle" dominant-baseline="central">' + Math.round(f * 100) + "%</text>"; }
+    }
+    a0 = f1;
   });
-  const legend = items.map(it => '<button class="legRow" data-cb="' + esc(it.n) + '"><i style="background:' + it.c[2] + '"></i><span>' + it.c[1] + " " + esc(it.n) + "</span><em>" + fmt(it.v) + " · " + Math.round(it.v / tot * 100) + "%</em></button>").join("");
-  return '<div class="pieWrap"><svg class="pie" viewBox="0 0 200 200" aria-hidden="true">' + paths + '</svg><div class="legend">' + legend + "</div></div>";
+  return '<div class="pieWrap"><svg class="pie" viewBox="0 0 200 200" aria-hidden="true">' + paths + labels + '</svg><div id="pieRow">' + pieRowHTML(pieSel, by, tot) + "</div></div>";
+}
+function pieTap(svg, e) { // a tap anywhere on the pie picks the slice in that direction
+  const r = svg.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  let f = (Math.atan2(dy, dx) + Math.PI / 2) / (2 * Math.PI); f -= Math.floor(f);
+  const hit = [...svg.querySelectorAll("[data-cat]")].find(p => f >= +p.dataset.f0 && f < +p.dataset.f1);
+  if (!hit || !pieData) return;
+  pieSel = hit.dataset.cat;
+  svg.querySelectorAll("[data-cat]").forEach(p => p.classList.toggle("on", p === hit));
+  const row = document.getElementById("pieRow"); if (row) row.innerHTML = pieRowHTML(pieSel, pieData.by, pieData.tot);
 }
 const TAB_ORDER = ["insights", "savings", "loans"];
 let slideDir = 1, lastTabShown = null;
@@ -1534,7 +1551,7 @@ sheet.addEventListener("click", e => {
   else { const v = num(sheet.querySelector('[data-f="lim"]').value); if (!(v > 0)) { alert("Enter a limit greater than zero."); return; } S.cb[F.name] = v; }
   S.su = Date.now(); save(); hideSheet(); F = null; renderIns();
 });
-$("#insBody").addEventListener("click", e => { const b = e.target.closest("[data-cb]"); if (b) openCB(b.dataset.cb); });
+$("#insBody").addEventListener("click", e => { const sv = e.target.closest("svg.pie"); if (sv) return pieTap(sv, e); const b = e.target.closest("[data-cb]"); if (b) openCB(b.dataset.cb); });
 
 /* ---------- Swipe a page sideways to go back, search & filter ---------- */
 /* ---------- Page transitions, matched to the reference recording: Settings slides in from the left and Insights from the right, while the home screen moves the other way. Search keeps its fade-in. ---------- */
