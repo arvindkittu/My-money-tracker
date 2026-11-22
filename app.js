@@ -976,8 +976,8 @@ function renderLoanList(el) {
 }
 function ldRowHTML(l, sel, cm) {
   const id = esc(l.id);
-  if (l.cleared) return '<div class="swrow lnRow"><div class="swc lnCard lnDone" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + LN_CHECK_SM + esc(l.name) + '</span></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + LN_TRASH + "</button></div>";
-  return '<div class="swrow lnRow"><div class="swc lnCard" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + esc(l.name) + '</span><span class="lnAmt">' + sfmt(ldShown(l, sel, cm)) + " <small>left</small>" + LN_CHEV + '</span></div><div class="lnBarP2"><i style="width:' + ldPctShown(l, sel, cm) + '%"></i></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + LN_TRASH + "</button></div>";
+  if (l.cleared) return '<div class="swrow lnRow"><div class="swc lnCard lnDone" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + LN_CHECK_SM + esc(l.name) + '</span></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + ICO_DEL + "</button></div>";
+  return '<div class="swrow lnRow"><div class="swc lnCard" data-lnopen="' + id + '"><div class="lnTop"><span class="lnName">' + esc(l.name) + '</span><span class="lnAmt">' + sfmt(ldShown(l, sel, cm)) + " <small>left</small>" + LN_CHEV + '</span></div><div class="lnBarP2"><i style="width:' + ldPctShown(l, sel, cm) + '%"></i></div></div><button class="swd" data-lndel="' + id + '" aria-label="Delete loan">' + ICO_DEL + "</button></div>";
 }
 
 /* ---------- Loan detail ---------- */
