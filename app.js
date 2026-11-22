@@ -215,7 +215,31 @@ function openBudget() {
 }
 
 /* ---------- Insights & settings pages ---------- */
-function renderIns() {
+function pieSection(by, tot) { // the categories used this month, as a pie; each legend row still sets that category's limit
+  const used = Object.entries(by).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (!used.length || !tot) return "";
+  const items = used.map(([n, v]) => ({ n, v, c: catInfo("expense", n) }));
+  let a0 = -Math.PI / 2, paths = "";
+  items.forEach(it => {
+    const f = it.v / tot;
+    if (f >= 0.9999) { paths += '<circle cx="100" cy="100" r="96" fill="' + it.c[2] + '"/>'; return; }
+    const a1 = a0 + f * 2 * Math.PI, big = f > 0.5 ? 1 : 0;
+    const x0 = 100 + 96 * Math.cos(a0), y0 = 100 + 96 * Math.sin(a0), x1 = 100 + 96 * Math.cos(a1), y1 = 100 + 96 * Math.sin(a1);
+    paths += '<path d="M100 100L' + x0.toFixed(2) + " " + y0.toFixed(2) + "A96 96 0 " + big + " 1 " + x1.toFixed(2) + " " + y1.toFixed(2) + 'Z" fill="' + it.c[2] + '" stroke="#000" stroke-width="2"/>';
+    a0 = a1;
+  });
+  const legend = items.map(it => '<button class="legRow" data-cb="' + esc(it.n) + '"><i style="background:' + it.c[2] + '"></i><span>' + it.c[1] + " " + esc(it.n) + "</span><em>" + fmt(it.v) + " · " + Math.round(it.v / tot * 100) + "%</em></button>").join("");
+  return '<div class="pieWrap"><svg class="pie" viewBox="0 0 200 200" aria-hidden="true">' + paths + '</svg><div class="legend">' + legend + "</div></div>";
+}
+const TAB_ORDER = ["insights", "savings", "loans"];
+let slideDir = 1, lastTabShown = null;
+function renderIns() { // a change of tab slides the new page in; other re-renders stay still
+  if (tab === "spending") tab = "insights";
+  const first = lastTabShown === null, switched = !first && lastTabShown !== tab; lastTabShown = tab;
+  renderInsInner();
+  if (switched) { const el = $("#insBody"); el.style.setProperty("--dir", slideDir); el.classList.remove("tabIn"); void el.offsetWidth; el.classList.add("tabIn"); }
+}
+function renderInsInner() {
   if (tab !== "loans") lnId = null;
   { const pg = $("#insights"), tb = $("#insTabs").parentElement; pg.classList.toggle("svmode", tab === "savings" || (tab === "loans" && S.loans.length > 0)); tb.classList.add("svtop"); pg.style.setProperty("--tabsH", tb.offsetHeight + "px"); }
   $$("#insTabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
@@ -223,28 +247,19 @@ function renderIns() {
   if (tab === "savings") return renderGoals(el);
   if (tab === "loans") return renderLoans(el);
   const inc = sum(S.tx.filter(t => t.type === "income" && t.date.startsWith(vm)));
-  if (tab === "spending") {
-    const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
-    const names = [...new Set([...S.cats.expense.map(c => c[0]), ...Object.keys(by)])].sort((a, b) => (by[b] || 0) - (by[a] || 0));
-    el.innerHTML = '<div class="lab" style="text-align:center;margin-bottom:6px">' + mname(vm) + " · tap a category to set a monthly limit</div>" + names.map(n => {
-      const c = catInfo("expense", n), v = r2(by[n] || 0), lim = S.cb[n] || 0, p = lim ? v / lim : (tot ? v / tot : 0);
-      const col = lim ? (p > 1 ? "#ff5f5f" : p >= .8 ? "#f59e0b" : c[2]) : c[2];
-      return `<button class="srow" data-cb="${esc(n)}"><span class="ce">${c[1]}</span><div><div class="sl"><b>${esc(n)}</b><em>${fmt(v)}${lim ? " / " + fmt(lim) : ""}</em></div><div class="bar"><i style="width:${Math.min(100, p * 100)}%;background:${col}"></i></div></div></button>`;
-    }).join("");
-    return;
-  }
   if (!ex.length && !inc) { el.innerHTML = '<div class="empty" style="text-align:center">No transactions in ' + mname(vm) + "</div>"; return; }
   const y = +vm.slice(0, 4), m = +vm.slice(5, 7), dim = new Date(y, m, 0).getDate(), cur = vm === today().slice(0, 7);
   const days = cur ? new Date().getDate() : dim, avg = tot / days, bud = budgetFor(vm);
   const pk = iso(new Date(y, m - 2, 1)).slice(0, 7), prev = sum(S.tx.filter(t => t.type === "expense" && t.date.startsWith(pk)));
+  const by = {}; ex.forEach(t => by[t.cat] = (by[t.cat] || 0) + t.amount);
   const cards = [["Spent in " + mname(vm), fmt(tot)], ["Income", fmt(inc)], ["Net saved", sgn(r2(inc - tot))], ["Daily average", fmt(r2(avg))]];
   if (cur) cards.push(["Projected month-end", fmt(Math.round(avg * dim))]);
   if (bud) cards.push([tot > bud ? "Over budget by" : "Left in budget", fmt(r2(Math.abs(bud - tot)))]);
   if (prev) cards.push(["Vs last month", (tot >= prev ? "+" : "−") + Math.round(Math.abs(tot - prev) / prev * 100) + "%"]);
   Object.entries(S.cb).forEach(([n, lim]) => { const v = sum(ex.filter(t => t.cat === n)); if (lim && v >= lim * .8) cards.push([n + (v > lim ? " is over its limit" : " is near its limit"), Math.round(v / lim * 100) + "% of " + fmt(lim)]); });
-  el.innerHTML = cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
+  el.innerHTML = pieSection(by, tot) + cards.map(c => `<div class="icard"><small>${c[0]}</small><b>${c[1]}</b></div>`).join("") + '<button class="save wide" data-report="1">Share ' + mname(vm) + " report</button>";
 }
-$("#insTabs").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; savGid = null; renderIns(); } };
+$("#insTabs").onclick = e => { const b = e.target.closest("button"); if (!b) return; const nt = b.dataset.tab; if (nt !== tab) slideDir = TAB_ORDER.indexOf(nt) > TAB_ORDER.indexOf(tab) ? 1 : -1; tab = nt; savGid = null; if (nt === "loans") lnSel = null; renderIns(); };
 const openPage = id => { if (id === "insights") { savGid = null; renderIns(); } else { renderGreet(); refreshAcct(); refreshDaily(); } if (PAGE_MOTION[id]) slidePage($("#" + id), true); else showPage($("#" + id)); };
 $$("[data-close]").forEach(b => b.onclick = () => closePage(b.closest(".page")));
 $("#nm").onclick = () => { const n = prompt("Your name", S.name); if (n && n.trim()) { S.name = n.trim().slice(0, 30); S.su = Date.now(); save(); $("#nm").textContent = S.name + " ✎"; renderGreet(); } };
@@ -915,17 +930,17 @@ function renderLoanList(el) {
   const act = S.loans.filter(l => !l.cleared), fin = S.loans.filter(l => l.cleared);
   const R = ldEmiRange(), cm = ldIdx(today().slice(0, 7));
   const firstEmi = act.filter(l => l.kind === "emi").map(l => ldIdx(l.start.slice(0, 7)));
-  if (R) lnSel = Math.min(R.b, Math.max(R.a, lnSel == null ? (firstEmi.length ? Math.min(...firstEmi) : cm) : lnSel));
+  if (R) lnSel = Math.min(R.b, Math.max(R.a, lnSel == null ? cm : lnSel));
   const sel = R ? lnSel : cm, hd = ldHeadFor(sel, cm, act);
   let chart = "";
   if (R) {
     let bars = "";
-    for (let i = R.a; i <= R.b; i++) bars += '<div class="lnBar' + (i === sel ? " on" : "") + '" data-i="' + i + '"><i class="' + (ldEmiAt(i) ? "" : "dt") + '"></i></div>';
+    for (let i = R.a; i <= R.b; i++) bars += '<div class="lnBar' + (i === sel ? " on" : "") + (i === cm ? " now" : "") + '" data-i="' + i + '"><i class="' + (ldEmiAt(i) ? "" : "dt") + '"></i></div>';
     const v = ldEmiAt(sel);
     chart = '<div class="lnSecH"><span>MONTHLY EMI</span><button class="lnNew" data-lnew="1">+ Add a loan</button></div>'
       + '<div class="lnChartc"><div class="lnVal" id="lnVal">' + (v ? "−" + sfmt(v) : "") + '</div><div class="lnSc" id="lnSc"><div class="lnPad"></div>' + bars + '<div class="lnPad"></div></div><div class="lnMon" id="lnMon">' + ldYmLbl(ldYm(sel)) + "</div></div>";
   }
-  el.innerHTML = '<div class="svhead lnHead"><div class="lnBig" id="lnBig">' + sfmt(hd.big) + '</div><div class="lnSub" id="lnSub">' + hd.sub + "</div>" + chart + "</div>"
+  el.innerHTML = '<div class="svhead lnHead"><div class="stot"><b id="lnBig">' + sfmt(hd.big) + '</b><small id="lnSub">' + hd.sub + "</small></div>" + chart + "</div>"
     + '<div class="svscroll">'
     + '<div class="lnSec"><span>LOANS · ' + act.length + "</span>" + (R ? "" : '<button class="lnNew" data-lnew="1">+ Add a loan</button>') + "</div>"
     + (act.length ? '<div class="svlist">' + act.map(l => ldRowHTML(l, sel, cm)).join("") + "</div>" : "")
