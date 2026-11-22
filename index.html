@@ -620,6 +620,31 @@ body{overflow:hidden;overflow:clip}
 .greet b{display:block;font-size:15px;font-weight:500;color:#f2f2f7;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .greet small{display:block;margin:0;font-size:13px;line-height:16px;color:#8e8e93}
 .greet small em{font-style:normal;color:#f2f2f7;font-weight:600}
+/* v2.3.36 pass: one Insights tab with a spending pie; tab changes slide in; shared type for headers, labels, rows, bars and charts; swipe rows reveal on black, like goals */
+.pieWrap{padding:6px 18px 4px}
+.pie{display:block;width:210px;height:210px;margin:0 auto}
+.legend{margin-top:14px}
+.legRow{display:flex;align-items:center;gap:12px;width:100%;padding:12px 0;border:0;border-bottom:1px solid #1c1c1e;background:none;color:#fff;font-size:16px;text-align:left;font-family:inherit}
+.legRow i{width:10px;height:10px;border-radius:50%;flex:none}
+.legRow span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legRow em{font-style:normal;font-size:13px;color:#8e8e93;white-space:nowrap}
+@keyframes tabIn{from{opacity:0;transform:translateX(calc(var(--dir,1) * 28px))}to{opacity:1;transform:none}}
+#insBody.tabIn{animation:tabIn .3s cubic-bezier(.2,.7,.2,1) both}
+.lnHead{padding-top:0}
+.lnSecH,.lnSec{padding:0 18px;margin:22px 0 9px}
+.lnSecH span,.lnSec span,.lnCol span{font-size:9px;letter-spacing:.8px;color:#666;text-transform:uppercase}
+.gtop{font-size:16px}
+.gtop .gname{font-size:16px;color:#fff}
+.gtop .gamt{font-size:16px;color:#fff}
+.gtop .gamt small{font-size:13px;color:#8e8e93;margin-left:4px}
+.gbar{height:6px;border-radius:3px;background:#2c2c2e;margin-top:12px}
+.gbar i{border-radius:3px}
+.swrow{background:#000}
+.lnBar i{width:10px;border-radius:5px;background:#545454}
+.lnBar.now i{background:#6b3434}
+.lnBar.on i{background:#ff5f5f}
+.lnBar i.dt{width:6px;height:6px}
+.lnBig3,.lnBig4{font-size:36px;font-weight:400;line-height:44px}
 </style></head><body>
 <div id="stage"><header>
 <button id="walletBtn" aria-label="Settings"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h11v3M4 7v10a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6a2 2 0 0 1-2-1zM16 13.5h2"/></svg></button>
@@ -635,7 +660,7 @@ body{overflow:hidden;overflow:clip}
 <button id="fab" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 4v16M4 12h16"/></svg></button></div>
 
 <section class="page" id="insights"><div class="top"><button id="insBack" aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="spending">Spending</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div><button id="savFab" aria-label="Add or withdraw money"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="seg" id="insTabs"><button data-tab="insights" class="on">Insights</button><button data-tab="savings">Savings</button><button data-tab="loans">Loans</button></div></div><div id="insBody"></div><button id="savFab" aria-label="Add or withdraw money"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
 </section>
 
 <section class="page" id="settings"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><span class="ttl">Settings</span></div>
@@ -649,7 +674,7 @@ body{overflow:hidden;overflow:clip}
 <label class="menu" id="impL">Import Data<input type="file" id="imp" accept=".json,application/json" hidden></label>
 <button class="menu" id="lo" hidden>Log Out</button>
 <button class="menu red" id="er">Erase Data</button>
-</div><div class="ver">v2.3.35</div></section>
+</div><div class="ver">v2.3.36</div></section>
 
 <section class="page" id="search"><div class="top"><button data-close aria-label="Back"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><input id="sq" class="fi sin" type="search" placeholder="Search description, category or amount" autocomplete="off" autocapitalize="off" enterkeyhint="search"></div>
 <div class="seg" id="sType"><button data-s="all" class="on">All</button><button data-s="expense">Expense</button><button data-s="income">Income</button></div>
