@@ -1069,7 +1069,7 @@ function renderLoanDetail(el, l) {
     } };
   }
   body += '<div class="lnSec"><span>PAYMENTS</span>' + (isEmi && !l.cleared ? '<button class="lnClose" data-lnclose="' + id + '">Close early</button>' : "") + "</div>"
-    + '<div class="lnPc">' + (rowsAll.length ? '<div class="lpBox">' + rowsAll.map((r, i) => ldPayRowSw(r, l.kind === "flex" || i === 0)).join("") + "</div>" : '<p class="lnNone">No payments logged yet.</p>') + "</div>";
+    + '<div class="lpCard">' + (rowsAll.length ? rowsAll.map((r, i) => ldPayRowSw(r, l.kind === "flex" || i === 0)).join("") : '<p class="lnNone">No payments logged yet.</p>') + "</div>";
   el.innerHTML = head + '<div class="svscroll">' + body + "</div>" + ldTray(l);
   if (bind) ldBindChart("lpSc", bind.a, bind.n, bind.sel, 28, bind.onPick);
 }
