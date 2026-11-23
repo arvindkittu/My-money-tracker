@@ -844,6 +844,7 @@ $("#insBody").onclick = e => {
   if (hit("[data-lnclose]")) return openLoanPay(hit("[data-lnclose]").dataset.lnclose, true);
   if (hit("[data-lnmark]")) return lnMark(hit("[data-lnmark]").dataset.lnmark, true);
   if (hit("[data-lnreopen]")) return lnReopen(hit("[data-lnreopen]").dataset.lnreopen);
+  if (hit("[data-lpdel]")) return askLoanPayDelete(hit("[data-lpdel]").dataset.lpdel);
   if (hit("[data-lndel]")) return askDeleteLoan(hit("[data-lndel]").dataset.lndel);
   if (hit("[data-lntray]")) { const b = hit("[data-lntray]"); return ldTrayAct(b.dataset.lid, b.dataset.pid, b.dataset.lntray === "yes"); }
   if (hit("[data-sdel]")) return askDeleteEntry(hit("[data-sdel]").dataset.sdel);
@@ -1010,6 +1011,35 @@ function ldTray(l) { // asks whether the latest payment should also be an expens
   const id = esc(l.id), pid = esc(p.id);
   return '<div class="lnTray' + (l.kind === "flex" && !l.cleared ? " up" : "") + '"><span>Add ' + sfmt(p.amt) + " for " + esc(l.name) + ' as expense</span><button class="lnTrayY" data-lntray="yes" data-lid="' + id + '" data-pid="' + pid + '" aria-label="Add as expense">' + LN_CHECK + '</button><button class="lnTrayN" data-lntray="no" data-lid="' + id + '" data-pid="' + pid + '" aria-label="Skip">✕</button></div>';
 }
+function ldPayRowSw(p, deletable) { // a payment row that slides to reveal its delete button, the same as goals and transactions
+  return '<div class="swrow lpSw"><div class="swc">' + ldPayRow(p) + "</div>" + (deletable ? '<button class="swd" data-lpdel="' + esc(p.id) + '" aria-label="Delete payment">' + ICO_DEL + "</button>" : "") + "</div>";
+}
+function dropPayExpense(l, p) { // removes the expense that a payment added, if one was added
+  if (p.exp !== "yes") return;
+  const note = l.kind === "emi" ? l.name + " EMI" : l.name;
+  const t = S.tx.find(x => (p.tx ? x.id === p.tx : (x.type === "expense" && x.cat === "EMI" && x.amount === p.amt && x.date === p.date && x.note === note)));
+  if (t) { S.del[t.id] = Date.now(); S.tx = S.tx.filter(x => x.id !== t.id); }
+}
+function askLoanPayDelete(pid) { // asks first; the payment and any expense it added are removed together
+  const l = S.loans.find(x => x.id === lnId); if (!l) return;
+  const row = ldPayList(l).find(x => x.id === pid); if (!row) return;
+  const undo = l.kind === "emi" && (row.t === "emi" || row.t === "close" || String(pid).startsWith("e"));
+  askConfirm("Delete payment?", sfmt(row.amt) + (undo ? " will be undone, and the EMI schedule reopens." : " will be removed from " + l.name + "."), "Delete", () => deleteLoanPay(l.id, pid));
+}
+function deleteLoanPay(lid, pid) {
+  const l = S.loans.find(x => x.id === lid); if (!l) return;
+  const pays = l.pays || [], last = pays.slice(-1)[0];
+  if (l.kind === "emi" && String(pid).startsWith("e")) { // a completed EMI with no payment record: undo the newest one
+    if (last && (last.t === "emi" || last.t === "close")) return deleteLoanPay(lid, last.id);
+    l.done = Math.max(0, l.done - 1); l.cleared = false; l.u = Date.now(); save(); renderIns(); render(); return;
+  }
+  const p = pays.find(x => x.id === pid); if (!p) return;
+  dropPayExpense(l, p);
+  if (p.t === "close" && last && last.id === p.id) { lnReopen(lid); return; }
+  l.pays = pays.filter(x => x.id !== pid);
+  if (p.t === "emi") { l.done = p.pre != null ? p.pre : Math.max(0, l.done - 1); l.cleared = false; }
+  l.u = Date.now(); save(); renderIns(); render();
+}
 function renderLoanDetail(el, l) {
   const id = esc(l.id), isEmi = l.kind === "emi", rem = ldRem(l), p = ldPct(l), cm = ldIdx(today().slice(0, 7));
   let card = "", status = "";
@@ -1039,7 +1069,7 @@ function renderLoanDetail(el, l) {
     } };
   }
   body += '<div class="lnSec"><span>PAYMENTS</span>' + (isEmi && !l.cleared ? '<button class="lnClose" data-lnclose="' + id + '">Close early</button>' : "") + "</div>"
-    + '<div class="lnPc">' + (rowsAll.length ? rowsAll.map(ldPayRow).join("") : '<p class="lnNone">No payments logged yet.</p>') + "</div>";
+    + '<div class="lnPc">' + (rowsAll.length ? '<div class="lpBox">' + rowsAll.map((r, i) => ldPayRowSw(r, l.kind === "flex" || i === 0)).join("") + "</div>" : '<p class="lnNone">No payments logged yet.</p>') + "</div>";
   el.innerHTML = head + '<div class="svscroll">' + body + "</div>" + ldTray(l);
   if (bind) ldBindChart("lpSc", bind.a, bind.n, bind.sel, 28, bind.onPick);
 }
@@ -1066,7 +1096,7 @@ function lnReopen(id) { // EMI loans: undoes the last payment; flexible loans: b
 }
 function ldTrayAct(lid, pid, yes) {
   const l = S.loans.find(x => x.id === lid), p = l && (l.pays || []).find(x => x.id === pid); if (!p) return;
-  if (yes) S.tx.push({ id: crypto.randomUUID(), type: "expense", amount: p.amt, date: p.date, note: l.kind === "emi" ? l.name + " EMI" : l.name, cat: "EMI", u: Date.now() });
+  if (yes) { const xid = crypto.randomUUID(); S.tx.push({ id: xid, type: "expense", amount: p.amt, date: p.date, note: l.kind === "emi" ? l.name + " EMI" : l.name, cat: "EMI", u: Date.now() }); p.tx = xid; }
   p.exp = yes ? "yes" : "no"; l.u = Date.now(); save(); renderIns(); render();
 }
 function askDeleteLoan(id) {
